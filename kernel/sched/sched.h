@@ -1630,6 +1630,7 @@ static inline void __add_nr_running(struct rq *rq, unsigned count)
 {
 	unsigned prev_nr = rq->nr_running;
 
+	sched_update_nr_prod(cpu_of(rq), rq->nr_running, true);
 	rq->nr_running = prev_nr + count;
 
 	if (prev_nr < 2 && rq->nr_running >= 2) {
@@ -1656,6 +1657,7 @@ static inline void __add_nr_running(struct rq *rq, unsigned count)
 
 static inline void __sub_nr_running(struct rq *rq, unsigned count)
 {
+	sched_update_nr_prod(cpu_of(rq), rq->nr_running, false);
 	rq->nr_running -= count;
 }
 
