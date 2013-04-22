@@ -1927,6 +1927,8 @@ extern void init_dl_task_timer(struct sched_dl_entity *dl_se);
 
 unsigned long to_ratio(u64 period, u64 runtime);
 
+extern void init_max_cpu_capacity(struct max_cpu_capacity *mcc);
+
 extern void init_entity_runnable_average(struct sched_entity *se);
 
 static inline void __add_nr_running(struct rq *rq, unsigned count)
