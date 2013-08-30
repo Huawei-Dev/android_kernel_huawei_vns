@@ -43,6 +43,7 @@
 #include <linux/mutex.h>
 #include <linux/delay.h>
 #include <linux/swap.h>
+#include <linux/fs.h>
 #include <linux/atomic.h>
 #include <hisi/hisi_lmk/lowmem_killer.h>
 
@@ -266,9 +267,14 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		return 0;
 
 	other_free = global_page_state(NR_FREE_PAGES);
-	other_file = global_page_state(NR_FILE_PAGES) -
+
+	if (global_page_state(NR_SHMEM) + total_swapcache_pages() <
+		global_page_state(NR_FILE_PAGES))
+		other_file = global_page_state(NR_FILE_PAGES) -
 						global_page_state(NR_SHMEM) -
 						total_swapcache_pages();
+	else
+		other_file = 0;
 
 	int ret_tune;
 
