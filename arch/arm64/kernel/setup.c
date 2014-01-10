@@ -66,6 +66,12 @@
 
 #include <asm/mmu_context.h>
 
+unsigned int boot_reason;
+EXPORT_SYMBOL(boot_reason);
+
+unsigned int cold_boot;
+EXPORT_SYMBOL(cold_boot);
+
 static const char *machine_name;
 phys_addr_t __fdt_pointer __initdata;
 
