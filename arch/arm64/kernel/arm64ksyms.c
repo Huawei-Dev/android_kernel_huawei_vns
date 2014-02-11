@@ -28,6 +28,7 @@
 #include <linux/io.h>
 #include <linux/arm-smccc.h>
 
+#include <asm/cacheflush.h>
 #include <asm/checksum.h>
 
 EXPORT_SYMBOL(copy_page);
@@ -73,3 +74,8 @@ EXPORT_SYMBOL(_mcount);
 	/* arm-smccc */
 EXPORT_SYMBOL(arm_smccc_smc);
 EXPORT_SYMBOL(arm_smccc_hvc);
+
+	/* caching functions */
+EXPORT_SYMBOL(__dma_inv_range);
+EXPORT_SYMBOL(__dma_clean_range);
+EXPORT_SYMBOL(__dma_flush_range);
