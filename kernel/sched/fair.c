@@ -3099,6 +3099,11 @@ static inline int power_cost(struct task_struct *p, int cpu)
 	return SCHED_CAPACITY_SCALE;
 }
 
+static unsigned int power_cost_at_freq(int cpu, unsigned int freq)
+{
+	return 1;
+}
+
 static inline int mostly_idle_cpu(int cpu)
 {
 	return 0;
@@ -9407,7 +9412,10 @@ static int idle_balance(struct rq *this_rq)
 	struct sched_domain *sd;
 	int pulled_task = 0;
 	u64 curr_cost = 0;
-	long removed_util=0;
+	int i, cost;
+	int min_power = INT_MAX;
+	int balance_cpu = -1;
+	struct rq *balance_rq = NULL;
 
 	/*
 	 * We must set idle_stamp _before_ calling idle_balance(), such that we
@@ -9427,41 +9435,58 @@ static int idle_balance(struct rq *this_rq)
 		goto out;
 	}
 
+	/*
+	 * If this CPU is not the most power-efficient idle CPU in the
+	 * lowest level domain, run load balance on behalf of that
+	 * most power-efficient idle CPU.
+	 */
+	rcu_read_lock();
+	sd = rcu_dereference_check_sched_domain(this_rq->sd);
+	if (sd && sysctl_sched_enable_power_aware) {
+		for_each_cpu(i, sched_domain_span(sd)) {
+			if (i == this_cpu || idle_cpu(i)) {
+				cost = power_cost_at_freq(i, 0);
+				if (cost < min_power) {
+					min_power = cost;
+					balance_cpu = i;
+				}
+			}
+		}
+		BUG_ON(balance_cpu == -1);
+
+	} else {
+		balance_cpu = this_cpu;
+	}
+	rcu_read_unlock();
+	balance_rq = cpu_rq(balance_cpu);
+
 	raw_spin_unlock(&this_rq->lock);
 
-	/*
-	 * If removed_util_avg is !0 we most probably migrated some task away
-	 * from this_cpu. In this case we might be willing to trigger an OPP
-	 * update, but we want to do so if we don't find anybody else to pull
-	 * here (we will trigger an OPP update with the pulled task's enqueue
-	 * anyway).
-	 *
-	 * Record removed_util before calling update_blocked_averages, and use
-	 * it below (before returning) to see if an OPP update is required.
-	 */
-	removed_util = atomic_long_read(&(this_rq->cfs).removed_util_avg);
-	update_blocked_averages(this_cpu);
+	update_blocked_averages(balance_cpu);
 	rcu_read_lock();
-	for_each_domain(this_cpu, sd) {
+	for_each_domain(balance_cpu, sd) {
 		int continue_balancing = 1;
 		u64 t0, domain_cost;
 
 		if (!(sd->flags & SD_LOAD_BALANCE))
 			continue;
 
-		if (this_rq->avg_idle < curr_cost + sd->max_newidle_lb_cost) {
+		if (balance_rq->avg_idle < curr_cost + sd->max_newidle_lb_cost) {
 			update_next_balance(sd, 0, &next_balance);
 			break;
 		}
 
 		if (sd->flags & SD_BALANCE_NEWIDLE) {
-			t0 = sched_clock_cpu(this_cpu);
+			t0 = sched_clock_cpu(balance_cpu);
 
-			pulled_task = load_balance(this_cpu, this_rq,
-						   sd, CPU_NEWLY_IDLE,
+			pulled_task = load_balance(balance_cpu, balance_rq,
+						   sd,
+						   (this_cpu == balance_cpu ?
+						    CPU_NEWLY_IDLE :
+						    CPU_IDLE),
 						   &continue_balancing);
 
-			domain_cost = sched_clock_cpu(this_cpu) - t0;
+			domain_cost = sched_clock_cpu(balance_cpu) - t0;
 			if (domain_cost > sd->max_newidle_lb_cost)
 				sd->max_newidle_lb_cost = domain_cost;
 
@@ -9472,9 +9497,9 @@ static int idle_balance(struct rq *this_rq)
 
 		/*
 		 * Stop searching for tasks to pull if there are
-		 * now runnable tasks on this rq.
+		 * now runnable tasks on the balance rq.
 		 */
-		if (pulled_task || this_rq->nr_running > 0)
+		if (pulled_task || balance_rq->nr_running > 0)
 			break;
 	}
 	rcu_read_unlock();
@@ -9501,7 +9526,8 @@ out:
 	if (this_rq->nr_running != this_rq->cfs.h_nr_running)
 		pulled_task = -1;
 
-	if (pulled_task)
+	if (pulled_task && balance_cpu == this_cpu) {
+		idle_exit_fair(this_rq);
 		this_rq->idle_stamp = 0;
 	else if (removed_util) {
 		/*
