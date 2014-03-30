@@ -2578,6 +2578,9 @@ static u32 __compute_runnable_contrib(u64 n)
 	return contrib + runnable_avg_yN_sum[n];
 }
 
+static void add_to_scaled_stat(int cpu, struct sched_avg *sa, u64 delta);
+static inline void decay_scaled_stat(struct sched_avg *sa, u64 periods);
+
 #if (SCHED_LOAD_SHIFT - SCHED_LOAD_RESOLUTION) != 10 || SCHED_CAPACITY_SHIFT != 10
 #error "load tracking assumes 2^10 as unit"
 #endif
@@ -2618,12 +2621,13 @@ static u32 __compute_runnable_contrib(u64 n)
  */
 static __always_inline int
 __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
-		  unsigned long weight, int update_util, struct cfs_rq *cfs_rq)
+		  unsigned long weight, int running, struct cfs_rq *cfs_rq)
 {
 	u64 delta, scaled_delta, periods;
 	u32 contrib;
 	unsigned int delta_w, scaled_delta_w, decayed = 0;
 	unsigned long scale_freq, scale_cpu;
+	struct sched_entity *se = NULL;
 
 	delta = now - sa->last_update_time;
 	/*
@@ -2643,6 +2647,12 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 	if (!delta)
 		return 0;
 	sa->last_update_time = now;
+
+	if (!cfs_rq && weight) {
+		se = container_of(sa, struct sched_entity, avg);
+		if (entity_is_task(se) && se->on_rq)
+			dec_cumulative_runnable_avg(rq_of(cfs_rq), task_of(se));
+	}
 
 	scale_freq = arch_scale_freq_capacity(NULL, cpu);
 	scale_cpu = arch_scale_cpu_capacity(NULL, cpu);
@@ -2665,12 +2675,13 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 		scaled_delta_w = cap_scale(delta_w, scale_freq);
 		if (weight) {
 			sa->load_sum += weight * scaled_delta_w;
+			add_to_scaled_stat(cpu, sa, delta_w);
 			if (cfs_rq) {
 				cfs_rq->runnable_load_sum +=
 						weight * scaled_delta_w;
 			}
 		}
-		if (update_util == 0x3)
+		if (running)
 			sa->util_sum += scaled_delta_w * scale_cpu;
 
 		delta -= delta_w;
@@ -2691,10 +2702,11 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 		contrib = cap_scale(contrib, scale_freq);
 		if (weight) {
 			sa->load_sum += weight * contrib;
+			add_to_scaled_stat(cpu, sa, contrib);
 			if (cfs_rq)
 				cfs_rq->runnable_load_sum += weight * contrib;
 		}
-		if (update_util == 0x3)
+		if (running)
 			sa->util_sum += contrib * scale_cpu;
 	}
 
@@ -2702,10 +2714,15 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 	scaled_delta = cap_scale(delta, scale_freq);
 	if (weight) {
 		sa->load_sum += weight * scaled_delta;
+		add_to_scaled_stat(cpu, sa, delta);
 		if (cfs_rq)
 			cfs_rq->runnable_load_sum += weight * scaled_delta;
 	}
-	if (update_util == 0x3)
+
+	if (se && entity_is_task(se) && se->on_rq)
+		inc_cumulative_runnable_avg(rq_of(cfs_rq), task_of(se));
+
+	if (running)
 		sa->util_sum += scaled_delta * scale_cpu;
 
 	sa->period_contrib += delta;
@@ -2716,8 +2733,7 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 			cfs_rq->runnable_load_avg =
 				div_u64(cfs_rq->runnable_load_sum, LOAD_AVG_MAX);
 		}
-		if (update_util & 0x2)
-			sa->util_avg = sa->util_sum / LOAD_AVG_MAX;
+		sa->util_avg = sa->util_sum / LOAD_AVG_MAX;
 	}
 
 	return decayed;
@@ -3090,6 +3106,45 @@ void init_new_task_load(struct task_struct *p)
 	p->ravg.mark_start		= wallclock;
 	for (i = 0; i < RAVG_HIST_SIZE; ++i)
 		p->ravg.sum_history[i] = 0;
+}
+
+/*
+ * Add scaled version of 'delta' to runnable_avg_sum_scaled
+ * 'delta' is scaled in reference to "best" cpu
+ */
+static inline void
+add_to_scaled_stat(int cpu, struct sched_avg *sa, u64 delta)
+{
+	struct rq *rq = cpu_rq(cpu);
+	int cur_freq = rq->cur_freq, max_freq = rq->max_freq;
+	int cpu_max_possible_freq = rq->max_possible_freq;
+	u64 scaled_delta;
+
+	if (unlikely(cur_freq > max_possible_freq ||
+		     (cur_freq == max_freq &&
+		      max_freq < cpu_max_possible_freq)))
+		cur_freq = max_possible_freq;
+
+	scaled_delta = div64_u64(delta * cur_freq, max_possible_freq);
+	sa->runnable_avg_sum_scaled += scaled_delta;
+}
+
+static inline void decay_scaled_stat(struct sched_avg *sa, u64 periods)
+{
+	sa->runnable_avg_sum_scaled =
+		decay_load(sa->runnable_avg_sum_scaled,
+			   periods);
+}
+
+#else  /* CONFIG_SCHED_FREQ_INPUT */
+
+static inline void
+add_to_scaled_stat(int cpu, struct sched_avg *sa, u64 delta)
+{
+}
+
+static inline void decay_scaled_stat(struct sched_avg *sa, u64 periods)
+{
 }
 
 #endif /* CONFIG_SCHED_FREQ_INPUT */
