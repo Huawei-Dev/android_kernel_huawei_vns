@@ -66,6 +66,7 @@
 
 #include <asm/mmu_context.h>
 
+static const char *machine_name;
 phys_addr_t __fdt_pointer __initdata;
 
 /*
@@ -198,6 +199,9 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 	}
 
 	dump_stack_set_arch_desc("%s (DT)", of_flat_dt_get_machine_name());
+	machine_name = of_flat_dt_get_machine_name();
+	if (machine_name)
+		pr_info("Machine: %s\n", machine_name);
 }
 
 static void __init request_standard_resources(void)
