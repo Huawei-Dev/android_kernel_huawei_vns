@@ -29,6 +29,8 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/stop_machine.h>
+#include <linux/dma-contiguous.h>
+#include <linux/cma.h>
 
 #include <asm/barrier.h>
 #include <asm/cputype.h>
@@ -63,7 +65,7 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 }
 EXPORT_SYMBOL(phys_mem_access_prot);
 
-static void __init *early_pgtable_alloc(void)
+static void __init *early_alloc(void)
 {
 	phys_addr_t phys;
 	void *ptr;
@@ -134,7 +136,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
 static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
 				  unsigned long addr, unsigned long end,
 				  phys_addr_t phys, pgprot_t prot,
-				  void *(*pgtable_alloc)(void))
+				  void *(*alloc)(unsigned long size), bool pages)
 {
 	pmd_t *pmd;
 	unsigned long next;
@@ -143,7 +145,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
 	 * Check for initial section mappings in the pgd/pud and remove them.
 	 */
 	if (pud_none(*pud) || pud_sect(*pud)) {
-		pmd = pgtable_alloc();
+		pmd = alloc();
 		if (pud_sect(*pud)) {
 			/*
 			 * need to have the 1G of mappings continue to be
@@ -160,7 +162,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
 	do {
 		next = pmd_addr_end(addr, end);
 		/* try section mapping first */
-		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
+		if (!pages && ((addr | next | phys) & ~SECTION_MASK) == 0) {
 			pmd_t old_pmd =*pmd;
 			set_pmd(pmd, __pmd(phys |
 					   pgprot_val(mk_sect_prot(prot))));
@@ -178,7 +180,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
 			}
 		} else {
 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
-				       prot, pgtable_alloc);
+				       prot, alloc);
 		}
 		phys += next - addr;
 	} while (pmd++, addr = next, addr != end);
@@ -199,13 +201,13 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
 static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
 				  unsigned long addr, unsigned long end,
 				  phys_addr_t phys, pgprot_t prot,
-				  void *(*pgtable_alloc)(void))
+				  void *(*alloc)(unsigned long size), bool force_pages)
 {
 	pud_t *pud;
 	unsigned long next;
 
 	if (pgd_none(*pgd)) {
-		pud = pgtable_alloc();
+		pud = alloc();
 		pgd_populate(mm, pgd, pud);
 	}
 	BUG_ON(pgd_bad(*pgd));
@@ -238,8 +240,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
 				}
 			}
 		} else {
-			alloc_init_pmd(mm, pud, addr, next, phys, prot,
-				       pgtable_alloc);
+			alloc_init_pmd(mm, pud, addr, next, phys, prot, alloc, force_pages);
 		}
 		phys += next - addr;
 	} while (pud++, addr = next, addr != end);
@@ -252,7 +253,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
 static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
 				    phys_addr_t phys, unsigned long virt,
 				    phys_addr_t size, pgprot_t prot,
-				    void *(*pgtable_alloc)(void))
+				    void *(*alloc)(unsigned long size), bool force_pages)
 {
 	unsigned long addr, length, end, next;
 
@@ -262,12 +263,12 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
 	end = addr + length;
 	do {
 		next = pgd_addr_end(addr, end);
-		alloc_init_pud(mm, pgd, addr, next, phys, prot, pgtable_alloc);
+		alloc_init_pud(mm, pgd, addr, next, phys, prot, alloc, force_pages);
 		phys += next - addr;
 	} while (pgd++, addr = next, addr != end);
 }
 
-static void *late_pgtable_alloc(void)
+static void *late_alloc(void)
 {
 	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
 	BUG_ON(!ptr);
@@ -278,15 +279,15 @@ static void *late_pgtable_alloc(void)
 }
 
 static void __init create_mapping(phys_addr_t phys, unsigned long virt,
-				  phys_addr_t size, pgprot_t prot)
+				  phys_addr_t size, pgprot_t prot, bool force_pages)
 {
 	if (virt < VMALLOC_START) {
 		pr_warn("BUG: not creating mapping for %pa at 0x%016lx - outside kernel range\n",
 			&phys, virt);
 		return;
 	}
-	__create_mapping(&init_mm, pgd_offset_k(virt), phys, virt,
-			 size, prot, early_pgtable_alloc);
+	__create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
+			 size, prot, early_alloc, force_pages);
 }
 
 void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
@@ -294,7 +295,52 @@ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
 			       pgprot_t prot)
 {
 	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot,
-				late_pgtable_alloc);
+				late_alloc, false);
+}
+
+static inline pmd_t *pmd_off_k(unsigned long virt)
+{
+	return pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
+}
+
+void __init remap_as_pages(unsigned long start, unsigned long size)
+{
+	unsigned long addr;
+	unsigned long end = start + size;
+
+	/*
+	 * Clear previous low-memory mapping
+	 */
+	for (addr = __phys_to_virt(start); addr < __phys_to_virt(end);
+	     addr += PMD_SIZE)
+		pmd_clear(pmd_off_k(addr));
+
+	create_mapping(start, __phys_to_virt(start), size, PAGE_KERNEL, true);
+}
+
+struct dma_contig_early_reserve {
+	phys_addr_t base;
+	unsigned long size;
+};
+
+static struct dma_contig_early_reserve dma_mmu_remap[MAX_CMA_AREAS] __initdata;
+
+static int dma_mmu_remap_num __initdata;
+
+void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
+{
+	dma_mmu_remap[dma_mmu_remap_num].base = base;
+	dma_mmu_remap[dma_mmu_remap_num].size = size;
+	dma_mmu_remap_num++;
+}
+
+static void __init dma_contiguous_remap(void)
+{
+	int i;
+	for (i = 0; i < dma_mmu_remap_num; i++)
+		remap_as_pages(dma_mmu_remap[i].base,
+			       dma_mmu_remap[i].size);
+>>>>>>> 6720ca618a... arm64: Support early fixup for CMA
 }
 
 void create_mapping_late(phys_addr_t phys, unsigned long virt,
@@ -306,8 +352,8 @@ void create_mapping_late(phys_addr_t phys, unsigned long virt,
 		return;
 	}
 
-	return __create_mapping(&init_mm, pgd_offset_k(virt),
-				phys, virt, size, prot, late_pgtable_alloc);
+	return __create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK),
+				phys, virt, size, prot, late_alloc, false);
 }
 
 #ifdef CONFIG_DEBUG_RODATA
@@ -323,32 +369,31 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
 
 	if (end < kernel_x_start) {
 		create_mapping(start, __phys_to_virt(start),
-			end - start, PAGE_KERNEL);
+			end - start, PAGE_KERNEL, false);
 	} else if (start >= kernel_x_end) {
 		create_mapping(start, __phys_to_virt(start),
-			end - start, PAGE_KERNEL);
+			end - start, PAGE_KERNEL, false);
 	} else {
 		if (start < kernel_x_start)
 			create_mapping(start, __phys_to_virt(start),
 				kernel_x_start - start,
-				PAGE_KERNEL);
+				PAGE_KERNEL, false);
 		create_mapping(kernel_x_start,
 				__phys_to_virt(kernel_x_start),
 				kernel_x_end - kernel_x_start,
-				PAGE_KERNEL_EXEC);
+				PAGE_KERNEL_EXEC, false);
 		if (kernel_x_end < end)
 			create_mapping(kernel_x_end,
 				__phys_to_virt(kernel_x_end),
 				end - kernel_x_end,
-				PAGE_KERNEL);
+				PAGE_KERNEL, false);
 	}
-
 }
 #else
 static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
 {
 	create_mapping(start, __phys_to_virt(start), end - start,
-			PAGE_KERNEL_EXEC);
+			PAGE_KERNEL_EXEC, false);
 }
 #endif
 
@@ -413,7 +458,7 @@ static void __init fixup_executable(void)
 
 		create_mapping(aligned_start, __phys_to_virt(aligned_start),
 				__pa(_stext) - aligned_start,
-				PAGE_KERNEL);
+				PAGE_KERNEL, false);
 	}
 
 	if (!IS_ALIGNED((unsigned long)__init_end, SWAPPER_BLOCK_SIZE)) {
@@ -421,7 +466,7 @@ static void __init fixup_executable(void)
 							  SWAPPER_BLOCK_SIZE);
 		create_mapping(__pa(__init_end), (unsigned long)__init_end,
 				aligned_end - __pa(__init_end),
-				PAGE_KERNEL);
+				PAGE_KERNEL, false);
 	}
 #endif
 }
@@ -451,6 +496,13 @@ void __init paging_init(void)
 {
 	map_mem();
 	fixup_executable();
+	dma_contiguous_remap();
+
+	/*
+	 * Finally flush the caches and tlb to ensure that we're in a
+	 * consistent state.
+	 */
+	flush_tlb_all();
 
 	bootmem_init();
 
@@ -673,7 +725,7 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
 
 	/* map the first chunk so we can read the size from the header */
 	create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
-		       SWAPPER_BLOCK_SIZE, prot);
+		       SWAPPER_BLOCK_SIZE, prot, false);
 
 	if (fdt_check_header(dt_virt) != 0)
 		return NULL;
@@ -684,7 +736,7 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
 
 	if (offset + size > SWAPPER_BLOCK_SIZE)
 		create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
-			       round_up(offset + size, SWAPPER_BLOCK_SIZE), prot);
+			       round_up(offset + size, SWAPPER_BLOCK_SIZE), prot, false);
 
 	memblock_reserve(dt_phys, size);
 
