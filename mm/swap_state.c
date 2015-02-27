@@ -99,6 +99,7 @@ int __add_to_swap_cache(struct page *page, swp_entry_t entry)
 		__inc_zone_page_state(page, NR_FILE_PAGES);
 		__inc_zone_page_state(page, NR_SWAPCACHE);
 		page_tracker_set_type(page, TRACK_FILE, 0);
+		__inc_zone_page_state(page, NR_SWAPCACHE);
 		INC_CACHE_INFO(add_total);
 	}
 	spin_unlock_irq(&address_space->tree_lock);
