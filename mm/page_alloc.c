@@ -1495,6 +1495,17 @@ int *get_migratetype_fallbacks(int mtype)
 	return fallbacks[mtype];
 }
 
+#ifdef CONFIG_CMA
+static struct page *__rmqueue_cma_fallback(struct zone *zone,
+					unsigned int order)
+{
+	return __rmqueue_smallest(zone, order, MIGRATE_CMA);
+}
+#else
+static inline struct page *__rmqueue_cma_fallback(struct zone *zone,
+					unsigned int order) { return NULL; }
+#endif
+
 /*
  * Move the free pages in a range to the free lists of the requested type.
  * Note that start_page and end_pages are not aligned on a pageblock
@@ -1834,13 +1845,10 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order,
 	}
 
 	page = __rmqueue_smallest(zone, order, migratetype);
-
-	if (unlikely(!page) && migratetype == MIGRATE_CMA) {
-		migratetype = MIGRATE_MOVABLE;
-		page = __rmqueue_smallest(zone, order, migratetype);
-	}
-
 	if (unlikely(!page)) {
+		if (migratetype == MIGRATE_MOVABLE)
+			page = __rmqueue_cma_fallback(zone, order);
+
 		if (!page)
 			page = __rmqueue_fallback(zone, order, migratetype,
 						  gfp_flags);
