@@ -63,7 +63,8 @@ static inline const struct file_operations *debugfs_real_fops(struct file *filp)
 
 #if defined(CONFIG_DEBUG_FS)
 
-extern const struct inode_operations debugfs_link_operations;
+/* declared over in file.c */
+extern const struct file_operations debugfs_file_operations;
 
 struct dentry *debugfs_create_file(const char *name, umode_t mode,
 				   struct dentry *parent, void *data,
