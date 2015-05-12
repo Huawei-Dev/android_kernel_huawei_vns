@@ -3189,9 +3189,7 @@ again:
  *          - return from syscall or exception to user-space
  *          - return from interrupt-handler to user-space
  *
- * WARNING: all callers must re-check need_resched() afterward and reschedule
- * accordingly in case an event triggered the need for rescheduling (such as
- * an interrupt waking up a task) while preemption was disabled in __schedule().
+ * WARNING: must be called with preemption disabled!
  */
 static void __sched __schedule(void)
 {
@@ -3201,7 +3199,6 @@ static void __sched __schedule(void)
 	int cpu;
 	u64 wallclock;
 
-	preempt_disable();
 	cpu = smp_processor_id();
 	rq = cpu_rq(cpu);
 	rcu_note_context_switch();
@@ -3268,8 +3265,6 @@ static void __sched __schedule(void)
 		raw_spin_unlock_irq(&rq->lock);
 
 	post_schedule(rq);
-
-	sched_preempt_enable_no_resched();
 }
 
 static inline void sched_submit_work(struct task_struct *tsk)
@@ -3290,7 +3285,9 @@ asmlinkage __visible void __sched schedule(void)
 
 	sched_submit_work(tsk);
 	do {
+		preempt_disable();
 		__schedule();
+		sched_preempt_enable_no_resched();
 	} while (need_resched());
 }
 EXPORT_SYMBOL(schedule);
@@ -3329,15 +3326,14 @@ void __sched schedule_preempt_disabled(void)
 static void __sched notrace preempt_schedule_common(void)
 {
 	do {
-		__preempt_count_add(PREEMPT_ACTIVE);
+		preempt_active_enter();
 		__schedule();
-		__preempt_count_sub(PREEMPT_ACTIVE);
+		preempt_active_exit();
 
 		/*
 		 * Check again in case we missed a preemption opportunity
 		 * between schedule and now.
 		 */
-		barrier();
 	} while (need_resched());
 }
 
@@ -3384,7 +3380,7 @@ asmlinkage __visible void __sched notrace preempt_schedule_context(void)
 		return;
 
 	do {
-		__preempt_count_add(PREEMPT_ACTIVE);
+		preempt_active_enter();
 		/*
 		 * Needs preempt disabled in case user_exit() is traced
 		 * and the tracer calls preempt_enable_notrace() causing
@@ -3394,8 +3390,7 @@ asmlinkage __visible void __sched notrace preempt_schedule_context(void)
 		__schedule();
 		exception_exit(prev_ctx);
 
-		__preempt_count_sub(PREEMPT_ACTIVE);
-		barrier();
+		preempt_active_exit();
 	} while (need_resched());
 }
 EXPORT_SYMBOL_GPL(preempt_schedule_context);
@@ -3419,17 +3414,11 @@ asmlinkage __visible void __sched preempt_schedule_irq(void)
 	prev_state = exception_enter();
 
 	do {
-		__preempt_count_add(PREEMPT_ACTIVE);
+		preempt_active_enter();
 		local_irq_enable();
 		__schedule();
 		local_irq_disable();
-		__preempt_count_sub(PREEMPT_ACTIVE);
-
-		/*
-		 * Check again in case we missed a preemption opportunity
-		 * between schedule and now.
-		 */
-		barrier();
+		preempt_active_exit();
 	} while (need_resched());
 
 	exception_exit(prev_state);
