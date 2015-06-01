@@ -639,7 +639,7 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
 {
 	const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
 	pgprot_t prot = PAGE_KERNEL | PTE_RDONLY;
-	int size, offset;
+	int granularity, size, offset;
 	void *dt_virt;
 
 	/*
@@ -665,15 +665,24 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
 	 */
 	BUILD_BUG_ON(dt_virt_base % SZ_2M);
 
-	BUILD_BUG_ON(__fix_to_virt(FIX_FDT_END) >> SWAPPER_TABLE_SHIFT !=
-		     __fix_to_virt(FIX_BTMAP_BEGIN) >> SWAPPER_TABLE_SHIFT);
+	if (IS_ENABLED(CONFIG_ARM64_64K_PAGES)) {
+		BUILD_BUG_ON(__fix_to_virt(FIX_FDT_END) >> PMD_SHIFT !=
+			     __fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT);
 
-	offset = dt_phys % SWAPPER_BLOCK_SIZE;
+		granularity = PAGE_SIZE;
+	} else {
+		BUILD_BUG_ON(__fix_to_virt(FIX_FDT_END) >> PUD_SHIFT !=
+			     __fix_to_virt(FIX_BTMAP_BEGIN) >> PUD_SHIFT);
+
+		granularity = PMD_SIZE;
+	}
+
+	offset = dt_phys % granularity;
 	dt_virt = (void *)dt_virt_base + offset;
 
 	/* map the first chunk so we can read the size from the header */
-	create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
-		       SWAPPER_BLOCK_SIZE, prot);
+	create_mapping(round_down(dt_phys, granularity), dt_virt_base,
+		       granularity, prot);
 
 	if (fdt_check_header(dt_virt) != 0)
 		return NULL;
@@ -682,9 +691,9 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
 	if (size > MAX_FDT_SIZE)
 		return NULL;
 
-	if (offset + size > SWAPPER_BLOCK_SIZE)
-		create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
-			       round_up(offset + size, SWAPPER_BLOCK_SIZE), prot);
+	if (offset + size > granularity)
+		create_mapping(round_down(dt_phys, granularity), dt_virt_base,
+			       round_up(offset + size, granularity), prot);
 
 	memblock_reserve(dt_phys, size);
 
