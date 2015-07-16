@@ -674,6 +674,14 @@
 	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
 .endm
 
+/*
+ * Branch to target if CPTR_EL2.TFP bit is set (VFP/SIMD trapping enabled)
+ */
+.macro skip_fpsimd_state tmp, target
+	mrs	\tmp, cptr_el2
+	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
+.endm
+
 .macro compute_debug_state target
 	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
 	// is set, we do a full save/restore cycle and disable trapping.
@@ -712,10 +720,12 @@
 	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
 	mrs	x4, dacr32_el2
 	mrs	x5, ifsr32_el2
-	mrs	x6, fpexc32_el2
 	stp	x4, x5, [x3]
-	str	x6, [x3, #16]
 
+	skip_fpsimd_state x8, 3f
+	mrs	x6, fpexc32_el2
+	str	x6, [x3, #16]
+3:
 	skip_debug_state x8, 2f
 	mrs	x7, dbgvcr32_el2
 	str	x7, [x3, #24]
@@ -742,10 +752,8 @@
 
 	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
 	ldp	x4, x5, [x3]
-	ldr	x6, [x3, #16]
 	msr	dacr32_el2, x4
 	msr	ifsr32_el2, x5
-	msr	fpexc32_el2, x6
 
 	skip_debug_state x8, 2f
 	ldr	x7, [x3, #24]
@@ -762,8 +770,22 @@
 
 .macro activate_traps
 	ldr     x2, [x0, #VCPU_HCR_EL2]
+
+	/*
+	 * We are about to set CPTR_EL2.TFP to trap all floating point
+	 * register accesses to EL2, however, the ARM ARM clearly states that
+	 * traps are only taken to EL2 if the operation would not otherwise
+	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+	 */
+	tbnz	x2, #HCR_RW_SHIFT, 99f // open code skip_32bit_state
+	mov	x3, #(1 << 30)
+	msr	fpexc32_el2, x3
+	isb
+99:
 	msr     hcr_el2, x2
 	mov	x2, #CPTR_EL2_TTA
+	orr     x2, x2, #CPTR_EL2_TFP
 	msr	cptr_el2, x2
 
 	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
@@ -786,7 +808,6 @@
 .macro deactivate_traps
 	mov	x2, #HCR_RW
 	msr	hcr_el2, x2
-	msr	cptr_el2, xzr
 	msr	hstr_el2, xzr
 
 	mrs	x2, mdcr_el2
@@ -909,12 +930,41 @@ __restore_debug:
 	ret
 
 __save_fpsimd:
+	skip_fpsimd_state x3, 1f
 	save_fpsimd
-	ret
+1:	ret
 
 __restore_fpsimd:
+	skip_fpsimd_state x3, 1f
 	restore_fpsimd
-	ret
+1:	ret
+
+switch_to_guest_fpsimd:
+	push	x4, lr
+
+	mrs	x2, cptr_el2
+	bic	x2, x2, #CPTR_EL2_TFP
+	msr	cptr_el2, x2
+	isb
+
+	mrs	x0, tpidr_el2
+
+	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
+	kern_hyp_va x2
+	bl __save_fpsimd
+
+	add	x2, x0, #VCPU_CONTEXT
+	bl __restore_fpsimd
+
+	skip_32bit_state x3, 1f
+	ldr	x4, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
+	msr	fpexc32_el2, x4
+1:
+	pop	x4, lr
+	pop	x2, x3
+	pop	x0, x1
+
+	eret
 
 /*
  * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
@@ -936,7 +986,6 @@ ENTRY(__kvm_vcpu_run)
 	kern_hyp_va x2
 
 	save_host_regs
-	bl __save_fpsimd
 	bl __save_sysregs
 
 	compute_debug_state 1f
@@ -955,7 +1004,6 @@ ENTRY(__kvm_vcpu_run)
 	// to Cortex-A57 erratum #852523.
 	restore_guest_32bit_state
 	bl __restore_sysregs
-	bl __restore_fpsimd
 
 	skip_debug_state x3, 1f
 	bl	__restore_debug
@@ -993,6 +1041,8 @@ __kvm_vcpu_return:
 
 	bl __restore_sysregs
 	bl __restore_fpsimd
+	/* Clear FPSIMD and Trace trapping */
+	msr     cptr_el2, xzr
 
 	skip_debug_state x3, 1f
 	// Clear the dirty flag for the next run, as all the state has
@@ -1148,3 +1198,166 @@ alternative_else
 alternative_endif
 ENDPROC(kvm_call_hyp)
 
+.macro invalid_vector	label, target
+	.align	2
+\label:
+	b \target
+ENDPROC(\label)
+.endm
+
+	/* None of these should ever happen */
+	invalid_vector	el2t_sync_invalid, __kvm_hyp_panic
+	invalid_vector	el2t_irq_invalid, __kvm_hyp_panic
+	invalid_vector	el2t_fiq_invalid, __kvm_hyp_panic
+	invalid_vector	el2t_error_invalid, __kvm_hyp_panic
+	invalid_vector	el2h_sync_invalid, __kvm_hyp_panic
+	invalid_vector	el2h_irq_invalid, __kvm_hyp_panic
+	invalid_vector	el2h_fiq_invalid, __kvm_hyp_panic
+	invalid_vector	el2h_error_invalid, __kvm_hyp_panic
+	invalid_vector	el1_sync_invalid, __kvm_hyp_panic
+	invalid_vector	el1_irq_invalid, __kvm_hyp_panic
+	invalid_vector	el1_fiq_invalid, __kvm_hyp_panic
+	invalid_vector	el1_error_invalid, __kvm_hyp_panic
+
+el1_sync:					// Guest trapped into EL2
+	push	x0, x1
+	push	x2, x3
+
+	mrs	x1, esr_el2
+	lsr	x2, x1, #ESR_ELx_EC_SHIFT
+
+	cmp	x2, #ESR_ELx_EC_HVC64
+	b.ne	el1_trap
+
+	mrs	x3, vttbr_el2			// If vttbr is valid, the 64bit guest
+	cbnz	x3, el1_trap			// called HVC
+
+	/* Here, we're pretty sure the host called HVC. */
+	pop	x2, x3
+	pop	x0, x1
+
+	/* Check for __hyp_get_vectors */
+	cbnz	x0, 1f
+	mrs	x0, vbar_el2
+	b	2f
+
+1:	push	lr, xzr
+
+	/*
+	 * Compute the function address in EL2, and shuffle the parameters.
+	 */
+	kern_hyp_va	x0
+	mov	lr, x0
+	mov	x0, x1
+	mov	x1, x2
+	mov	x2, x3
+	blr	lr
+
+	pop	lr, xzr
+2:	eret
+
+el1_trap:
+	/*
+	 * x1: ESR
+	 * x2: ESR_EC
+	 */
+
+	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
+	cmp	x2, #ESR_ELx_EC_FP_ASIMD
+	b.eq	switch_to_guest_fpsimd
+
+	cmp	x2, #ESR_ELx_EC_DABT_LOW
+	mov	x0, #ESR_ELx_EC_IABT_LOW
+	ccmp	x2, x0, #4, ne
+	b.ne	1f		// Not an abort we care about
+
+	/* This is an abort. Check for permission fault */
+	and	x2, x1, #ESR_ELx_FSC_TYPE
+	cmp	x2, #FSC_PERM
+	b.ne	1f		// Not a permission fault
+
+	/*
+	 * Check for Stage-1 page table walk, which is guaranteed
+	 * to give a valid HPFAR_EL2.
+	 */
+	tbnz	x1, #7, 1f	// S1PTW is set
+
+	/* Preserve PAR_EL1 */
+	mrs	x3, par_el1
+	push	x3, xzr
+
+	/*
+	 * Permission fault, HPFAR_EL2 is invalid.
+	 * Resolve the IPA the hard way using the guest VA.
+	 * Stage-1 translation already validated the memory access rights.
+	 * As such, we can use the EL1 translation regime, and don't have
+	 * to distinguish between EL0 and EL1 access.
+	 */
+	mrs	x2, far_el2
+	at	s1e1r, x2
+	isb
+
+	/* Read result */
+	mrs	x3, par_el1
+	pop	x0, xzr			// Restore PAR_EL1 from the stack
+	msr	par_el1, x0
+	tbnz	x3, #0, 3f		// Bail out if we failed the translation
+	ubfx	x3, x3, #12, #36	// Extract IPA
+	lsl	x3, x3, #4		// and present it like HPFAR
+	b	2f
+
+1:	mrs	x3, hpfar_el2
+	mrs	x2, far_el2
+
+2:	mrs	x0, tpidr_el2
+	str	w1, [x0, #VCPU_ESR_EL2]
+	str	x2, [x0, #VCPU_FAR_EL2]
+	str	x3, [x0, #VCPU_HPFAR_EL2]
+
+	mov	x1, #ARM_EXCEPTION_TRAP
+	b	__kvm_vcpu_return
+
+	/*
+	 * Translation failed. Just return to the guest and
+	 * let it fault again. Another CPU is probably playing
+	 * behind our back.
+	 */
+3:	pop	x2, x3
+	pop	x0, x1
+
+	eret
+
+el1_irq:
+	push	x0, x1
+	push	x2, x3
+	mrs	x0, tpidr_el2
+	mov	x1, #ARM_EXCEPTION_IRQ
+	b	__kvm_vcpu_return
+
+	.ltorg
+
+	.align 11
+
+ENTRY(__kvm_hyp_vector)
+	ventry	el2t_sync_invalid		// Synchronous EL2t
+	ventry	el2t_irq_invalid		// IRQ EL2t
+	ventry	el2t_fiq_invalid		// FIQ EL2t
+	ventry	el2t_error_invalid		// Error EL2t
+
+	ventry	el2h_sync_invalid		// Synchronous EL2h
+	ventry	el2h_irq_invalid		// IRQ EL2h
+	ventry	el2h_fiq_invalid		// FIQ EL2h
+	ventry	el2h_error_invalid		// Error EL2h
+
+	ventry	el1_sync			// Synchronous 64-bit EL1
+	ventry	el1_irq				// IRQ 64-bit EL1
+	ventry	el1_fiq_invalid			// FIQ 64-bit EL1
+	ventry	el1_error_invalid		// Error 64-bit EL1
+
+	ventry	el1_sync			// Synchronous 32-bit EL1
+	ventry	el1_irq				// IRQ 32-bit EL1
+	ventry	el1_fiq_invalid			// FIQ 32-bit EL1
+	ventry	el1_error_invalid		// Error 32-bit EL1
+ENDPROC(__kvm_hyp_vector)
+
+	.popsection
