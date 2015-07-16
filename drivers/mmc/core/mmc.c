@@ -2056,6 +2056,9 @@ static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
 	 */
 	mmc_disable_clk_scaling(host);
 
+	if (is_suspend)
+		host->dev_status = DEV_SUSPENDING;
+
 	if (mmc_card_doing_bkops(host->card)) {
 		err = mmc_stop_bkops(host->card);
 		if (err)
@@ -2111,6 +2114,10 @@ static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
 	}
 
 out:
+	if (err)
+		host->dev_status = DEV_UNKNOWN;
+	else if (is_suspend)
+		host->dev_status = DEV_SUSPENDED;
 	mmc_release_host(host);
 	return err;
 }
@@ -2193,6 +2200,8 @@ static int _mmc_resume(struct mmc_host *host)
 		mmc_init_clk_scaling(host);
 
 out:
+	if (!err)
+		host->dev_status = DEV_RESUMED;
 	return err;
 }
 
