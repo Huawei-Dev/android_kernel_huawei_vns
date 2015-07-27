@@ -194,6 +194,8 @@ source "drivers/android/Kconfig"
 
 source "drivers/nvdimm/Kconfig"
 
+source "drivers/nvmem/Kconfig"
+
 source "drivers/hisi/Kconfig"
 
 source "drivers/huawei_platform/Kconfig"
