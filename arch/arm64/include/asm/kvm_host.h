@@ -237,22 +237,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
 		     hyp_stack_ptr, vector_ptr);
 }
 
-static inline void __cpu_init_stage2(void)
-{
-}
-
-#ifdef CONFIG_HIBERNATION
-static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
-					phys_addr_t phys_idmap_start)
-{
-	/*
-	 * Call reset code, and switch back to stub hyp vectors.
-	 */
-	kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
-}
-#else
 static inline void kvm_arch_hardware_disable(void) {}
-#endif
 static inline void kvm_arch_hardware_unsetup(void) {}
 static inline void kvm_arch_sync_events(struct kvm *kvm) {}
 static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
