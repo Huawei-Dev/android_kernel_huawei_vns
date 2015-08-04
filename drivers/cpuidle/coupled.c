@@ -471,7 +471,7 @@ int cpuidle_enter_state_coupled(struct cpuidle_device *dev,
 			return entered_state;
 		}
 		entered_state = cpuidle_enter_state(dev, drv,
-			dev->safe_state_index);
+			drv->safe_state_index);
 		local_irq_disable();
 	}
 
@@ -519,7 +519,7 @@ retry:
 		}
 
 		entered_state = cpuidle_enter_state(dev, drv,
-			dev->safe_state_index);
+			drv->safe_state_index);
 		local_irq_disable();
 	}
 
