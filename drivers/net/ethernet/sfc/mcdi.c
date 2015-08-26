@@ -8,7 +8,6 @@
  */
 
 #include <linux/delay.h>
-#include <asm/cmpxchg.h>
 #include <linux/moduleparam.h>
 #include <linux/atomic.h>
 #include "net_driver.h"
