@@ -2577,7 +2577,6 @@ static inline void
 prepare_task_switch(struct rq *rq, struct task_struct *prev,
 		    struct task_struct *next)
 {
-	trace_sched_switch(prev, next);
 	sched_info_switch(rq, prev, next);
 	perf_event_task_sched_out(prev, next);
 	fire_sched_out_preempt_notifiers(prev, next);
@@ -3382,6 +3381,7 @@ static void __sched __schedule(bool preempt)
 		rq->curr = next;
 		++*switch_count;
 
+		trace_sched_switch(preempt, prev, next);
 		rq = context_switch(rq, prev, next); /* unlocks the rq */
 		cpu = cpu_of(rq);
 	} else {
