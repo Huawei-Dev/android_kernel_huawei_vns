@@ -217,4 +217,7 @@ source "drivers/devkit/lcdkit/Kconfig"
 source "drivers/devkit/tpkit/Kconfig"
 
 source "drivers/spmi_hisi/Kconfig"
+
+source "drivers/fpga/Kconfig"
+
 endmenu
