@@ -1156,6 +1156,9 @@ PHONY += kselftest
 kselftest:
 	$(Q)$(MAKE) -C tools/testing/selftests run_tests
 
+kselftest-clean:
+	$(Q)$(MAKE) -C tools/testing/selftests clean
+
 # ---------------------------------------------------------------------------
 # Modules
 
@@ -1363,6 +1366,7 @@ help:
 	@echo  '  kselftest       - Build and run kernel selftest (run as root)'
 	@echo  '                    Build, install, and boot kernel before'
 	@echo  '                    running kselftest on it'
+	@echo  '  kselftest-clean - Remove all generated kselftest files'
 	@echo  ''
 	@echo  'Kernel packaging:'
 	@$(MAKE) $(build)=$(package-dir) help
