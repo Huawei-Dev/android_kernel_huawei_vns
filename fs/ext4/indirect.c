@@ -565,7 +565,7 @@ int ext4_ind_map_blocks(handle_t *handle, struct inode *inode,
 	if (ext4_has_feature_bigalloc(inode->i_sb)) {
 		EXT4_ERROR_INODE(inode, "Can't allocate blocks for "
 				 "non-extent mapped inodes with bigalloc");
-		return -EUCLEAN;
+		return -EFSCORRUPTED;
 	}
 
 	/* Set up for the direct block allocation */
