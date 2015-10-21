@@ -1557,8 +1557,6 @@ struct blk_integrity {
 	unsigned short		tag_size;
 
 	const char		*name;
-
-	struct kobject		kobj;
 };
 
 extern bool blk_integrity_is_initialized(struct gendisk *);
