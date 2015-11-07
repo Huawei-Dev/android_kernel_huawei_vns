@@ -2364,8 +2364,10 @@ static inline bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 #endif /* CONFIG_FAIL_PAGE_ALLOC */
 
 /*
- * Return true if free pages are above 'mark'. This takes into account the order
- * of the allocation.
+ * Return true if free base pages are above 'mark'. For high-order checks it
+ * will return true of the order-0 watermark is reached and there is at least
+ * one free page of a suitable size. Checking now avoids taking the zone lock
+ * to check in the allocation paths if no pages are free.
  */
 static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 			unsigned long mark, int classzone_idx, int alloc_flags,
@@ -2373,7 +2375,7 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 {
 	long min = mark;
 	int o;
-	long free_cma = 0;
+	const int alloc_harder = (alloc_flags & ALLOC_HARDER);
 
 	/* free_pages may go negative - that's OK */
 	free_pages -= (1 << order) - 1;
@@ -2386,7 +2388,7 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 	 * the high-atomic reserves. This will over-estimate the size of the
 	 * atomic reserve but it avoids a search.
 	 */
-	if (likely(!(alloc_flags & ALLOC_HARDER)))
+	if (likely(!alloc_harder))
 		free_pages -= z->nr_reserved_highatomic;
 	else
 		min -= min / 4;
@@ -2394,10 +2396,15 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 #ifdef CONFIG_CMA
 	/* If allocation can't use CMA areas don't use free CMA pages */
 	if (!(alloc_flags & ALLOC_CMA))
-		free_cma = zone_page_state(z, NR_FREE_CMA_PAGES);
+		free_pages -= zone_page_state(z, NR_FREE_CMA_PAGES);
 #endif
 
-	if (free_pages - free_cma <= min + z->lowmem_reserve[classzone_idx])
+	/*
+	 * Check watermarks for an order-0 allocation request. If these
+	 * are not met, then a high-order request also cannot go ahead
+	 * even if a suitable page happened to be free.
+	 */
+	if (free_pages <= min + z->lowmem_reserve[classzone_idx])
 		return false;
 
 	/* If this is an order-0 request then the watermark is fine */
@@ -2412,15 +2419,14 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 		if (!area->nr_free)
 			continue;
 
-		/**
-		 * Since migrate_cma is also on pcp list,
-		 * here need to use MIGRATE_PCPTYPES - 1.
-		 * For cma alloc, also check the cma freelist.
-		 */
-		for (mt = 0; mt < MIGRATE_PCPTYPES - 1; mt++) {
+		if (alloc_harder)
+			return true;
+
+		for (mt = 0; mt < MIGRATE_PCPTYPES; mt++) {
 			if (!list_empty(&area->free_list[mt]))
-					return true;
+				return true;
 		}
+
 #ifdef CONFIG_CMA
 		if ((alloc_flags & ALLOC_CMA) &&
 		    !list_empty(&area->free_list[MIGRATE_CMA])) {
