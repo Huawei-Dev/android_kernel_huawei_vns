@@ -463,6 +463,8 @@ static void __init map_mem(void)
 
 		if (start >= end)
 			break;
+		if (memblock_is_nomap(reg))
+			continue;
 
 		__map_memblock(start, end);
 	}
