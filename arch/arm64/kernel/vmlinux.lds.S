@@ -126,6 +126,14 @@ SECTIONS
 		. = ALIGN(16);
 		*(.got)			/* Global offset table		*/
 	}
+	
+	. = ALIGN(32);
+	__start_hwlog_tag = .;
+	__start_hwlog_tag : {
+		*(__hwlog_tag)
+	}
+	. = ALIGN(SEGMENT_ALIGN);
+	__stop_hwlog_tag = .;
 
 	RO_DATA(PAGE_SIZE)
 	EXCEPTION_TABLE(8)
