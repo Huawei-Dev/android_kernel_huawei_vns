@@ -63,7 +63,6 @@
 #include <asm/memblock.h>
 #include <asm/efi.h>
 #include <asm/xen/hypervisor.h>
-
 #include <asm/mmu_context.h>
 
 unsigned int boot_reason;
