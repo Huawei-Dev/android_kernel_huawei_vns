@@ -484,12 +484,6 @@ void __init paging_init(void)
 	flush_tlb_all();
 
 	bootmem_init();
-
-	/*
-	 * TTBR0 is only used for the identity mapping at this stage. Make it
-	 * point to zero page to avoid speculatively fetching new entries.
-	 */
-	cpu_uninstall_idmap();
 }
 
 /*
