@@ -8,6 +8,7 @@
 #include "configfs.h"
 #include "u_f.h"
 #include "u_os_desc.h"
+#include "debug.h"
 
 #include <chipset_common/hwusb/hw_usb_rwswitch.h>
 #include <chipset_common/hwusb/hw_usb_sync_host_time.h>
@@ -1886,6 +1887,8 @@ static int __init gadget_cfs_init(void)
 
 	config_group_init(&gadget_subsys.su_group);
 
+	debug_debugfs_init();
+
 	ret = configfs_register_subsystem(&gadget_subsys);
 
 #ifdef CONFIG_USB_CONFIGFS_UEVENT
@@ -1900,6 +1903,7 @@ module_init(gadget_cfs_init);
 
 static void __exit gadget_cfs_exit(void)
 {
+	debug_debugfs_exit();
 	configfs_unregister_subsystem(&gadget_subsys);
 #ifdef CONFIG_USB_CONFIGFS_UEVENT
 	if (!IS_ERR(android_class))
