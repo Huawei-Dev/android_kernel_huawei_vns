@@ -6370,8 +6370,10 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	if (!se) {
 		walt_inc_cumulative_runnable_avg(rq, p);
 		if (!task_new && !rq->rd->overutilized &&
-		    cpu_overutilized(rq->cpu))
+		    cpu_overutilized(rq->cpu)) {
 			rq->rd->overutilized = true;
+			trace_sched_overutilized(true);
+		}
 
 		/*
 		 * We want to potentially trigger a freq switch
