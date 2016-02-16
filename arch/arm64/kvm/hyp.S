@@ -1166,7 +1166,7 @@ __hyp_panic_str:
 	.align	2
 
 /*
- * u64 kvm_call_hyp(void *hypfn, ...);
+ * u64 __kvm_call_hyp(void *hypfn, ...);
  *
  * This is not really a variadic function in the classic C-way and care must
  * be taken when calling this to ensure parameters are passed in registers
@@ -1184,7 +1184,7 @@ __hyp_panic_str:
  * arch/arm64/kernel/hyp_stub.S.
  * HVC behaves as a 'bl' call and will clobber lr.
  */
-ENTRY(kvm_call_hyp)
+ENTRY(__kvm_call_hyp)
 alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
 	str     lr, [sp, #-16]!
 	hvc	#0
@@ -1196,7 +1196,7 @@ alternative_else
 	nop
 	nop
 alternative_endif
-ENDPROC(kvm_call_hyp)
+ENDPROC(__kvm_call_hyp)
 
 .macro invalid_vector	label, target
 	.align	2
