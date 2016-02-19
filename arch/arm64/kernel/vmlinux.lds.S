@@ -152,8 +152,9 @@ SECTIONS
 	. = ALIGN(SEGMENT_ALIGN);
 	__stop_hwlog_tag = .;
 
-	RO_DATA(PAGE_SIZE)
-	EXCEPTION_TABLE(8)
+	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
+	RO_DATA(PAGE_SIZE)		/* everything from this point to */
+	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
 	NOTES
 
 	. = ALIGN(SEGMENT_ALIGN);
