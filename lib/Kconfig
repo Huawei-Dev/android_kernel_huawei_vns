@@ -535,4 +535,8 @@ config QUASI
     bool "quasi io"
     default n
 
+config STACKDEPOT
+	bool
+	select STACKTRACE
+
 endmenu
