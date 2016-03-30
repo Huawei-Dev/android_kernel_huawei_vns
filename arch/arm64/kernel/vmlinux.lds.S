@@ -122,7 +122,6 @@ SECTIONS
 		_text = .;
 		HEAD_TEXT
 	}
-	. = ALIGN(SEGMENT_ALIGN);
 	.text : {			/* Real text segment		*/
 		_stext = .;		/* Text and read-only data	*/
 			__exception_text_start = .;
