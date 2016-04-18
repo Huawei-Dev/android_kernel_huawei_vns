@@ -598,7 +598,7 @@ secondary_startup:
 ENDPROC(secondary_startup)
 0:	.long	(_text - TEXT_OFFSET) - __secondary_switched
 
-ENTRY(__secondary_switched)
+__secondary_switched:
 	adr_l	x5, vectors
 	msr	vbar_el1, x5
 	isb
