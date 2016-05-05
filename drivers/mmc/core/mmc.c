@@ -366,6 +366,10 @@ static void mmc_manage_gp_partitions(struct mmc_card *card, u8 *ext_csd)
 
 extern void mmc_decode_ext_csd_emmc50(struct mmc_card *card, u8 *ext_csd);
 extern void mmc_decode_ext_csd_emmc51(struct mmc_card *card, u8 *ext_csd);
+
+/* Minimum partition switch timeout in milliseconds */
+#define MMC_MIN_PART_SWITCH_TIME	300
+
 /*
  * Decode extended CSD.
  */
