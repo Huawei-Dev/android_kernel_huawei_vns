@@ -6357,6 +6357,28 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		add_nr_running(rq, 1);
 		inc_rq_hmp_stats(rq, p, 1);
 	}
+
+#ifdef CONFIG_SMP
+
+	if (!se) {
+		if (!task_new && !rq->rd->overutilized &&
+		    cpu_overutilized(rq->cpu))
+			rq->rd->overutilized = true;
+
+		schedtune_enqueue_task(p, cpu_of(rq));
+
+		/*
+		 * We want to potentially trigger a freq switch
+		 * request only for tasks that are waking up; this is
+		 * because we get here also during load balancing, but
+		 * in these cases it seems wise to trigger as single
+		 * request after load balancing is done.
+		 */
+		if (task_new || task_wakeup)
+			update_capacity_of(cpu_of(rq));
+	}
+#endif /* CONFIG_SMP */
+
 	hrtick_update(rq);
 }
 
@@ -6420,6 +6442,30 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		sub_nr_running(rq, 1);
 		dec_rq_hmp_stats(rq, p, 1);
 	}
+
+#ifdef CONFIG_SMP
+
+	if (!se) {
+		schedtune_dequeue_task(p, cpu_of(rq));
+
+		/*
+		 * We want to potentially trigger a freq switch
+		 * request only for tasks that are going to sleep;
+		 * this is because we get here also during load
+		 * balancing, but in these cases it seems wise to
+		 * trigger as single request after load balancing is
+		 * done.
+		 */
+		if (task_sleep) {
+			if (rq->cfs.nr_running)
+				update_capacity_of(cpu_of(rq));
+			else if (sched_freq())
+				set_cfs_cpu_capacity(cpu_of(rq), false, 0);
+		}
+	}
+
+#endif /* CONFIG_SMP */
+
 	hrtick_update(rq);
 }
 
