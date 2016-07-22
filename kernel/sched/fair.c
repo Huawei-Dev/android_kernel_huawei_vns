@@ -60,6 +60,8 @@ unsigned int sysctl_sched_cstate_aware = 0;
 #ifdef CONFIG_SCHED_WALT
 unsigned int sysctl_sched_use_walt_cpu_util = 1;
 unsigned int sysctl_sched_use_walt_task_util = 1;
+__read_mostly unsigned int sysctl_sched_walt_cpu_high_irqload =
+    (10 * NSEC_PER_MSEC);
 #endif
 /*
  * The initial- and re-scaling of tunables is configurable
@@ -6386,7 +6388,6 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	schedtune_enqueue_task(p, cpu_of(rq));
 
 #endif /* CONFIG_SMP */
-
 	hrtick_update(rq);
 }
 
@@ -7982,6 +7983,10 @@ static inline int find_best_target(struct task_struct *p, bool boosted, bool pre
 		if (new_util > capacity_orig_of(i))
 			continue;
 
+#ifdef CONFIG_SCHED_WALT
+		if (walt_cpu_high_irqload(i))
+			continue;
+#endif
 		/*
 		 * Unconditionally favoring tasks that prefer idle cpus to
 		 * improve latency.
