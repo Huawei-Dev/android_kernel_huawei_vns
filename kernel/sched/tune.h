@@ -26,12 +26,12 @@ struct target_nrg {
 extern int schedtune_cpu_boost(int cpu);
 int schedtune_task_boost(struct task_struct *tsk);
 
-void schedtune_exit_task(struct task_struct *tsk);
-
 int schedtune_prefer_idle(struct task_struct *tsk);
 
-extern void schedtune_enqueue_task(struct task_struct *p, int cpu);
-extern void schedtune_dequeue_task(struct task_struct *p, int cpu);
+void schedtune_exit_task(struct task_struct *tsk);
+
+void schedtune_enqueue_task(struct task_struct *p, int cpu);
+void schedtune_dequeue_task(struct task_struct *p, int cpu);
 
 #else /* CONFIG_CGROUP_SCHEDTUNE */
 

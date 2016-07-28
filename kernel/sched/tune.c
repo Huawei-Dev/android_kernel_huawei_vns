@@ -363,17 +363,10 @@ void schedtune_enqueue_task(struct task_struct *p, int cpu)
 	raw_spin_unlock_irqrestore(&bg->lock, irq_flags);
 }
 
-int schedtune_allow_attach(struct cgroup_subsys_state *css,
-		struct cgroup_taskset *tset)
-{
-	/* We always allows tasks to be moved between existing CGroups */
-	return 0;
-}
-
-int schedtune_can_attach(struct cgroup_subsys_state *css,
-			  struct cgroup_taskset *tset)
+int schedtune_can_attach(struct cgroup_taskset *tset)
 {
 	struct task_struct *task;
+	struct cgroup_subsys_state *css;
 	struct boost_groups *bg;
 	unsigned long irq_flags;
 	unsigned int cpu;
@@ -384,6 +377,7 @@ int schedtune_can_attach(struct cgroup_subsys_state *css,
 
 	if (!unlikely(schedtune_initialized))
 		return 0;
+
 
 	cgroup_taskset_for_each(task, css, tset) {
 
@@ -442,8 +436,7 @@ int schedtune_can_attach(struct cgroup_subsys_state *css,
 	return 0;
 }
 
-void schedtune_cancel_attach(struct cgroup_subsys_state *css,
-			     struct cgroup_taskset *tset)
+void schedtune_cancel_attach(struct cgroup_taskset *tset)
 {
 	/* This can happen only if SchedTune controller is mounted with
 	 * other hierarchies ane one of them fails. Since usually SchedTune is
@@ -724,7 +717,6 @@ schedtune_exit(struct cgroup_subsys_state *css,
 struct cgroup_subsys schedtune_cgrp_subsys = {
 	.css_alloc	= schedtune_css_alloc,
 	.css_free	= schedtune_css_free,
-	.exit		= schedtune_exit,
 	.can_attach     = schedtune_can_attach,
 	.cancel_attach  = schedtune_cancel_attach,
 	.legacy_cftypes	= files,
