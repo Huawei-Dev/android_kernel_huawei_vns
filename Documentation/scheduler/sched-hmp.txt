@@ -1010,7 +1010,11 @@ efficiency (instructions per cycle) in the system. If an update occurs
 and a window rollover is observed, curr_runnable_sum is copied into
 prev_runnable_sum before being reset to 0. The sched_get_busy() API
 returns prev_runnable_sum, scaled to the efficiency and fmax of given
-CPU.
+CPU. The same applies to nt_curr_runnable_sum and  nt_prev_runnable_sum.
+
+A 'new' task is defined as a task whose number of active windows since fork is
+less than SCHED_NEW_TASK_WINDOWS. An active window is defined as a window
+where a task was observed to be runnable.
 
 *** 6.2 Per-task window-based stats
 
