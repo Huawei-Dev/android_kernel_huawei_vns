@@ -59,6 +59,9 @@
 #include <soc_crgperiph_interface.h>
 #include <linux/pm_runtime.h>
 
+static unsigned short hs_3_pole_max_voltage = 8;
+struct hi6555c_priv *CoHPriv = NULL;
+
 /* HI6555C CODEC */
 static struct snd_soc_codec *g_codec;
 
@@ -594,118 +597,19 @@ static int classd_voltage_put(struct snd_kcontrol *kcontrol,
 /*****************************************************************************
   Sound Controls
  *****************************************************************************/
-/* LINEPGAL GAIN(LINEPGAL_GAIN<3:0>)£»
- * range:-14dB~16dB¡£
- * step:2dB¡£
- * 0000:-14dB£»
- * 0001:-12dB£»
- * 0010:-10dB£»
- * ¡­¡­
- * 0111:0dB£»
- * ¡­¡­
- * 1110:14dB£»
- * 1111:16dB£» */
+
 static DECLARE_TLV_DB_SCALE(hi6555c_smt_linepgal_gain_tlv, -1400, 200, 0);
 
-/* LINEPGAR GAIN(LINEPGAR_GAIN<3:0>)£»
- * range:-14dB~16dB¡£
- * step:2dB¡£
- * 0000:-14dB£»
- * 0001:-12dB£»
- * 0010:-10dB£»
- * ¡­¡­
- * 0111:0dB£»
- * ¡­¡­
- * 1110:14dB£»
- * 1111:16dB£» */
 static DECLARE_TLV_DB_SCALE(hi6555c_smt_linepgar_gain_tlv, -1400, 200, 0);
 
-/* AUXPGA GAIN(AUXPGA_GAIN<2:0>)£»
- * range:0dB~14dB¡£
- * step:2dB¡£
- * 000: 0dB£»
- * 001: 2dB£»
- * 010: 4dB£»
- * 011: 6dB£»
- * 100: 8dB£»
- * 101: 10dB£»
- * 110: 12dB£»
- * 111: 14dB£» */
 static DECLARE_TLV_DB_SCALE(hi6555c_smt_auxpga_gain_tlv, 0, 200, 0);
 
-/* MAINPGA GAIN(MAINPGA_GAIN<2:0>)£»
- * range:0dB~14dB¡£
- * step:2dB¡£
- * 000: 0dB£»
- * 001: 2dB£»
- * 010: 4dB£»
- * 011: 6dB£»
- * 100: 8dB£»
- * 101: 10dB£»
- * 110: 12dB£»
- * 111: 14dB£» */
 static DECLARE_TLV_DB_SCALE(hi6555c_smt_mainpga_gain_tlv, 0, 200, 0);
 
-/* HeadphoneL GAIN(HSL_GAIN<3:0>)£»
- * range:-20dB~-0dB¡£
- * step:1.5dB¡£
- * 0000:-20dB£»
- * 0001:-18dB£»
- * 0010:-16.5dB£»
- * 0011: -15dB;
- * 0100:-13.5dB;
- * 0101:-12dB;
- * 0110:-10.5dB;
- * 0111:-9.5dB;
- * 1000:-8.5dB;
- * 1001:-7.5dB;
- * 1010:-6.5dB;
- * 1011:-5.5dB;
- * 1100:-4.5dB;
- * 1101:-3dB;
- * 1110:-1.5dB;
- * 1111:0dB; */
 static DECLARE_TLV_DB_SCALE(hi6555c_smt_hsl_gain_tlv, -2000, 150, 0);
 
-/* HeadphoneR GAIN(HSR_GAIN<3:0>)£»
- * range:-20dB~-0dB¡£
- * step:1.5dB¡£
- * 0000:-20dB£»
- * 0001:-18dB£»
- * 0010:-16.5dB£»
- * 0011: -15dB;
- * 0100:-13.5dB;
- * 0101:-12dB;
- * 0110:-10.5dB;
- * 0111:-9.5dB;
- * 1000:-8.5dB;
- * 1001:-7.5dB;
- * 1010:-6.5dB;
- * 1011:-5.5dB;
- * 1100:-4.5dB;
- * 1101:-3dB;
- * 1110:-1.5dB;
- * 1111:0dB; */
 static DECLARE_TLV_DB_SCALE(hi6555c_smt_hsr_gain_tlv, -2000, 150, 0);
 
-/* EAR GAIN(EAR_GAIN<5:0>)£»
- * range:-20dB~-6dB¡£
- * step:2dB¡£
- * 0000:-20dB£»
- * 0001:-18dB£»
- * 0010:-16dB£»
- * 0011: -14dB;
- * 0100:-12dB;
- * 0101:-10dB;
- * 0110:-8dB;
- * 0111:-6dB;
- * 1000:-4dB;
- * 1001:-2dB;
- * 1010:-0dB;
- * 1011:2dB;
- * 1100:4dB;
- * 1101:6dB;
- * orther: mute */
 static DECLARE_TLV_DB_SCALE(hi6555c_smt_ear_gain_tlv, -2000, 200, 0);
 
 static const struct snd_kcontrol_new hi6555c_snd_controls[] = {
@@ -1713,13 +1617,11 @@ static int hi6555c_smt_hsmicb_power_mode_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
-		/* to avoid irq while MBHD_COMP power up£¬mask the irq then clean it */
 		irq_mask = hi6555c_reg_read(g_codec, HI6555C_SMT_ANA_IRQM_REG0_ADDR);
 		hi6555c_irqs_mask_set(irq_mask | IRQ_MSK_COMP);
 		hi6555c_hs_micbias_work_enable(g_codec, true);
 		msleep(25);
 
-		/* to avoid irq while MBHD_COMP power up£¬mask the irq then clean it */
 		hi6555c_irqs_clr(IRQ_MSK_COMP);
 		hi6555c_irqs_mask_clr(IRQ_MSK_BTN_NOR);
 		break;
@@ -3779,7 +3681,6 @@ static void hi6555c_hs_micbias_pd(struct snd_soc_codec *codec, bool enable)
 {
 	unsigned int irq_mask = 0;
 
-	/* to avoid irq while MBHD_COMP power up£¬mask the irq then clean it */
 	irq_mask = hi6555c_reg_read(codec, HI6555C_SMT_ANA_IRQM_REG0_ADDR);
 	hi6555c_irqs_mask_set(irq_mask | IRQ_MSK_COMP);
 
@@ -4183,7 +4084,6 @@ static void hs_plug_in_detect_func(struct snd_soc_codec *codec)
 		loge("hs status=%d(old=%d) not changed\n", priv->hs_status, priv->old_hs_status);
 	}
 
-	/* to avoid irq while MBHD_COMP power up£¬mask the irq then clean it */
 	hi6555c_irqs_clr(IRQ_MSK_COMP);
 	hi6555c_irqs_mask_clr(IRQ_MSK_BTN_NOR);
 	mutex_unlock(&priv->plug_mutex);
@@ -4271,7 +4171,6 @@ static int hs_btn_down_detect_func(struct snd_soc_codec *codec)
 	hi6555c_hs_micbias_hkadc_enable(codec, false);
 	mutex_unlock(&priv->hkadc_mutex);
 	msleep(30);
-	/* to avoid irq while MBHD_COMP power up£¬mask the irq then clean it */
 	hi6555c_irqs_clr(IRQ_MSK_COMP);
 	hi6555c_irqs_mask_clr(IRQ_MSK_BTN_NOR);
 	logi("mask clean\n");
@@ -4664,7 +4563,9 @@ struct snd_soc_dai_driver hi6555c_dai[] = {
 static void set_headset_keys_config(struct hi6555c_priv *priv)
 {
 	/* config the headset */
-	priv->headset_voltage.hs_3_pole_max_voltage = 8;
+	CoHPriv = priv;
+	priv->headset_voltage.hs_3_pole_max_voltage = hs_3_pole_max_voltage;
+	logi("CodeofHonor: hs_3_pole_max_voltage set to '%d'", hs_3_pole_max_voltage);
 	priv->headset_voltage.hs_4_pole_min_voltage = 900;
 	priv->headset_voltage.hs_4_pole_max_voltage = 2565;
 	logi("headset_voltage {3pole=%d, 4pole=(%d-%d)}\n",
@@ -4922,7 +4823,6 @@ static int hi6555c_headset_init(struct snd_soc_codec *codec)
 	priv->hs_jack.report = 0;
 	priv->pressed_btn_type = 0;
 
-	/*VREF PD ú»MICBIAS PD  */
 	hi6555c_set_reg_bits(HI6555C_SMT_CODEC_ANA_RW02_ADDR, 0x1 << HI6555C_SMT_HSMICB_PD_BIT_START);
 	hi6555c_set_reg_bits(HI6555C_SMT_CODEC_ANA_RW24_ADDR, 0x1 << HI6555C_SMT_MBHD_VREF_PD_BIT_START);
 
@@ -5378,5 +5278,16 @@ static void __exit hi6555c_codec_exit(void)
 }
 module_exit(hi6555c_codec_exit);
 
+static int set_headphone_volt(const char *val, struct kernel_param *kp) {
+	param_set_ushort(val,kp);
+	if (CoHPriv) {
+	    CoHPriv->headset_voltage.hs_3_pole_max_voltage = hs_3_pole_max_voltage;
+	    logi("CodeOfHonor : hs_3_pole_max_voltage updated to '%d'\n", CoHPriv->headset_voltage.hs_3_pole_max_voltage);
+	} else {
+	    logi("CodeOfHonor : priv uninited, hs_3_pole_max_voltage updated to '%d'\n", hs_3_pole_max_voltage);
+	}
+}
+
+module_param_call(hs_3_pole_max_voltage, set_headphone_volt, param_get_ushort, &hs_3_pole_max_voltage, S_IRUGO | S_IWUSR);
 MODULE_DESCRIPTION("ASoC hi6555c driver");
 MODULE_LICENSE("GPL");
