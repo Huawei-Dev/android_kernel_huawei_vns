@@ -82,10 +82,6 @@
 #include "binder_alloc.h"
 #include "binder_trace.h"
 
-#ifdef CONFIG_HUAWEI_KSTATE
-#include <huawei_platform/power/hw_kcollect.h>
-#endif
-
 #ifdef CONFIG_HW_BINDER_FG_REQ_FIRST
 #define MAX_FG_WORKS_PROCEEDED 2
 
@@ -3044,20 +3040,6 @@ static void binder_transaction(struct binder_proc *proc,
 		target_proc->tmp_ref++;
 		binder_inner_proc_unlock(target_proc);
 		binder_node_unlock(target_node);
-
-#ifdef CONFIG_HUAWEI_KSTATE
-		/*
-		* 1.not oneway, sync call
-		* 2.called uid > 2000(SYSTEM_UID,
-		*   PHONE_UID,WIFI_UID,MEDIA_UID,DRM_UID...)
-		* 3.pid not same
-		*/
-		if ((!(tr->flags & TF_ONE_WAY))
-			&& (target_proc->tsk->cred->euid.val > 2000)
-			&& (proc->pid != target_proc->pid)) {
-			hwbinderinfo(proc->pid, target_proc->pid);
-		}
-#endif
 
 		if (security_binder_transaction(proc->tsk,
 						target_proc->tsk) < 0) {

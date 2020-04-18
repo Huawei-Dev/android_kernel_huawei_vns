@@ -30,10 +30,6 @@
 #include "binder_alloc.h"
 #include "binder_trace.h"
 
-#ifdef CONFIG_HUAWEI_KSTATE
-#include <huawei_platform/power/hw_kcollect.h>
-#endif
-
 static DEFINE_MUTEX(binder_alloc_mmap_lock);
 
 enum {
@@ -325,21 +321,6 @@ struct binder_buffer *binder_alloc_new_buf_locked(struct binder_alloc *alloc,
 				alloc->pid, extra_buffers_size);
 		return ERR_PTR(-EINVAL);
 	}
-
-#ifdef CONFIG_HUAWEI_KSTATE
-	/*
-	* if async and no more async space left.
-	* data bigger 1/3 buffer or buffer free lower 100K
-	*/
-	if (is_async
-		&& (alloc->free_async_space
-			< 3*(size + sizeof(struct binder_buffer))
-			|| alloc->free_async_space < 100*1024)) {
-		pr_warn("will no more space [freed:%zd][alloc size:%zd], pid [%d]\n",
-			alloc->free_async_space, size, alloc->pid);
-		hwbinderinfo(-1, alloc->pid);
-	}
-#endif
 
 	if (is_async &&
 	    alloc->free_async_space < size + sizeof(struct binder_buffer)) {
