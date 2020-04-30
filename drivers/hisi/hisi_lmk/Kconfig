@@ -14,11 +14,4 @@ config HISI_LOWMEM_DBG
 	help
 	  print processes info when lmk happen per several seconds
 
-config HISI_MULTI_KILL
-	bool "Enable lmk multi kill"
-	default n
-	depends on ANDROID_LOW_MEMORY_KILLER
-	help
-	  When enabled, lmk will kill multi thread at once.
-
 endmenu
