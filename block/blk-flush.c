@@ -74,9 +74,6 @@
 #include "blk.h"
 #include "blk-mq.h"
 
-#include "hisi-blk-mq-dispatch-strategy.h"
-#include "hisi-blk-mq-debug.h"
-
 /* FLUSH/FUA sequences */
 enum {
 	REQ_FSEQ_PREFLUSH	= (1 << 0), /* pre-flushing in progress */
@@ -324,10 +321,6 @@ static bool blk_kick_flush(struct request_queue *q, struct blk_flush_queue *fq)
 	flush_rq->cmd_flags = WRITE_FLUSH | REQ_FLUSH_SEQ;
 	flush_rq->rq_disk = first_rq->rq_disk;
 	flush_rq->end_io = flush_end_io;
-
-	hisi_blk_mq_init_req_timestamp(flush_rq);
-
-	blk_mq_debug_rq_processing_state_update(flush_rq, MQ_PROCESS_FLUSH_INIT);
 
 	return blk_flush_queue_rq(flush_rq, false);
 }

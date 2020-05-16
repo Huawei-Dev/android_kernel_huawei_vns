@@ -9,9 +9,7 @@ obj-$(CONFIG_BLOCK) := bio.o elevator.o blk-core.o blk-tag.o blk-sysfs.o \
 			blk-mq-sysfs.o blk-mq-cpu.o blk-mq-cpumap.o ioctl.o \
 			genhd.o scsi_ioctl.o partition-generic.o ioprio.o \
 			partitions/
-obj-$(CONFIG_HISI_MQ_DEBUG)		+= hisi-blk-mq-debug.o
-obj-$(CONFIG_HISI_BLK_MQ_DUMP)		+= hisi-blk-mq-dump.o
-obj-$(CONFIG_HISI_MQ_DISPATCH_DECISION)	+= hisi-blk-mq-dispatch-strategy.o
+
 obj-$(CONFIG_BOUNCE)	+= bounce.o
 obj-$(CONFIG_BLK_DEV_BSG)	+= bsg.o
 obj-$(CONFIG_BLK_DEV_BSGLIB)	+= bsg-lib.o
