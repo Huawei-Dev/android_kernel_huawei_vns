@@ -28,7 +28,6 @@
 #include <linux/slab.h>
 #include <linux/cma.h>
 #include <linux/sizes.h>
-#include <linux/hisi/hisi_cma.h>
 #include <linux/hisi/hisi_ion.h>
 #include <linux/hisi/hisi_drmdriver.h>
 #include <linux/hisi/hisi_mm.h>
