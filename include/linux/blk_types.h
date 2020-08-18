@@ -105,15 +105,6 @@ struct bio {
 	bio_end_io_t		*bi_end_io;
 
 	void			*bi_private;
-#ifdef CONFIG_HISI_IO_LATENCY_TRACE
-	unsigned char from_submit_bio_flag;
-	unsigned long bio_stage_jiffies[BIO_PROC_STAGE_MAX];
-	struct timer_list bio_latency_check_timer;
-	void* io_req;
-	atomic_t	bio_latency_timer_executing;
-	struct block_device	*bi_bdev_part;
-	struct task_struct* dispatch_task;
-#endif
 #ifdef CONFIG_BLK_DEV_THROTTLING
 	bio_throtl_end_io_t	*bi_throtl_end_io1;
 	void			*bi_throtl_private1;
@@ -136,12 +127,6 @@ struct bio {
 	};
 
 	unsigned short		bi_vcnt;	/* how many bio_vec's */
-
-#ifdef CONFIG_HISI_BLK_INLINE_CRYPTO
-	void			*ci_key;
-	int			ci_key_len;
-	pgoff_t			index;
-#endif
 
 	/*
 	 * Everything starting with bi_max_vecs will be preserved by bio_reset()
@@ -328,10 +313,6 @@ struct blk_rq_stat {
 #define REQ_DELAY_WARNING_MQ_REQ_INT_BACK			(50)
 #define REQ_DELAY_WARNING_MQ_REQ_FREE				(500)
 
-#ifdef CONFIG_HISI_IO_LATENCY_TRACE
-void bio_latency_check(struct bio *bio,enum bio_process_stage_enum bio_stage);
-#else
 static inline void bio_latency_check(struct bio *bio,enum bio_process_stage_enum bio_stage){}
-#endif
 
 #endif /* __LINUX_BLK_TYPES_H */
