@@ -41,5 +41,4 @@ obj-$(CONFIG_HISI_PERFHUB) += perfhub/
 obj-$(CONFIG_HISI_HILOG) += hilog/
 obj-$(CONFIG_HISI_TIMEKEEPER) += timekeeper/
 obj-$(CONFIG_HISI_ARMV8_DEPRECATED) += armv8_deprecated/
-obj-$(CONFIG_TLB_CONFLICT_WORKAROUND) += tlb_conflict/
 obj-y += hisi_lmk/
