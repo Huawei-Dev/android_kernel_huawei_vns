@@ -165,10 +165,7 @@ void wbt_done(struct rq_wb *rwb, struct wb_issue_stat *stat, bool fg)
 			rwb->sync_cookie = NULL;
 		}
 
-#ifdef CONFIG_BLK_DEV_THROTTLING
-		if (fg)
-#endif
-			wb_timestamp(rwb, &rwb->last_comp);
+		wb_timestamp(rwb, &rwb->last_comp);
 	} else {
 		/*lint -save -e727 -e730*/
 		WARN_ON_ONCE(stat == rwb->sync_cookie);
@@ -223,13 +220,8 @@ static bool inline stat_sample_valid(struct blk_rq_stat *stat)
 	 * that it's writes impacting us, and not just some sole read on
 	 * a device that is in a lower power state.
 	 */
-#ifdef CONFIG_BLK_DEV_THROTTLING
-	return stat[2].nr_samples >= RWB_MIN_READ_SAMPLES &&
-		(stat[1].nr_samples - stat[3].nr_samples) >= RWB_MIN_WRITE_SAMPLES;
-#else
 	return stat[0].nr_samples >= RWB_MIN_READ_SAMPLES &&
 		stat[1].nr_samples >= RWB_MIN_WRITE_SAMPLES;
-#endif
 }
 
 static u64 rwb_sync_issue_lat(struct rq_wb *rwb)
@@ -257,12 +249,7 @@ static int __latency_exceeded(struct rq_wb *rwb, struct blk_rq_stat *stat)
 {
 	u64 thislat;
 	u32 io_type;
-
-#ifdef CONFIG_BLK_DEV_THROTTLING
-	io_type = 2;
-#else
 	io_type = 0;
-#endif
 
 	/*
 	 * If our stored sync issue exceeds the window size, or it
@@ -666,13 +653,8 @@ void wbt_issue(struct rq_wb *rwb, struct wb_issue_stat *stat, bool fg)
 	 */
 	/*lint -save -e713*/
 	if (!wbt_tracked(stat) && !rwb->sync_issue) {
-#ifdef CONFIG_BLK_DEV_THROTTLING
-		if (fg)
-#endif
-		{
 			rwb->sync_cookie = stat;
 			rwb->sync_issue = wbt_issue_stat_get_time(stat);
-		}
 	}
 	/*lint -restore*/
 }
