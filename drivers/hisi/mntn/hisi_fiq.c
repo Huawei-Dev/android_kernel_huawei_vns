@@ -47,6 +47,7 @@ asmlinkage void fiq_dump(struct pt_regs *regs, unsigned int esr)
 	pr_crit("fiq_dump end\n");
 	mntn_show_stack_cpustall();
 	kmsg_dump(KMSG_DUMP_PANIC);
+	flush_cache_all();
 
 	asm("b .");
 }

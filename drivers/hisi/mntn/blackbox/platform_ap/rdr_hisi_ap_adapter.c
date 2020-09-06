@@ -1708,6 +1708,7 @@ void rdr_hisiap_reset(u32 modid, u32 etype, u64 coreid)
 	flush_ftrace_buffer_cache();
 	mntn_show_stack_cpustall();
 	kmsg_dump(KMSG_DUMP_PANIC);
+	flush_cache_all();
 
 	hisiap_nmi_notify_lpm3();
 	printk("%s end\n", __func__);
