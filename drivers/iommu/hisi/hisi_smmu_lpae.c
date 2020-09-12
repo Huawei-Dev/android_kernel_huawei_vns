@@ -338,7 +338,6 @@ int hisi_smmu_handle_mapping_lpae(struct iommu_domain *domain,
 		iova = next;
 	} while (pgd++, iova < end);
 out_unlock:
-	smmu_trace_hook(MEM_ALLOC, iova, paddr, (unsigned int)size);
 	return ret;
 }
 
@@ -429,7 +428,6 @@ unsigned int hisi_smmu_handle_unmapping_lpae(struct iommu_domain *domain,
 		dbg("%s: pgdp=%pK, iova=0x%lx\n", __func__, pgdp, iova);
 	} while (pgdp++, iova < end);
 
-	smmu_trace_hook(MEM_FREE, iova, (unsigned long long)0, unmap_size);
 	return unmap_size;
 }
 
