@@ -3743,12 +3743,6 @@ CONFIG_HISI_AXI=y
 # CONFIG_IVP_SMMU is not set
 
 #
-# Hisilicon IVP vp5
-#
-# CONFIG_HISI_PAGE_TRACKER is not set
-# CONFIG_HISI_PAGE_EXT is not set
-
-#
 # Hisi lpm3_debug options
 #
 # CONFIG_HISI_LPM3_DEBUG is not set
