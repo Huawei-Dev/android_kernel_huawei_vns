@@ -311,13 +311,16 @@ static int mmc_blk_cmdq_wait_for_dcmd(struct mmc_host *host,
 	init_completion(&mrq->cmdq_completion);
 	mrq->done = mmc_blk_cmdq_dcmd_done;
 	mrq->host = host;
+
 	ret = mmc_start_cmdq_request(host, mrq);
 	if (ret) {
 		pr_err("%s: DCMD error\n", __func__);
 		return ret;
 	}
+
 	ret = wait_for_completion_timeout(&mrq->cmdq_completion,
 			msecs_to_jiffies(60000));
+
 	ret = ret ? 0 : -ETIMEDOUT;
 
 	return ret;
@@ -772,16 +775,16 @@ int mmc_blk_cmdq_issue_rq(struct mmc_queue *mq, struct request *req)
 	struct mmc_blk_data *md = mq->data;
 	struct mmc_card *card = md->queue.card;
 	unsigned int cmd_flags = req->cmd_flags;
-
+	
 	struct mmc_cmdq_context_info *ctx_info = &card->host->cmdq_ctx;
 	struct mmc_queue_req *mq_rq = &mq->mqrq_cmdq[req->tag];
 	struct mmc_cmdq_req *cmdq_req = &mq_rq->mmc_cmdq_req;
 
 	mmc_claim_host(card->host);
-
+	
 	if (cmdq_is_reset(card->host)) {
-		ret = -EHOSTUNREACH;
-		goto requeue_for_reset;
+                   ret = -EHOSTUNREACH;
+                   goto requeue_for_reset;
 	}
 
 	if (mmc_card_suspended(card)) {
@@ -846,7 +849,7 @@ int mmc_blk_cmdq_issue_rq(struct mmc_queue *mq, struct request *req)
 		blk_requeue_request(mq->queue, req);
 		spin_unlock_irq(mq->queue->queue_lock);
 	}
-
+	
 requeue_for_reset:
 	if (-EHOSTUNREACH == ret) {
 		clear_bit(req->tag, &card->host->cmdq_ctx.active_reqs);
@@ -1133,11 +1136,12 @@ int mmc_cmdq_init_queue(struct mmc_queue *mq, struct mmc_card * card,
 }
 
 /*this reset func may cause dead lock of claim_host*/
+
 void mmc_blk_cmdq_reset(struct mmc_host *host)
 {
 	struct mmc_card *card = host->card;
 	struct mmc_blk_data *md = dev_get_drvdata(&card->dev);
-
+	
 	mmc_claim_host(host);
 	mmc_card_clr_cmdq(card);
 	if (host->cmdq_ops && host->cmdq_ops->disable_immediatly)
@@ -1147,8 +1151,6 @@ void mmc_blk_cmdq_reset(struct mmc_host *host)
 
 	if(!md)
 		pr_err("%s get md failed!\n",__func__);
-
 	(void)mmc_blk_cmdq_switch(card, md, (bool)true);
 	mmc_release_host(host);
 }
-

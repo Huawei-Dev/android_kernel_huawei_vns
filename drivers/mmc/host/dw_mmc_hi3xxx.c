@@ -2039,7 +2039,6 @@ static int dw_mci_hs_runtime_resume(struct device *dev)
 }
 #endif
 
-
 void dw_mci_reg_dump(struct dw_mci *host)
 {
 	u32 status, mintsts;

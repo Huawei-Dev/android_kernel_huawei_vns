@@ -29,7 +29,6 @@
 #include "sdhci.h"
 #ifdef CONFIG_HISI_DEBUG_FS
 #include "hisi_mmc_debug.h"
-#define CMDQ_DEBUG
 #endif
 
 /* 1 sec FIXME: optimize it */
@@ -581,6 +580,11 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		err = -EHOSTDOWN;
 		goto out;
 	}
+	
+	if (cq_host->reset_flag) {
+		err = -EHOSTUNREACH;
+		goto out;
+	}
 
 	if (cq_host->reset_flag) {
 		err = -EHOSTUNREACH;
@@ -636,9 +640,6 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 				break;
 			else {
 				spin_unlock_irqrestore(&cq_host->cmdq_lock, flags);
-#ifdef CMDQ_DEBUG
-				cmdq_dcmd_wait();
-#endif
 				if (cq_host->reset_flag) {
 					pr_err("%s: cmdq reset hanppens during DCMD\n", __func__);
 					err = -EHOSTUNREACH;
@@ -761,9 +762,6 @@ irqreturn_t cmdq_irq(struct mmc_host *mmc, u32 intmask)
 		pr_err("%s: not expect cmdq irq, intmask = 0x%x\n", __func__, intmask);
 		cmdq_dumpregs(cq_host);
 	}
-#ifdef CMDQ_DEBUG
-	err = cmdq_trigger_irq_err(err);
-#endif
 	status = cmdq_readl(cq_host, CQIS);
 	cmdq_writel(cq_host, status, CQIS);
 	if ((status & CQIS_RED) || err) {
@@ -779,9 +777,6 @@ irqreturn_t cmdq_irq(struct mmc_host *mmc, u32 intmask)
 
 		/* prase error information */
 		err_info = cmdq_readl(cq_host, CQTERRI);
-#ifdef CMDQ_DEBUG
-		err_info = cmdq_trigger_irq_resend(err_info, CQTERRI_DAT_ERR);
-#endif
 		if (err_info & CQTERRI_RES_ERR) {
 			if (CQTERRI_RES_CMD(err_info) == 13) {
 				if (++cq_host->cmd13_err_count > CMDQ_CMD13_RETRY_TIMES) {
@@ -950,23 +945,19 @@ void cmdq_reset(struct cmdq_host *cq_host)
 
 	cmdq_dumpregs(cq_host);
 	cq_host->reset_flag = 1;
-#ifdef CMDQ_DEBUG
-	cmdq_clear_dcmd_debug_flag();
-#endif
 	mmc_blk_cmdq_reset(cq_host->mmc);
 
-	/*When DISCARD request is handled, reset happens. Discard return,
-	 *response error may occur. So don't resend discard cmd.
-	 */
+/*When DISCARD request is handled, reset happens. Discard return,
+*response error may occur. So don't resend discard cmd.
+*/
 	mrq = cq_host->mrq_slot[31];
-	if (mrq && (mrq->cmdq_req->cmd_flags & REQ_DISCARD)) {
+	if(mrq && (mrq->cmdq_req->cmd_flags & REQ_DISCARD)) {
 		pr_err("%s: do not resend discard cmd after reset\n", __func__);
 		cq_host->mrq_slot[31] = NULL;
 	}
 
 	cq_host->reset_flag = 0;
 }
-
 
 static void cmdq_work_resend(struct work_struct *work)
 {
@@ -986,9 +977,7 @@ static void cmdq_work_resend(struct work_struct *work)
 	pr_err("%s:%s++\n", mmc_hostname(cq_host->mmc), __func__);
 	/* count error retry */
 	val = cmdq_readl(cq_host, CQTERRI);
-#ifdef CMDQ_DEBUG
-	val = cmdq_trigger_resend(val, (u32)CQTERRI_DAT_ERR);
-#endif
+
 	if (val & CQTERRI_DAT_ERR) {
 		tag = CQTERRI_DAT_TASK(val);
 		if ((cq_host->mmc->ios.timing == MMC_TIMING_MMC_HS400)
@@ -1017,10 +1006,6 @@ static void cmdq_work_resend(struct work_struct *work)
 		cmdq_reset(cq_host);
 		goto dishalt;
 	}
-#ifdef CMDQ_DEBUG
-	if (cmdq_halt_trigger_reset(cq_host))
-		goto dishalt;
-#endif
 
 	/* tuning move */
 	if (need_tuning_move) {
@@ -1073,10 +1058,6 @@ static void cmdq_work_resend(struct work_struct *work)
 				cmdq_reset(cq_host);
 				goto dishalt;
 			}
-#ifdef CMDQ_DEBUG
-			if (cmdq_retry_trigger_reset(cq_host))
-				goto dishalt;
-#endif
 		}
 	} else {
 		pr_err("%s:err tag num %d\n", __func__, tag);
@@ -1092,10 +1073,6 @@ static void cmdq_work_resend(struct work_struct *work)
 		cmdq_reset(cq_host);
 		goto dishalt;
 	}
-#ifdef CMDQ_DEBUG
-	if (cmdq_clear_task_trigger_reset(cq_host))
-		goto dishalt;
-#endif
 
 	db_reg = cmdq_readl(cq_host, CQTDBR);
 	pr_err("%s:%s: doorbell is 0x%x after clear task\n", mmc_hostname(cq_host->mmc), __func__, db_reg);
@@ -1163,7 +1140,6 @@ static void cmdq_timeout_timer(unsigned long param)
 
 	spin_lock_irqsave(&cq_host->cmdq_lock, flags);
 	pr_err("%s: Timeout waiting for hardware interrupt.\n", __func__);
-
 	if (false == cq_host->err_handle) {
 		cmdq_dumpregs(cq_host);
 		cq_host->err_handle = true;

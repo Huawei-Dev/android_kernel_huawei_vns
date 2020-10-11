@@ -153,7 +153,7 @@ struct cmdq_host {
 	 *it is only used in linked trans descriptor
 	 */
 	u8 dma64_trans_desc_len;
-
+	
 	int reset_flag;
 
 	dma_addr_t desc_dma_base;
