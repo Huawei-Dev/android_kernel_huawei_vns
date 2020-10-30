@@ -8,7 +8,7 @@
 
 #include <linux/tracepoint.h>
 
-TRACE_EVENT(lowmem_tune,/* [false alarm] */
+TRACE_EVENT(lowmem_tune,
 	TP_PROTO(int nzones, gfp_t gfp_mask, int other_free, int other_file,
 		 int tune_free, int tune_file),
 
