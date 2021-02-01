@@ -539,8 +539,4 @@ config STACKDEPOT
 	bool
 	select STACKTRACE
 
-config STACKDEPOT
-	bool
-	select STACKTRACE
-
 endmenu
