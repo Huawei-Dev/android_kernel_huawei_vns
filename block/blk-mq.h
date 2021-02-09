@@ -1,7 +1,6 @@
 #ifndef INT_BLK_MQ_H
 #define INT_BLK_MQ_H
 
-#include "blk-stat.h"
 #include <linux/preempt.h>
 
 struct blk_mq_tag_set;
@@ -23,9 +22,6 @@ struct blk_mq_ctx {
 
 	/* incremented at completion time */
 	unsigned long		____cacheline_aligned_in_smp rq_completed[2];
-#ifdef CONFIG_WBT
-	struct blk_rq_stat	stat[4];
-#endif
 
 	struct request_queue	*queue;
 	struct kobject		kobj;

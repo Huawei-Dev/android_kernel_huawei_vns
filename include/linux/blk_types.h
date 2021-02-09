@@ -96,7 +96,6 @@ struct bio {
 	unsigned long		bi_rw;		/* bottom bits READ/WRITE,
 						 * top bits priority
 						 */
-	unsigned char bi_iosche_bypass;
 	struct bvec_iter	bi_iter;
 
 #ifdef CONFIG_BLOCK_PERF_FRAMEWORK
