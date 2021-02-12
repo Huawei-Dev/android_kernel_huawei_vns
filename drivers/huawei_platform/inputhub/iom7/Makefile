@@ -1,7 +1,3 @@
-#ifdef CONFIG_CONTEXTHUB_SHMEM
-ccflags-y  += -I$(srctree)/drivers/contexthub/
-#endif
-
 # InputHub Driver
 obj-$(CONFIG_INPUTHUB)		+= inputhub_bridge.o
 obj-$(CONFIG_INPUTHUB)		+= inputhub_route.o
