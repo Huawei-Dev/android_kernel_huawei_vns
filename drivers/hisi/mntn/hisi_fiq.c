@@ -12,9 +12,8 @@
 
 #include <linux/hisi/hisi_ddr.h>
 #include <linux/hisi/mntn_record_sp.h>
-#include <linux/hisi/eeye_ftrace_pub.h>
-
 #include "bl31/hisi_bl31_exception.h"
+
 static u32 fiq_dump_flag;
 
 void hisi_mntn_inform(void)
@@ -30,7 +29,6 @@ asmlinkage void fiq_dump(struct pt_regs *regs, unsigned int esr)
 {
 	fiq_dump_flag = 0xdeaddead;
 	bust_spinlocks(1);
-	flush_ftrace_buffer_cache();
 
 	pr_crit("fiq_dump begin!\n");
 	dmss_fiq_handler();
