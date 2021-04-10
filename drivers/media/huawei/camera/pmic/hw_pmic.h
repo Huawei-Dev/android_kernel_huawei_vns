@@ -60,6 +60,7 @@ struct hisi_pmic_info {
 	const char *name;
 	int index;
 	unsigned int slave_address;
+	int mutex_flag;
 };
 
 struct hisi_pmic_ctrl_t;

@@ -18,6 +18,7 @@
 #include "hwcam_compat32.h"
 
 #include "hwcam_intf.h"
+//lint -save -e429 -e31
 
 typedef struct _tag_hwcam_cfgpipeline_mount_req
 {
@@ -1030,9 +1031,9 @@ hwcam_cfgpipeline_vo_ioctl32(
         unsigned long arg)
 {
     long rc = 0;
-    void __user *up = NULL;
+    void __user *up_p = NULL;
     void __user *kp = NULL;
-    up = compat_ptr(arg);
+    up_p = compat_ptr(arg);
 
 	switch (cmd)
 	{
@@ -1050,13 +1051,13 @@ hwcam_cfgpipeline_vo_ioctl32(
 			kp = compat_alloc_user_space(sizeof(struct v4l2_event));
 			if (NULL == kp)
 				return -EFAULT;
-			rc = compat_get_v4l2_event_data(kp, up);
+			rc = compat_get_v4l2_event_data(kp, up_p);
 			if (0 != rc)
 				return rc;
 			rc = hwcam_cfgpipeline_vo_ioctl(filep, cmd, (unsigned long)(kp));
 			if (0 != rc)
 				return rc;
-			rc = compat_put_v4l2_event_data(kp, up);
+			rc = compat_put_v4l2_event_data(kp, up_p);
 		}
 		break;
     default:
@@ -1297,4 +1298,5 @@ hwcam_cfgpipeline_mount_req_release(
 
     kzfree(mpr);
 }
+//lint -restore
 

@@ -3,8 +3,14 @@
 #ifndef __HW_JACKY_KERNEL_HISP_INTERFACE_H__
 #define __HW_JACKY_KERNEL_HISP_INTERFACE_H__
 
-#if defined( CHICAGO_CAMERA  ) || defined( BOSTON_CAMERA  )
+#if defined( HISP150_CAMERA  )
 #include <media/huawei/hisp150_cfg.h>
+#elif defined( HISP160_CAMERA  )
+#include <media/huawei/hisp160_cfg.h>
+#elif defined( HISP120_CAMERA  )
+#include <media/huawei/hisp120_cfg.h>
+#elif defined( HISP200_CAMERA  )
+#include <media/huawei/hisp200_cfg.h>
 #else
 #include <media/huawei/hisp_cfg.h>
 #endif
