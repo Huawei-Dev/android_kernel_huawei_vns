@@ -24,7 +24,6 @@
 #include <linux/hisi/hisi_adc.h>
 #include <linux/hisi/hisi_rproc.h>
 
-
 #define	MODULE_NAME		"hisi_adc"
 /*adc maybe IPC timeout*/
 #define ADC_IPC_TIMEOUT		1500
@@ -42,9 +41,12 @@
 #define	ADC_CHN_MAX		18
 
 #define	ADC_CHANNEL_XOADC	(15)
-#define	VREF_MV_DIV_100		(18)
-#define	AMPLIFY_DIV_BY_100	(125)
-#define	AD_RANGE				(32768)
+#define	VREF_VOLT		(1800)
+#define	AD_RANGE				(32767)
+
+#define	ADC_IPC_CMD_TYPE_CURRENT	(0x14)
+#define	ADC_IPC_CURRENT		((HISI_AP_ID << 24) | (ADC_OBJ_ID << 16) | (ADC_IPC_CMD_TYPE0 << 8) | ADC_IPC_CMD_TYPE_CURRENT)
+#define	HADC_IPC_RECV_CURRENT_HEADER	((0x08 << 24) | (ADC_OBJ_ID << 16) | (ADC_IPC_CMD_TYPE0 << 8) | ADC_IPC_CMD_TYPE_CURRENT)
 
 enum {
 	ADC_IPC_CMD_TYPE = 0,
@@ -73,6 +75,7 @@ static struct hisi_adc_device	*hisi_adc_dev = NULL;
 #define ADC_RPROC_RECV_ID	HISI_RPROC_LPM3_MBX0
 
 int g_hkadc_debug = 0;
+
 void hkadc_debug(int onoff)
 {
 	g_hkadc_debug = onoff;
@@ -90,21 +93,22 @@ static int adc_dev_notifier(struct notifier_block *nb, unsigned long len, void *
 			pr_info("%s_debug:[notifier] msg[%lu] = 0x%x\n", MODULE_NAME, i, _msg[i]);
 	}
 
-	if (_msg[0] == HADC_IPC_RECV_HEADER) {
+	if (_msg[0] == HADC_IPC_RECV_HEADER || _msg[0] == HADC_IPC_RECV_CURRENT_HEADER) {
 		if (!(ADC_DATA_BIT_R(_msg[1], 8) & ADC_DATA_MASK)) {
 			if ((_msg[1] & ADC_DATA_MASK) == hisi_adc_dev->info.channel) {
 				hisi_adc_dev->info.value = ADC_DATA_BIT_R(_msg[1], 16);
 				is_complete = 0;
-			} else {
-				pr_info("%s: msg[1][0x%x]\n", MODULE_NAME, _msg[1]);
+				goto exit;
 			}
 		} else {
 			is_complete = 0;
 			hisi_adc_dev->info.value = ADC_RESULT_ERR;
-			pr_err("%s: error value msg[1][0x%x]\n", MODULE_NAME, _msg[1]);
 		}
 	}
 
+	pr_err("%s: error value msg[1][0x%x]\n", MODULE_NAME, _msg[1]);
+
+exit:
 	if (!is_complete)
 		complete(&hisi_adc_dev->completion);
 
@@ -113,7 +117,7 @@ static int adc_dev_notifier(struct notifier_block *nb, unsigned long len, void *
 
 
 /* AP sends msgs to LPM3 for adc sampling&converting. */
-static int adc_send_ipc_to_lpm3(int channel)
+static int adc_send_ipc_to_lpm3(int channel, int ipc_header)
 {
 	int loop = ADC_IPC_MAX_CNT;
 	int ret = 0;
@@ -130,8 +134,7 @@ static int adc_send_ipc_to_lpm3(int channel)
 		goto err_adc_dev;
 	}
 
-	if (hisi_adc_dev->tx_msg[ADC_IPC_CMD_TYPE] != ADC_IPC_DATA)
-		hisi_adc_dev->tx_msg[ADC_IPC_CMD_TYPE] = ADC_IPC_DATA;
+	hisi_adc_dev->tx_msg[ADC_IPC_CMD_TYPE] = ipc_header;
 
 	hisi_adc_dev->info.channel = channel;
 	hisi_adc_dev->tx_msg[ADC_IPC_CMD_CHANNEL] = channel;
@@ -180,7 +183,7 @@ int xoadc_to_volt(int adc)
 	if (adc < 0)
 		return -1;
 
-	volt = adc * VREF_MV_DIV_100 * AMPLIFY_DIV_BY_100 / AD_RANGE;
+	volt = adc * VREF_VOLT / AD_RANGE;
 
 	return volt;
 }
@@ -211,6 +214,29 @@ int hisi_adc_get_value(int adc_channel)
 }
 EXPORT_SYMBOL(hisi_adc_get_value);
 
+static int hisi_adc_send_wait(int adc_channel, int ipc_header)
+{
+	int ret = 0;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0)
+	reinit_completion(&hisi_adc_dev->completion);
+#else
+	INIT_COMPLETION(hisi_adc_dev->completion);
+#endif
+	ret = adc_send_ipc_to_lpm3(adc_channel, ipc_header);
+	if (ret)
+		goto exit;
+
+	ret = wait_for_completion_timeout(&hisi_adc_dev->completion, msecs_to_jiffies(ADC_IPC_TIMEOUT));
+	if (!ret) {
+		pr_err("%s: channel-%d timeout!\n", MODULE_NAME, adc_channel);
+		ret =  -ETIMEOUT;
+	} else
+		ret = 0;
+
+exit:
+	return ret;
+}
 /*
  * Function name:hisi_adc_get_adc.
  * Discription:get adc value from hkadc.
@@ -224,24 +250,9 @@ int hisi_adc_get_adc(int adc_channel)
 	int ret = 0;
 
 	mutex_lock(&hisi_adc_dev->mutex);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0)
-	reinit_completion(&hisi_adc_dev->completion);
-#else
-	INIT_COMPLETION(hisi_adc_dev->completion);
-#endif
-	ret = adc_send_ipc_to_lpm3(adc_channel);
-	if (ret)
-		goto err_send_msg;
 
-	ret = wait_for_completion_timeout(&hisi_adc_dev->completion, msecs_to_jiffies(ADC_IPC_TIMEOUT));
-	if (!ret) {
-		pr_err("%s: channel-%d timeout!\n", MODULE_NAME, adc_channel);
-		ret =  -ETIMEOUT;
-	} else {
-		ret = 0;
-	}
+	ret = hisi_adc_send_wait(adc_channel, ADC_IPC_DATA);
 
-err_send_msg:
 	hisi_adc_dev->info.channel = ADC_RESULT_ERR;
 	mutex_unlock(&hisi_adc_dev->mutex);
 	if (1 == g_hkadc_debug)
@@ -250,6 +261,21 @@ err_send_msg:
 	return ret ? ret : hisi_adc_dev->info.value;
 }
 EXPORT_SYMBOL(hisi_adc_get_adc);
+
+int hisi_adc_get_current(int adc_channel)
+{
+	int ret = 0;
+
+	mutex_lock(&hisi_adc_dev->mutex);
+
+	ret = hisi_adc_send_wait(adc_channel, ADC_IPC_CURRENT);
+	hisi_adc_dev->info.channel = ADC_RESULT_ERR;
+
+	mutex_unlock(&hisi_adc_dev->mutex);
+
+	return ret ? ret : hisi_adc_dev->info.value;
+}
+EXPORT_SYMBOL(hisi_adc_get_current);
 
 
 static void adc_init_device_debugfs(void)
@@ -291,7 +317,7 @@ static int __init hisi_adc_driver_init(void)
 	}
 
 	hisi_adc_dev->tx_msg[ADC_IPC_CMD_TYPE] = ADC_IPC_DATA;
-	hisi_adc_dev->tx_msg[ADC_IPC_CMD_CHANNEL] = ADC_RESULT_ERR;
+	hisi_adc_dev->tx_msg[ADC_IPC_CMD_CHANNEL] = (mbox_msg_t)ADC_RESULT_ERR;
 
 	mutex_init(&hisi_adc_dev->mutex);
 	init_completion(&hisi_adc_dev->completion);

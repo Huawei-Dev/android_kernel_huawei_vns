@@ -10,12 +10,12 @@
 
 #ifndef	HISI_ADC_H
 #define	HISI_ADC_H
-#include <global_ddr_map.h>
+#include <iomcu_ddr_map.h>
 
 #ifdef CONFIG_HISI_THERMAL_CONTEXTHUB
-#define CONTEXTHUB_THERMAL_DDR_HEADER_ADDR (HISI_CONTEXTHUB_THERMAL_SHMEM_PHYMEM_BASE)
-#define CONTEXTHUB_THERMAL_DDR_MEMBERS_SIZE (0x600)
-#define CONTEXTHUB_THERMAL_DDR_TOTAL_SIZE (HISI_CONTEXTHUB_THERMAL_SHMEM_PHYMEM_SIZE)
+#define CONTEXTHUB_THERMAL_DDR_HEADER_ADDR      DDR_THERMAL_SHMEM_PHYMEM_BASE_AP
+#define CONTEXTHUB_THERMAL_DDR_MEMBERS_SIZE     (0x600)
+#define CONTEXTHUB_THERMAL_DDR_TOTAL_SIZE       DDR_THERMAL_SHMEM_PHYMEM_SIZE
 #endif
 enum hkadc_table_id {
 	HKADC_ADC_TABLEID = 0,
@@ -74,8 +74,14 @@ static inline int hisi_adc_get_value(int adc_channel)
  */
 #ifdef CONFIG_HISI_HKADC
 extern int hisi_adc_get_adc(int adc_channel);
+extern int hisi_adc_get_current(int adc_channel);
 #else
 static inline int hisi_adc_get_adc(int adc_channel)
+{
+	return -1;
+}
+
+static inline int hisi_adc_get_current(int adc_channel)
 {
 	return -1;
 }
