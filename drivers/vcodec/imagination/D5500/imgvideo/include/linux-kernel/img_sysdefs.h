@@ -208,10 +208,24 @@ inline static void* img_sys_vmalloc(size_t size, const char *fct, uint32_t line)
     }
     return ptr;
 }
-#define IMG_SYSBIGALLOC(size) img_sys_vmalloc(size, __FILE__, __LINE__)
 
-#define IMG_SYSFREE(ptr)         kfree(ptr)
-#define IMG_SYSBIGFREE(ptr)      vfree(ptr)
+inline static void img_sys_kfree(void *ptr)
+{
+    kfree(ptr);
+    ptr = NULL;
+}
+
+inline static void img_sys_vfree(void *ptr)
+{
+    vfree(ptr);
+    ptr = NULL;
+}
+
+#define IMG_SYSBIGALLOC(size)   img_sys_vmalloc(size, __FILE__, __LINE__)
+#define IMG_SYSFREE(ptr)        img_sys_kfree(ptr)
+#define IMG_SYSBIGFREE(ptr)     img_sys_vfree(ptr)
+
+
 /** @brief With GCC this aligns the memory */
 #define IMG_ALIGN(bytes)       __attribute__ ((aligned (bytes)))
 

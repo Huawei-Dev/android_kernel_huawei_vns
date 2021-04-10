@@ -256,17 +256,24 @@ static nestlock_t gsListLock;
 
 static struct dentry *     gpsDebugfsRoot;  //<! root for device debugfs directory
 static SYSOSKM_sPowerInfo  gaPowerInfo;
-
+static IMG_INT32 gSuspendResult = IMG_SUCCESS;
 /* Platform driver related stuffs.  */
 static IMG_INT32 imgsys_suspend_handler(
     struct platform_device *  pdev,
     pm_message_t              state
 )
 {
+    REPORT(SYSOS_API_KM, REPORT_INFO, "vdec suspend start \n");
+    gSuspendResult = IMG_SUCCESS;
     gaPowerInfo.pfnKmPowerEvent(SYSOSKM_POWERTRANS_PRE, SYSOSKM_POWERSTATE_S5, gaPowerInfo.pvParam);
-
+    if (gSuspendResult != IMG_SUCCESS)
+    {
+        REPORT(SYSOS_API_KM, REPORT_ERR, "PRE SYSOSKM_POWERSTATE_S5 exception return \n");
+        return gSuspendResult;
+    }
+    REPORT(SYSOS_API_KM, REPORT_INFO, "vdec suspending \n");
     gaPowerInfo.pfnKmPowerEvent(SYSOSKM_POWERTRANS_POST, SYSOSKM_POWERSTATE_S5, gaPowerInfo.pvParam);
-
+    REPORT(SYSOS_API_KM, REPORT_INFO, "vdec suspend success \n");
     return IMG_SUCCESS;
 }
 
@@ -921,6 +928,57 @@ IMG_RESULT SYSOSKM_WaitEventObject(
 }
 IMGVIDEO_EXPORT_SYMBOL(SYSOSKM_WaitEventObject)
 
+/*!
+******************************************************************************
+
+ @Function                SYSOSKM_WaitEventObject_Timeout
+
+******************************************************************************/
+IMG_RESULT SYSOSKM_WaitEventObject_Timeout(
+    IMG_HANDLE  hEventHandle
+)
+{
+    static IMG_INT32 TimeoutCount = 0;
+    IMG_INT ret = IMG_SUCCESS;
+    SYSOSKM_sEvent *  psEvent = (SYSOSKM_sEvent *)hEventHandle;
+
+    IMG_ASSERT(gInitialised == IMG_TRUE);
+
+    IMG_ASSERT(hEventHandle != IMG_NULL);
+    if (hEventHandle == IMG_NULL)
+    {
+        return IMG_ERROR_GENERIC_FAILURE;
+    }
+
+    if (TimeoutCount < 1)
+    {
+        wait_event_timeout(sysos_wait_queue, psEvent->bSignalled, HZ);
+
+        /* If there was no signal...*/
+        IMG_ASSERT (psEvent->bSignalled == IMG_TRUE);
+        if (psEvent->bSignalled == IMG_TRUE)
+        {
+            TimeoutCount = 0;
+        }
+        else
+        {
+            TimeoutCount++;
+            REPORT(SYSOS_API_KM, REPORT_ERR, "IMG_ERROR_TIMEOUT \n");
+            gSuspendResult = IMG_ERROR_TIMEOUT;
+        }
+    }
+    else
+    {
+       TimeoutCount = 0;
+       wait_event(sysos_wait_queue, psEvent->bSignalled);
+    }
+
+   /* Clear signal pending...*/
+    psEvent->bSignalled = IMG_FALSE;
+
+    return ret;
+}
+IMGVIDEO_EXPORT_SYMBOL(SYSOSKM_WaitEventObject_Timeout)
 
 /*!
 ******************************************************************************
@@ -1370,6 +1428,10 @@ IMG_RESULT SYSOSKM_CopyFromUserRaw(
     IMG_SIZE                 stNumBytes
 )
 {
+    if (!pvFromCpuAddr)
+    {
+        return IMG_ERROR_FATAL;
+    }
 #ifdef IMG_KERNEL_MODULE
     if (0 != copy_from_user(pvToCpuKmAddr, pvFromCpuAddr, stNumBytes))
         return IMG_ERROR_FATAL;

@@ -4663,6 +4663,7 @@ decoder_StreamDestroy(
     }
 
     // Remove the device resources used for decoding and the two
+    // added to hold the last on front and back-end for stream.
     for (i = 0; i < psDecStrCtx->ui32NumDecRes + 2; i++)
     {
         ui32Result = RESOURCE_ListEmpty(&psDecStrCtx->sDecResList,
@@ -6607,6 +6608,7 @@ DECODER_PowerOff(
         ui32Result = IMG_ERROR_INVALID_PARAMETERS;
         goto error;
     }
+    REPORT(REPORT_MODULE_DECODER, REPORT_INFO, "vdec %s start to loop list  \n", __FUNCTION__);
 
     psDecCoreCtx = LST_first(&psDecCtx->sCoreList);
     while (psDecCoreCtx)
@@ -6645,6 +6647,7 @@ DECODER_PowerOff(
 
         psDecCoreCtx = LST_next(psDecCoreCtx);
     }
+    REPORT(REPORT_MODULE_DECODER, REPORT_INFO, "vdec %s stop to loop list  \n", __FUNCTION__);
 
     return IMG_SUCCESS;
 
@@ -6669,6 +6672,7 @@ DECODER_PrePowerOff(
 
     /* Check input parameters. */
     IMG_ASSERT(IMG_NULL != hDecCtx);
+    REPORT(REPORT_MODULE_DECODER, REPORT_INFO, "vdec %s enter \n", __FUNCTION__);
 
     ui32Result = DECODER_PowerOff(hDecCtx,IMG_TRUE);
     IMG_ASSERT(ui32Result == IMG_SUCCESS);
@@ -6683,6 +6687,7 @@ DECODER_PrePowerOff(
         IMG_UINT32      ui32VecRamVal = 0;
         DECODER_sCoreContext *  psDecCoreCtx;
         DECODER_sContext *      psDecCtx = (DECODER_sContext *)hDecCtx;
+        REPORT(REPORT_MODULE_DECODER, REPORT_INFO, "vdec %s start to loop list  \n", __FUNCTION__);
 
         //clear VLR for each core
         psDecCoreCtx = LST_first(&psDecCtx->sCoreList);
@@ -6695,6 +6700,7 @@ DECODER_PrePowerOff(
 
             psDecCoreCtx = LST_next(psDecCoreCtx);
         }
+        REPORT(REPORT_MODULE_DECODER, REPORT_INFO, "vdec %s stop to loop list  \n", __FUNCTION__);
     }
 #endif // VDEC_PM_EVENTS_INJECTION && VDEC_MSVDX_HARDWARE
 

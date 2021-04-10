@@ -171,11 +171,7 @@ obj-$(CONFIG_RAS)		+= ras/
 obj-$(CONFIG_THUNDERBOLT)	+= thunderbolt/
 obj-$(CONFIG_CORESIGHT)		+= hwtracing/hisi_coresight/
 obj-$(CONFIG_ANDROID)		+= android/
-ifeq ($(BOARD_CHARGER_ENABLE_DRM),true)
-obj-$(CONFIG_IMAGINATION_D5500_DRM_VCODEC)  += vcodec/imagination/D5500_DRM/
-else
 obj-$(CONFIG_IMAGINATION_D5500_VCODEC)  += vcodec/imagination/D5500/
-endif
 obj-$(CONFIG_HISILICON_PLATFORM)+= hisi/
 obj-$(CONFIG_HUAWEI_PLATFORM) 	+= huawei_platform/
 obj-$(CONFIG_HUAWEI_DSM)	+= dsm/

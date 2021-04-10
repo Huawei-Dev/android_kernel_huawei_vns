@@ -447,11 +447,14 @@ wbfifo_Get(
 		if (result != IMG_SUCCESS) return IMG_FALSE;
 	}
 
+	if (psSocket->ui32IncomingFifo_Consumer >= COMM_INCOMING_FIFO_SIZE)
+		return IMG_FALSE;
+
 	IMG_MEMCPY(pNewMsg, &psSocket->asIncomingFifo[psSocket->ui32IncomingFifo_Consumer], sizeof(IMG_WRITEBACK_MSG));
 
 	psSocket->ui32IncomingFifo_Consumer++;
 
-	if (psSocket->ui32IncomingFifo_Consumer == COMM_INCOMING_FIFO_SIZE)
+	if (psSocket->ui32IncomingFifo_Consumer >= COMM_INCOMING_FIFO_SIZE)
 		psSocket->ui32IncomingFifo_Consumer = 0;
 
 	return IMG_TRUE;
@@ -1370,7 +1373,7 @@ _comm_CloseSocket(
 {
 	IMG_UINT32 nIndex;
 	IMG_COMM_SOCKET *psSocket = (IMG_COMM_SOCKET *)param;
-	comm_Lock(psSocket->devContext, COMM_LOCK_BOTH);
+        comm_Lock(psSocket->devContext, COMM_LOCK_BOTH);
 	for (nIndex = 0; nIndex < TOPAZHP_MAX_POSSIBLE_STREAMS; nIndex++)
 	{
 		if(psSocket->devContext->deviceSockets[nIndex] == psSocket)
@@ -1419,7 +1422,7 @@ _comm_CloseSocket(
 
 	/* Free all the resources attached to this socket */
 	RMAN_DestroyBucket(psSocket->hResBHandle);
-	comm_Unlock(psSocket->devContext, COMM_LOCK_BOTH);
+        comm_Unlock(psSocket->devContext, COMM_LOCK_BOTH);
 	IMG_FREE(psSocket);
 }
 
