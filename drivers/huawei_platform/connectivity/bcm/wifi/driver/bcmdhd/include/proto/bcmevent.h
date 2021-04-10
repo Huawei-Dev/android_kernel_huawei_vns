@@ -262,8 +262,8 @@ typedef union bcm_event_msg_u {
 #define WLC_E_RMC_EVENT			139	/* RMC event */
 #ifdef  BRCM_RSDB
 #define WLC_E_DPSTA_INTF_IND	140	/* DPSTA interface indication */
-#define WLC_E_RRM		141	/* RRM Event */
 #endif
+#define WLC_E_RRM               141     /* RRM Event */
 #define WLC_E_PFN_SSID_EXT      142  /* SSID EXT event */
 #define WLC_E_ROAM_EXP_EVENT    143  /* Expanded roam event */
 #define WLC_E_ULP			146	/* ULP entered indication */
@@ -279,9 +279,17 @@ typedef union bcm_event_msg_u {
 #ifdef CONFIG_HW_ABS
 #define WLC_E_ANT_EVENT		166
 #endif
-#define WLC_E_LAST			167	/* highest val + 1 for range checking */
-#if (WLC_E_LAST > 167)
-#error "WLC_E_LAST: Invalid value for last event; must be <= 166."
+
+#define WLC_E_RRM_RESP_STATUS    168
+#ifdef WL_TIM_EVENT
+#define WLC_E_TIM_EVENT     169
+#endif
+#ifdef WL_TEM_CTRL
+#define WLC_E_TEM_CTRL_EVENT          172
+#endif
+#define WLC_E_LAST                     173     /* highest val + 1 for range checking */
+#if (WLC_E_LAST > 173)
+#error "WLC_E_LAST: Invalid value for last event; must be <= 172."
 #endif /* WLC_E_LAST */
 
 /* define an API for getting the string name of an event */
@@ -383,6 +391,9 @@ typedef struct wl_event_sdb_trans {
 #define WLC_E_PRUNE_HOME_AP		17	/* prune home AP */
 #ifdef WRONG_ACTION_PATCH
 #define WLC_E_PRUNE_WRONG_ACTION	20
+#endif
+#ifdef BCM_PATCH_FOR_AMPDU_TEAR_DOWN
+#define WLC_E_PRUNE_AMPDU_TEARDOWN	21
 #endif
 
 /* WPA failure reason codes carried in the WLC_E_PSK_SUP event */
@@ -613,6 +624,16 @@ enum nan_app_events {
 typedef struct wl_event_data_ant {
 	int32 state;
 } wl_event_data_ant_t;
+#endif
+#ifdef CONFIG_HW_GET_EXT_SIG
+#define RRM_EVENT_VERSION  0
+typedef struct wl_rrm_event {
+int16 version;
+	int16 len;
+	int16 cat;                             /* Category */
+	int16 subevent;
+	char payload[1]; /* Measurement payload */
+} wl_rrm_event_t;
 #endif
 
 /* This marks the end of a packed structure section. */

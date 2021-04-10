@@ -143,7 +143,6 @@ extern void notify_chr_thread_to_update_rtt(u32 rtt);
 
 #ifdef CONFIG_HW_WIFI
 #define HW_TCP_TIMESTAMP_ERR_THRESHOLD    (1)
-extern void hw_dhd_check_and_disable_timestamps(void);
 static void hw_tcp_check_and_disable_timestamps(void);
 #endif
 
@@ -5596,9 +5595,6 @@ static void hw_tcp_check_and_disable_timestamps(void)
 	}
 	if (sysctl_tcp_timestamps && (++tcp_ts_err > HW_TCP_TIMESTAMP_ERR_THRESHOLD)) {
 		pr_err("TCP timestamp error, check network interface and try to disable ts.\n");
-#ifdef CONFIG_BCMDHD
-		hw_dhd_check_and_disable_timestamps();
-#endif
 		tcp_ts_err = 0;
 	}
 	last_timestamps = sysctl_tcp_timestamps;

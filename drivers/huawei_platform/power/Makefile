@@ -15,3 +15,4 @@ CFLAGS_KERNEL += -DCONFIG_HLTHERM_RUNTEST
 endif
 
 obj-$(CONFIG_HUAWEI_BDAT) += bdat/
+obj-$(CONFIG_DOZE_FILTER)	+= wifi_filter/

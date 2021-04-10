@@ -40,13 +40,19 @@
 #ifdef CONFIG_HWCONNECTIVITY
 #include <huawei_platform/connectivity/hw_connectivity.h>
 #endif
-
+#define DTS_COMP_GPS_POWER_NAME "huawei,gps_power"
+#define BUFFER_SIZE 16
 #define PORT_NAME "/dev/ttyAMA3"
-
+#define SIZE_MAX      (18446744073709551615UL)
 #define USE_TIMER 1
 //#define BCM_TTY_DEBUG_INFO 0
 //#define BCM_TTY_DEBUG 0
-#define BCM_TTY_DELTA_MS_TO_TOGGLE_LOW 400
+/*
+From EMUI4.1 to  EMUI 5.0 , the GpioDelayMs is changed from 50ms to 250ms,
+so bcm suggest change the delay time from 400ms to 600 ms.
+*/
+//#define BCM_TTY_DELTA_MS_TO_TOGGLE_LOW 400
+#define BCM_TTY_DELTA_MS_TO_TOGGLE_LOW 600
 #define BCM_TTY_TIMER_IDLE_INTERVAL_MS 200
 //#define BCM_TTY_MCU_REQ_RESP 1
 
@@ -57,7 +63,7 @@
 #ifdef CONFIG_SENSORS_SSP_BBD
 extern void bbd_parse_asic_data(unsigned char *pucData, unsigned short usLen, void (*to_gpsd)(unsigned char *packet, unsigned short len, void* priv), void* priv);
 #endif
-
+char gps_tty[16];
 //--------------------------------------------------------------
 //
 //               Structs
@@ -418,6 +424,31 @@ static int bcm_tty_config_close(struct file *f)
 	return 0;
 }
 
+static int get_GPS_TTY_Port(void)
+{
+	struct device_node *np = NULL;
+	int ret = 0;
+	char *gps_tty_port_str = NULL;
+    
+	memset(gps_tty,0,sizeof(gps_tty));
+	np = of_find_compatible_node(NULL, NULL, DTS_COMP_GPS_POWER_NAME);
+	if (!np) 
+	{
+		GPSERR("%s, can't find node %s\n", __func__,DTS_COMP_GPS_POWER_NAME);
+		return -1;
+	}
+	ret = of_property_read_string(np, "broadcom_config,tty_port",(const char **)&gps_tty_port_str);
+	if (ret) 
+	{
+		GPSINFO("get broadcom_config,tty_port fail ret=%d\n",ret);
+		snprintf(gps_tty, sizeof(gps_tty),"/dev/%s", "ttyAMA3");
+		return 0;
+	}
+	snprintf(gps_tty, sizeof(gps_tty),"/dev/%s", gps_tty_port_str);
+	GPSINFO("get gps_tty=%s\n",gps_tty);
+	return 0;
+	
+}
 //--------------------------------------------------------------
 //
 //               File Operations
@@ -432,7 +463,11 @@ static int bcm_tty_open(struct inode *inode, struct file *filp)
 	struct bcm_tty_priv *priv = container_of(filp->private_data, struct bcm_tty_priv, misc);
 
 	GPSINFO("++");
-
+    if(get_GPS_TTY_Port()<0)
+	{
+		GPSERR("get_GPS_TTY_Port failed !");
+		return -1;
+	}
 	if(priv->tty)
 	{
 		GPSERR("-- has opened, open failed !");
@@ -440,16 +475,16 @@ static int bcm_tty_open(struct inode *inode, struct file *filp)
 	}
 
 	/* Open tty */
-	priv->tty = filp_open(PORT_NAME, O_RDWR, 0);
+	priv->tty = filp_open(gps_tty, O_RDWR, 0);
 	if (IS_ERR(priv->tty)) {
 		int ret = (int)PTR_ERR(priv->tty);
-		GPSERR(" can not open %s, error=%d", PORT_NAME, ret);
+		GPSERR(" can not open %s, error=%d", gps_tty, ret);
 		return ret;
 	}
 
 	/* Config tty */
 	if (bcm_tty_config(priv->tty)) {
-		GPSERR(" can not change %s setting.", PORT_NAME);
+		GPSERR(" can not change %s setting.", gps_tty);
 		return -EIO;
 	}
 
@@ -513,6 +548,9 @@ static ssize_t bcm_tty_write(struct file *filp, const char __user *buf, size_t s
 	priv = (struct bcm_tty_priv *)base->priv_data;
 
 	spin_lock_irqsave(&base->lock, flags);
+	if(size > SIZE_MAX){
+		size = SIZE_MAX;
+	}
 	base->total_bytes_to_write+=size;
 	base->total_write_request++;
 
@@ -560,7 +598,7 @@ int bcm4774_suspend(struct platform_device *p, pm_message_t state)
 	}
 	/* Disable auto uart flow control by hardware, enable manual uart flow control by register */
 	if (bcm_tty_config_close(ttyfile)) {
-		GPSERR("can not change %s setting.", PORT_NAME);
+		GPSERR("can not change %s setting.", gps_tty);
 		return 0;
 	}
 	/* Disable  uart RTS via register: pull high (register =0 means pull high) */
@@ -590,7 +628,7 @@ int bcm4774_resume(struct platform_device *p)
 
 	/* Enable auto uart flow control by hardware, manual uart flow control by register is disabled */
 	if (bcm_tty_config(ttyfile)) {
-		GPSERR(" can not change %s setting.", PORT_NAME);
+		GPSERR(" can not change %s setting.", gps_tty);
 		return 0;
 	}
 

@@ -411,8 +411,10 @@ const bcm_iovar_t sdioh_iovars[] = {
 	{"sd_ints", 	IOV_USEINTS,	0,	IOVT_BOOL,	0 },
 	{"sd_numints",	IOV_NUMINTS,	0,	IOVT_UINT32,	0 },
 	{"sd_numlocalints", IOV_NUMLOCALINTS, 0, IOVT_UINT32,	0 },
+#ifdef BCMINTERNAL
 	{"sd_hostreg",	IOV_HOSTREG,	0,	IOVT_BUFFER,	sizeof(sdreg_t) },
 	{"sd_devreg",	IOV_DEVREG, 	0,	IOVT_BUFFER,	sizeof(sdreg_t) },
+#endif
 	{"sd_divisor",	IOV_DIVISOR,	0,	IOVT_UINT32,	0 },
 	{"sd_power",	IOV_POWER,	0,	IOVT_UINT32,	0 },
 	{"sd_clock",	IOV_CLOCK,	0,	IOVT_UINT32,	0 },
@@ -612,7 +614,7 @@ sdioh_iovar_op(sdioh_info_t *si, const char *name,
 		int_val = (int32)0;
 		bcopy(&int_val, arg, sizeof(int_val));
 		break;
-
+#ifdef BCMINTERNAL
 	case IOV_GVAL(IOV_HOSTREG):
 	{
 		sdreg_t *sd_ptr = (sdreg_t *)params;
@@ -658,6 +660,10 @@ sdioh_iovar_op(sdioh_info_t *si, const char *name,
 		sdreg_t *sd_ptr = (sdreg_t *)params;
 		uint8 data = 0;
 
+		if ((uint)sd_ptr->func > si->num_funcs) {
+			bcmerror = BCME_BADARG;
+			break;
+		}
 		if (sdioh_cfg_read(si, sd_ptr->func, sd_ptr->offset, &data)) {
 			bcmerror = BCME_SDIO_ERROR;
 			break;
@@ -673,13 +679,17 @@ sdioh_iovar_op(sdioh_info_t *si, const char *name,
 		sdreg_t *sd_ptr = (sdreg_t *)params;
 		uint8 data = (uint8)sd_ptr->value;
 
+		if ((uint)sd_ptr->func > si->num_funcs) {
+			bcmerror = BCME_BADARG;
+			break;
+		}
 		if (sdioh_cfg_write(si, sd_ptr->func, sd_ptr->offset, &data)) {
 			bcmerror = BCME_SDIO_ERROR;
 			break;
 		}
 		break;
 	}
-
+#endif /* BCMINTERNAL */
 	default:
 		bcmerror = BCME_UNSUPPORTED;
 		break;
@@ -898,9 +908,12 @@ retry:
 			}
 #ifdef HW_WIFI_DMD_LOG
 #ifndef HW_WIFI_DMD_CLOSE_CMD52_LOG
-			hw_wifi_dsm_client_notify(DSM_WIFI_CMD52_ERROR,
+			if (hw_dmd_trigger_sdio_cmd(DSM_WIFI_CMD52_ERROR)) {
+				hw_dmd_increase_count(DSM_WIFI_CMD52_ERROR);
+				hw_wifi_dsm_client_notify(DSM_WIFI_CMD52_ERROR,
 						"bcmsdh_sdmmc: Failed to %s byte F%d:@0x%x=0x%x, Err: %d\n",
 						rw ? "Write" : "Read", func, regaddr, *byte, err_ret);
+			}
 #endif
 #endif
 #endif
@@ -917,8 +930,11 @@ sdioh_request_word(sdioh_info_t *sd, uint cmd_type, uint rw, uint func, uint add
 #if defined(MMC_SDIO_ABORT)
 	int sdio_abort_retry = MMC_SDIO_ABORT_RETRY_LIMIT;
 #endif
+#ifdef HW_REG_RECOVERY
+	int word_ret = SDIOH_API_RC_FAIL;
+#endif
 #ifdef HW_SDIO_RW_RETRY
-	int retry_times = 5;
+	int retry_times = 2;
 #endif
 
 	if (func == 0) {
@@ -962,6 +978,9 @@ retry:
 	/* Release host controller */
 	sdio_release_host(sd->func[func]);
 
+#ifdef HW_REG_RECOVERY
+	word_ret = err_ret;
+#endif
 	if (err_ret) {
 #if defined(MMC_SDIO_ABORT)
 		/* Any error on CMD53 transaction should abort that function using function 0. */
@@ -1004,7 +1023,8 @@ retry:
 
 #ifdef HW_WIFI_DMD_LOG
 #ifndef HW_WIFI_DMD_CLOSE_CMD52_LOG
-	if((err_ret != 0) && (retry_times == 0)) {
+	if((err_ret != 0) && (retry_times == 0) && hw_dmd_trigger_sdio_cmd(DSM_WIFI_CMD52_ERROR)) {
+		hw_dmd_increase_count(DSM_WIFI_CMD52_ERROR);
 		hw_wifi_dsm_client_notify(DSM_WIFI_CMD52_ERROR,
 		          "bcmsdh_sdmmc: Failed to %s word, Err: 0x%x\n",
 		          rw ? "Write" : "Read", err_ret);
@@ -1012,7 +1032,11 @@ retry:
 #endif
 #endif
 #endif
+#ifdef HW_REG_RECOVERY
+	return ((word_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL);
+#else
 	return ((err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL);
+#endif
 }
 
 static SDIOH_API_RC
@@ -1131,9 +1155,12 @@ sdioh_request_packet_chain(sdioh_info_t *sd, uint fix_inc, uint write, uint func
 			sd_err(("%s:CMD53 %s failed with code %d\n",
 				__FUNCTION__, write ? "write" : "read", err_ret));
 #ifdef HW_WIFI_DMD_LOG
-			hw_wifi_dsm_client_notify(DSM_WIFI_CMD53_ERROR,
-			          "%s:CMD53 %s failed with code %d\n",
-			          __FUNCTION__, write ? "write" : "read", err_ret);
+			if (hw_dmd_trigger_sdio_cmd(DSM_WIFI_CMD53_ERROR)) {
+				hw_dmd_increase_count(DSM_WIFI_CMD53_ERROR);
+				hw_wifi_dsm_client_notify(DSM_WIFI_CMD53_ERROR,
+						"%s:CMD53 %s failed with code %d\n",
+						__FUNCTION__, write ? "write" : "read", err_ret);
+			}
 #endif
 			return SDIOH_API_RC_FAIL;
 		}
@@ -1179,9 +1206,12 @@ sdioh_buffer_tofrom_bus(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
 		sd_err(("%s: %s FAILED %p, addr=0x%05x, pkt_len=%d, ERR=%d\n", __FUNCTION__,
 		       (write) ? "TX" : "RX", buf, addr, len, err_ret));
 #ifdef HW_WIFI_DMD_LOG
-		hw_wifi_dsm_client_notify(DSM_WIFI_CMD53_ERROR,
+		if (hw_dmd_trigger_sdio_cmd(DSM_WIFI_CMD53_ERROR)) {
+			hw_dmd_increase_count(DSM_WIFI_CMD53_ERROR);
+			hw_wifi_dsm_client_notify(DSM_WIFI_CMD53_ERROR,
 				"%s: %s FAILED %p, addr=0x%x, pkt_len=%d, ERR=%d\n", __FUNCTION__,
-		       (write) ? "TX" : "RX", buf, addr, len, err_ret);
+				(write) ? "TX" : "RX", buf, addr, len, err_ret);
+		}
 #endif
 	}
 	else

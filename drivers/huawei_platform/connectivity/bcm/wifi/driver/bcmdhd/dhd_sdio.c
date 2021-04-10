@@ -1,4 +1,28 @@
-
+/*
+ * DHD Bus Module for SDIO
+ *
+ * Copyright (C) 1999-2014, Broadcom Corporation
+ *
+ *      Unless you and Broadcom execute a separate written software license
+ * agreement governing use of this software, this software is licensed to you
+ * under the terms of the GNU General Public License version 2 (the "GPL"),
+ * available at http://www.broadcom.com/licenses/GPLv2.php, with the
+ * following added to such license:
+ *
+ *      As a special exception, the copyright holders of this software give you
+ * permission to link this software with independent modules, and to copy and
+ * distribute the resulting executable under terms of your choice, provided that
+ * you also meet, for each linked independent module, the terms and conditions of
+ * the license of that module.  An independent module is a module which is not
+ * derived from this software.  The special exception does not apply to any
+ * modifications of the software.
+ *
+ *      Notwithstanding the above, under no circumstances may you combine this
+ * software in any way with any other Broadcom software provided under a license
+ * other than the GPL, without Broadcom's express prior written consent.
+ *
+ * $Id: dhd_sdio.c 476991 2014-05-12 06:21:02Z $
+ */
 
 #include <typedefs.h>
 #include <osl.h>
@@ -4438,7 +4462,6 @@ dhd_txglom_enable(dhd_pub_t *dhdp, bool enable)
 	 */
 	dhd_bus_t *bus = dhdp->bus;
 #ifdef BCMSDIOH_TXGLOM
-	char buf[256];
 	uint32 rxglom;
 	int32 ret;
 
@@ -4451,9 +4474,8 @@ dhd_txglom_enable(dhd_pub_t *dhdp, bool enable)
 
 	if (enable) {
 		rxglom = 1;
-		memset(buf, 0, sizeof(buf));
-		bcm_mkiovar("bus:rxglom", (void *)&rxglom, 4, buf, sizeof(buf));
-		ret = dhd_wl_ioctl_cmd(dhdp, WLC_SET_VAR, buf, sizeof(buf), TRUE, 0);
+		ret = dhd_iovar(dhdp, 0, "bus:rxglom", (char *)&rxglom,
+				sizeof(rxglom), NULL, 0, TRUE);
 		if (ret >= 0)
 			bus->txglom_enable = TRUE;
 		else {
@@ -5995,11 +6017,19 @@ dhdsdio_dpc(dhd_bus_t *bus)
 	uint framecnt = 0;		  /* Temporary counter of tx/rx frames */
 	bool rxdone = TRUE;		  /* Flag for no more read data */
 	bool resched = FALSE;	  /* Flag indicating resched wanted */
+#ifdef HW_REG_RECOVERY
+	unsigned long read_reg_stamp = 0;
+	int hwerr1, hwerr2, hwerr3, hwerr4 = 0;
+	uint32 hwintstatus = 0;
+#endif
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
 	dhd_os_sdlock(bus->dhd);
-
+#ifdef HW_REG_RECOVERY
+	if (bus->dhd->busstate == DHD_BUS_DOWN || bus->dhd->hang_was_sent) {
+#else
 	if (bus->dhd->busstate == DHD_BUS_DOWN) {
+#endif
 		DHD_ERROR(("%s: Bus down, ret\n", __FUNCTION__));
 		bus->intstatus = 0;
 		dhd_os_sdunlock(bus->dhd);
@@ -6069,10 +6099,36 @@ dhdsdio_dpc(dhd_bus_t *bus)
 	/* Pending interrupt indicates new device status */
 	if (bus->ipend) {
 		bus->ipend = FALSE;
+#ifdef HW_REG_RECOVERY
+		read_reg_stamp = jiffies;
+		hwintstatus = 0;
+		hwintstatus |= bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, ((unsigned int)&regs->intstatus & 0xffff) + 0, &hwerr1);
+		hwintstatus |= bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, ((unsigned int)&regs->intstatus & 0xffff) + 1, &hwerr2) << 8;
+		hwintstatus |= bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, ((unsigned int)&regs->intstatus & 0xffff) + 2, &hwerr3) << 16;
+		hwintstatus |= bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, ((unsigned int)&regs->intstatus & 0xffff) + 3, &hwerr4) << 24;
+		newstatus = hwintstatus;
+		hwerr1 = hwerr1 | hwerr2 | hwerr3 | hwerr4;
+		if (hwerr1 || 0xffffffff == newstatus || 0x0 == newstatus) {
+			R_SDREG(newstatus, &regs->intstatus, retries);
+		}
+#else
 		R_SDREG(newstatus, &regs->intstatus, retries);
+#endif
 		bus->f1regdata++;
+#ifdef HW_REG_RECOVERY
+		if (bcmsdh_regfail(bus->sdh)) {
+
+			if (0xffffffff == newstatus || 0x0 == newstatus) {
+				if (hw_need_reg_recovery(read_reg_stamp)) {
+					goto regerror;
+				}
+			}
+			newstatus = 0;
+		}
+#else
 		if (bcmsdh_regfail(bus->sdh))
 			newstatus = 0;
+#endif /* HW_REG_RECOVERY */
 		newstatus &= bus->hostintmask;
 		bus->fcstate = !!(newstatus & I_HMB_FC_STATE);
 		if (newstatus) {
@@ -6096,7 +6152,26 @@ dhdsdio_dpc(dhd_bus_t *bus)
 	if (intstatus & I_HMB_FC_CHANGE) {
 		intstatus &= ~I_HMB_FC_CHANGE;
 		W_SDREG(I_HMB_FC_CHANGE, &regs->intstatus, retries);
+#ifdef HW_REG_RECOVERY
+		read_reg_stamp = jiffies;
+		hwintstatus = 0;
+		hwintstatus |= bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, ((unsigned int)&regs->intstatus & 0xffff) + 0, &hwerr1);
+		hwintstatus |= bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, ((unsigned int)&regs->intstatus & 0xffff) + 1, &hwerr2) << 8;
+		hwintstatus |= bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, ((unsigned int)&regs->intstatus & 0xffff) + 2, &hwerr3) << 16;
+		hwintstatus |= bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, ((unsigned int)&regs->intstatus & 0xffff) + 3, &hwerr4) << 24;
+		newstatus = hwintstatus;
+		hwerr1 = hwerr1 | hwerr2 | hwerr3 | hwerr4;
+		if (hwerr1 || 0xffffffff == newstatus || 0x0 == newstatus) {
+			R_SDREG(newstatus, &regs->intstatus, retries);
+		}
+		if (bcmsdh_regfail(bus->sdh) && (0xffffffff == newstatus || 0x0 == newstatus)) {
+			if (hw_need_reg_recovery(read_reg_stamp)) {
+				goto regerror;
+			}
+		}
+#else
 		R_SDREG(newstatus, &regs->intstatus, retries);
+#endif /* HW_REG_RECOVERY */
 		bus->f1regdata += 2;
 		bus->fcstate = !!(newstatus & (I_HMB_FC_STATE | I_HMB_FC_CHANGE));
 		intstatus |= (newstatus & bus->hostintmask);
@@ -6270,6 +6345,23 @@ exit:
 
 	dhd_os_sdunlock(bus->dhd);
 	return resched;
+
+#ifdef HW_REG_RECOVERY
+regerror:
+	dhd_os_sdunlock(bus->dhd);
+#ifdef HW_WIFI_DMD_LOG
+	hw_wifi_dsm_client_notify(DSM_WIFI_CMD53_ERROR, "read reg error\n");
+#endif /* HW_WIFI_DMD_LOG */
+	hw_record_reg_recovery();
+	if (hw_need_reg_panic()) {
+		DHD_ERROR(("recovery fail, will panic\n"));
+		BUG_ON(1);
+	} else {
+		DHD_ERROR(("recovery by R_SDREG fail\n"));
+		dhd_os_send_hang_message(bus->dhd);
+	}
+	return TRUE;
+#endif
 }
 
 bool
@@ -7020,7 +7112,9 @@ dhdsdio_probe(uint16 venid, uint16 devid, uint16 bus_no, uint16 slot,
 	dhd_txminmax = DHD_TXMINMAX;
 
 	forcealign = TRUE;
-
+#ifdef HW_WIFI_DMD_LOG
+	hw_dmd_trace_log("dhdsdio_probe: Enter");
+#endif
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 	DHD_INFO(("%s: venid 0x%04x devid 0x%04x\n", __FUNCTION__, venid, devid));
 
@@ -7098,23 +7192,35 @@ dhdsdio_probe(uint16 venid, uint16 devid, uint16 bus_no, uint16 slot,
 	/* attempt to attach to the dongle */
 	if (!(dhdsdio_probe_attach(bus, osh, sdh, regsva, devid))) {
 		DHD_ERROR(("%s: dhdsdio_probe_attach failed\n", __FUNCTION__));
+#ifdef HW_WIFI_DMD_LOG
+		hw_dmd_trace_log("%s: dhdsdio_probe_attach failed", __FUNCTION__);
+#endif
 		goto fail;
 	}
 
 	/* Attach to the dhd/OS/network interface */
 	if (!(bus->dhd = dhd_attach(osh, bus, SDPCM_RESERVE))) {
 		DHD_ERROR(("%s: dhd_attach failed\n", __FUNCTION__));
+#ifdef HW_WIFI_DMD_LOG
+		hw_dmd_trace_log("%s: dhd_attach failed", __FUNCTION__);
+#endif
 		goto fail;
 	}
 
 	/* Allocate buffers */
 	if (!(dhdsdio_probe_malloc(bus, osh, sdh))) {
 		DHD_ERROR(("%s: dhdsdio_probe_malloc failed\n", __FUNCTION__));
+#ifdef HW_WIFI_DMD_LOG
+		hw_dmd_trace_log("%s: dhdsdio_probe_malloc failed", __FUNCTION__);
+#endif
 		goto fail;
 	}
 
 	if (!(dhdsdio_probe_init(bus, osh, sdh))) {
 		DHD_ERROR(("%s: dhdsdio_probe_init failed\n", __FUNCTION__));
+#ifdef HW_WIFI_DMD_LOG
+		hw_dmd_trace_log("%s: dhdsdio_probe_init failed", __FUNCTION__);
+#endif
 		goto fail;
 	}
 
@@ -7134,6 +7240,9 @@ dhdsdio_probe(uint16 venid, uint16 devid, uint16 bus_no, uint16 slot,
 	}
 
 	DHD_INFO(("%s: completed!!\n", __FUNCTION__));
+#ifdef HW_WIFI_DMD_LOG
+	hw_dmd_trace_log("dhdsdio_probe: completed");
+#endif
 
 	/* if firmware path present try to download and bring up bus */
 	bus->dhd->hang_report  = TRUE;
@@ -7248,14 +7357,20 @@ dhdsdio_probe_attach(struct dhd_bus *bus, osl_t *osh, void *sdh, void *regsva,
 	if (!(bus->sih = si_attach((uint)devid, osh, regsva, DHD_BUS, sdh,
 	                           &bus->vars, &bus->varsz))) {
 		DHD_ERROR(("%s: si_attach failed!\n", __FUNCTION__));
+#ifdef HW_WIFI_DMD_LOG
+		hw_dmd_trace_log("%s: si_attach failed!", __FUNCTION__);
+#endif
 		goto fail;
 	}
 
 #ifdef DHD_DEBUG
 	DHD_ERROR(("F1 signature OK, socitype:0x%x chip:0x%4x rev:0x%x pkg:0x%x\n",
 		bus->sih->socitype, bus->sih->chip, bus->sih->chiprev, bus->sih->chippkg));
+#ifdef HW_WIFI_DMD_LOG
+	hw_dmd_trace_log("F1 signature OK, socitype:0x%x chip:0x%4x rev:0x%x pkg:0x%x",
+		bus->sih->socitype, bus->sih->chip, bus->sih->chiprev, bus->sih->chippkg);
+#endif
 #endif /* DHD_DEBUG */
-
 
 	bcmsdh_chipinfo(sdh, bus->sih->chip, bus->sih->chiprev);
 
@@ -7429,6 +7544,9 @@ dhdsdio_probe_init(dhd_bus_t *bus, osl_t *osh, void *sdh)
 	int32 fnum;
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
+#ifdef HW_WIFI_DMD_LOG
+	hw_dmd_trace_log("dhdsdio_probe_init enter");
+#endif
 
 	bus->_srenab = FALSE;
 
@@ -7738,6 +7856,9 @@ int
 dhd_bus_register(void)
 {
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
+#ifdef HW_WIFI_DMD_LOG
+	hw_dmd_trace_log("dhd_bus_register: Enter");
+#endif
 
 	return bcmsdh_register(&dhd_sdio);
 }
@@ -7781,6 +7902,7 @@ dhdsdio_download_code_array(struct dhd_bus *bus)
 
 			if (offset == 0) {
 				bus->resetinstr = *(((uint32*)dlarray));
+				/* Add start of RAM address to the address given by user */
 				offset += bus->dongle_ram_base;
 			}
 		}
@@ -7888,6 +8010,7 @@ dhdsdio_download_code_file(struct dhd_bus *bus, char *pfw_path)
 
 			if (offset == 0) {
 				bus->resetinstr = *(((uint32*)memptr));
+				/* Add start of RAM address to the address given by user */
 				offset += bus->dongle_ram_base;
 			}
 		}
@@ -8675,7 +8798,9 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 		/* App must have restored power to device before calling */
 
 		DHD_TRACE(("\n\n%s: == WLAN ON ==\n", __FUNCTION__));
-
+#ifdef HW_WIFI_DMD_LOG
+		hw_dmd_trace_log("dhd_bus_devreset enter flag: 0");
+#endif
 		if (bus->dhd->dongle_reset) {
 			/* Turn on WLAN */
 			dhd_os_sdlock(dhdp);

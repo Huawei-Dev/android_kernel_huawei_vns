@@ -1524,6 +1524,9 @@
 #define VNDR_IE_PRBREQ_FLAG	0x10
 #define VNDR_IE_ASSOCREQ_FLAG	0x20
 #define VNDR_IE_IWAPID_FLAG	0x40 /* vendor IE in IW advertisement protocol ID field */
+#if defined(WLFBT)
+	#define VNDR_IE_AUTHREQ_FLAG 0x80
+#endif
 #define VNDR_IE_CUSTOM_FLAG	0x100 /* allow custom IE id */
 
 #if defined(WLP2P)

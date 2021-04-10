@@ -432,12 +432,22 @@ struct net_info {
 };
 
 /* association inform */
+#ifndef BCM_PATCH_CVE_2017_13292_13303
 #define MAX_REQ_LINE 1024
+#else
+#define MAX_REQ_LINE 1024u
+#endif
 struct wl_connect_info {
 	u8 req_ie[MAX_REQ_LINE];
+#ifndef BCM_PATCH_CVE_2017_13292_13303
 	s32 req_ie_len;
 	u8 resp_ie[MAX_REQ_LINE];
 	s32 resp_ie_len;
+#else
+	u32 req_ie_len;
+	u8 resp_ie[MAX_REQ_LINE];
+	u32 resp_ie_len;
+#endif
 };
 
 /* firmware /nvram downloading controller */
@@ -791,10 +801,10 @@ struct bcm_cfg80211 {
 	bcm_struct_cfgdev *bss_cfgdev;  /* For DUAL STA/STA+AP */
 	s32 cfgdev_bssidx;
 	bool bss_pending_op;		/* indicate where there is a pending IF operation */
-#ifdef BRCM_RSDB
 #ifdef WLFBT
 	uint8 fbt_key[FBT_KEYLEN];
 #endif
+#ifdef BRCM_RSDB
 	int roam_offload;
 #ifdef WL_NAN
 	bool nan_enable;
@@ -1505,7 +1515,6 @@ wl_get_netinfo_by_wdev(struct bcm_cfg80211 *cfg, struct wireless_dev *wdev)
 	 (!_sme->crypto.n_ciphers_pairwise) && \
 	 (!_sme->crypto.cipher_group))
 
-#ifdef BRCM_RSDB
 #ifdef WLFBT
 #if defined(WLAN_AKM_SUITE_FT_8021X) && defined(WLAN_AKM_SUITE_FT_PSK)
 #define IS_AKM_SUITE_FT(sec) (sec->wpa_auth == WLAN_AKM_SUITE_FT_8021X || \
@@ -1521,6 +1530,7 @@ wl_get_netinfo_by_wdev(struct bcm_cfg80211 *cfg, struct wireless_dev *wdev)
 #define IS_AKM_SUITE_FT(sec) ({BCM_REFERENCE(sec); FALSE;})
 #endif /* WLFBT */
 
+#ifdef BRCM_RSDB
 #ifdef BCMCCX
 #define IS_AKM_SUITE_CCKM(sec) (sec->wpa_auth == WLAN_AKM_SUITE_CCKM)
 #else
@@ -1583,6 +1593,9 @@ extern s32 wl_cfg80211_get_p2p_noa(struct net_device *net, char* buf, int len);
 extern s32 wl_cfg80211_set_wps_p2p_ie(struct net_device *net, char *buf, int len,
 	enum wl_management_type type);
 extern s32 wl_cfg80211_set_p2p_ps(struct net_device *net, char* buf, int len);
+#ifdef WL_TEM_CTRL
+extern void wl_hw_tem_ctrl_event_report(void);
+#endif
 #ifdef BRCM_RSDB
 extern s32 wl_cfg80211_set_p2p_ecsa(struct net_device *net, char* buf, int len);
 #ifdef WL11ULB
@@ -1710,6 +1723,12 @@ static inline void wl_escan_print_sync_id(s32 status, u16 result_id, u16 wl_id)
 #endif  /* DUAL_ESCAN_RESULT_BUFFER  && BRCM_RSDB  */
 extern void wl_cfg80211_ibss_vsie_set_buffer(vndr_ie_setbuf_t *ibss_vsie, int ibss_vsie_len);
 extern s32 wl_cfg80211_ibss_vsie_delete(struct net_device *dev);
+
+#if defined WL_TEM_CTRL || defined WL_TIM_EVENT
+extern int wifi_init_proc(void);
+extern void wifi_exit_proc(void);
+#endif
+
 #ifdef  BRCM_RSDB
 #ifdef WLAIBSS
 extern void wl_cfg80211_set_txfail_pid(int pid);
@@ -1719,10 +1738,10 @@ extern int wl_cfg80211_set_mgmt_vndr_ies(struct bcm_cfg80211 *cfg,
 	bcm_struct_cfgdev *cfgdev, s32 bssidx, s32 pktflag,
 	const u8 *vndr_ie, u32 vndr_ie_len);
 
+#endif /* BRCM_RSDB */
 #ifdef WLFBT
 extern void wl_cfg80211_get_fbt_key(uint8 *key);
 #endif
-#endif /* BRCM_RSDB */
 /* Action frame specific functions */
 extern u8 wl_get_action_category(void *frame, u32 frame_len);
 extern int wl_get_public_action(void *frame, u32 frame_len, u8 *ret_action);
