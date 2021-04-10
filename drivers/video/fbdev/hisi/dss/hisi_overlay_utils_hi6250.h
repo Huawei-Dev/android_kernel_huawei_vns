@@ -32,8 +32,12 @@
 #define GPIO_PG_SEL_B (54)    //GPIO_6_6
 #define GPIO_TX_RX_B (56)    //GPIO_7_0
 
+#define OVL_LAYER_NUM_MAX (7)
+#define OVL_PATTERN_RATIO (1)
+
 //288 KB
 #define MMBUF_SIZE_MAX	(288 * 1024)
+#define MMBUF_SIZE_MDC_MAX (0)
 #define HISI_DSS_CMDLIST_MAX	(14)
 #define HISI_DSS_CMDLIST_IDXS_MAX (0x15F3)   //9 cmdlist, 14bit, 01,0101,1111,0011=0x15f3
 #define HISI_DSS_DPP_MAX_SUPPORT_BIT (0x3bf) //contrast to enmu dpp_module_idx, DPP_LCP_GMP, IFBC not support
@@ -96,12 +100,6 @@
 #define DEFAULT_PCLK_DSS_RATE	(120000000UL)
 #define DEFAULT_PCLK_PCTRL_RATE	(120000000UL)
 
-/* perf stat */
-#define DSS_DEVMEM_PERF_BASE						(0xFF012000)
-#define CRG_PERIPH_APB_PERRSTSTAT0_REG 				(0x68)
-#define CRG_PERIPH_APB_IP_RST_PERF_STAT_BIT 		(18)
-#define PERF_SAMPSTOP_REG 							(0x10)
-#define DEVMEM_PERF_SIZE							(0x100)
 #define SMMU_SID_NUM	(64)
 
 /*******************************************************************************
@@ -253,7 +251,7 @@ typedef struct dss_module_reg {
 	uint8_t dfc_used[DSS_CHN_MAX_DEFINE];
 	uint8_t scl_used[DSS_CHN_MAX_DEFINE];
 	uint8_t sharp_used[DSS_CHN_MAX_DEFINE];
-	uint8_t post_cilp_used[DSS_CHN_MAX_DEFINE];
+	uint8_t post_clip_used[DSS_CHN_MAX_DEFINE];
 	uint8_t ce_used[DSS_CHN_MAX_DEFINE];
 	uint8_t csc_used[DSS_CHN_MAX_DEFINE];
 	uint8_t ov_used[DSS_OVL_IDX_MAX];

@@ -51,6 +51,8 @@ typedef enum master_dss_op_type {
 typedef enum compose_mode {
 	ONLINE_COMPOSE_MODE,
 	OFFLINE_COMPOSE_MODE,
+	OVL1_ONLINE_COMPOSE_MODE,
+	OVL3_OFFLINE_COMPOSE_MODE,
 	MAX_COMPOSE_MODE,
 } COMPOSE_MODE;
 

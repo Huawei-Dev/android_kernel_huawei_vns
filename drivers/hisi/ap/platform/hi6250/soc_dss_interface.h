@@ -68,6 +68,12 @@ enum dss_dfc_format {
  DFC_PIXEL_FORMAT_YVYU422,
  DFC_PIXEL_FORMAT_VYUY422,
  DFC_PIXEL_FORMAT_UYVY422,
+ DFC_PIXEL_FORMAT_BGRA_1010102,
+ DFC_PIXEL_FORMAT_YUVA_1010102,
+ DFC_PIXEL_FORMAT_UYVA_1010102,
+ DFC_PIXEL_FORMAT_VUYA_1010102,
+ DFC_PIXEL_FORMAT_YUYV_10,
+ DFC_PIXEL_FORMAT_UYVY_10,
 };
 enum dss_dma_format {
  DMA_PIXEL_FORMAT_RGB_565 = 0,
@@ -84,6 +90,15 @@ enum dss_dma_format {
  DMA_PIXEL_FORMAT_YUV_422_SP_HP,
  DMA_PIXEL_FORMAT_YUV_422_P_HP,
  DMA_PIXEL_FORMAT_AYUV_4444,
+ DMA_PIXEL_FORMAT_RESERVED1,
+ DMA_PIXEL_FORMAT_RESERVED2,
+ DMA_PIXEL_FORMAT_RGBA_1010102,
+ DMA_PIXEL_FORMAT_Y410_10BIT,
+ DMA_PIXEL_FORMAT_YUV422_10BIT,
+ DMA_PIXEL_FORMAT_YUV420_SP_10BIT,
+ DMA_PIXEL_FORMAT_YUV422_SP_10BIT,
+ DMA_PIXEL_FORMAT_YUV420_P_10BIT,
+ DMA_PIXEL_FORMAT_YUV422_P_10BIT,
 };
 enum dss_buf_format {
  DSS_BUF_LINEAR = 0,
@@ -270,6 +285,7 @@ enum dss_rdma_idx {
 #define PERI_CTRL29 (0x078)
 #define PERI_CTRL30 (0x07C)
 #define PERI_CTRL32 (0x084)
+#define PERI_CTRL33 (0x088)
 #define PERI_STAT0 (0x094)
 #define PERI_STAT1 (0x098)
 #define PERI_STAT16 (0x0D4)
@@ -277,6 +293,19 @@ enum dss_rdma_idx {
 #define PCTRL_DPHYTX_ULPSEXIT0 BIT(3)
 #define PCTRL_DPHYTX_CTRL1 BIT(1)
 #define PCTRL_DPHYTX_CTRL0 BIT(0)
+#define MEDIA_PEREN0 (0x000)
+#define MEDIA_PERDIS0 (0x004)
+#define MEDIA_PERDIS1 (0x014)
+#define MEDIA_PERDIS2 (0x024)
+#define MEDIA_PERRSTEN0 (0x030)
+#define MEDIA_PERRSTDIS0 (0x034)
+#define MEDIA_PERRSTDIS1 (0x040)
+#define MEDIA_CLKDIV8 (0x080)
+#define MEDIA_CLKDIV9 (0x084)
+#define MEDIA_PEREN1 (0x010)
+#define MEDIA_PEREN2 (0x020)
+#define PERRSTEN_GENERAL_SEC (0xA00)
+#define PERRSTDIS_GENERAL_SEC (0xA04)
 #define BIT_DSS_GLB_INTS BIT(30)
 #define BIT_MMU_IRPT_S BIT(29)
 #define BIT_MMU_IRPT_NS BIT(28)
@@ -879,8 +908,8 @@ enum dss_mmu_tlb_tag_org {
 #define AFBCD_HEADER_POINTER_OFFSET (0x0944)
 #define AFBCE_HREG_PIC_BLKS (0x0900)
 #define AFBCE_HREG_FORMAT (0x0904)
-#define AFBCE_HREG_HDR_PTR_LO (0x0908)
-#define AFBCE_HREG_PLD_PTR_LO (0x090C)
+#define AFBCE_HREG_HDR_PTR_L0 (0x0908)
+#define AFBCE_HREG_PLD_PTR_L0 (0x090C)
 #define AFBCE_PICTURE_SIZE (0x0910)
 #define AFBCE_CTL (0x0914)
 #define AFBCE_HEADER_SRTIDE (0x0918)
@@ -1021,8 +1050,8 @@ typedef struct dss_wdma {
  uint32_t rot_size;
  uint32_t afbce_hreg_pic_blks;
  uint32_t afbce_hreg_format;
- uint32_t afbce_hreg_hdr_ptr_lo;
- uint32_t afbce_hreg_pld_ptr_lo;
+ uint32_t afbce_hreg_hdr_ptr_l0;
+ uint32_t afbce_hreg_pld_ptr_l0;
  uint32_t afbce_picture_size;
  uint32_t afbce_ctl;
  uint32_t afbce_header_srtide;
@@ -1056,6 +1085,7 @@ typedef struct dss_dfc {
  uint32_t icg_module;
  uint32_t dither_enable;
  uint32_t padding_ctl;
+ uint32_t bitext_ctl;
 } dss_dfc_t;
 #define CSC_IDC (0x0000)
 #define CSC_ODC (0x0004)
@@ -1262,6 +1292,9 @@ typedef struct dss_post_clip{
 #define MCTL_RCH_OV1_SEL (0x0184)
 #define MCTL_RCH_OV2_SEL (0x0188)
 #define MCTL_RCH_OV3_SEL (0x018C)
+#define MCTL_RCH_OV0_SEL1 (0x0190)
+#define MCTL_RCH_OV1_SEL1 (0x0194)
+#define MCTL_RCH_OV2_SEL1 (0x0198)
 #define MCTL_WCH0_OV_IEN (0x01A0)
 #define MCTL_WCH1_OV_IEN (0x01A4)
 #define MCTL_WCH_OV2_SEL (0x01A8)
@@ -1842,6 +1875,8 @@ typedef struct dss_sbl {
 #define LDI_CLK_EN (0x010C)
 #define LDI_IF_BYPASS (0x0110)
 #define LDI_FRM_VALID_DBG (0x0118)
+#define LDI_CPU_ITF_INTS (0x0248)
+#define LDI_CPU_ITF_INT_MSK (0x024C)
 #define DSS_MIPI_DSI0_OFFSET (0x00001000)
 #define DSS_MIPI_DSI1_OFFSET (0x00001400)
 #define MIPIDSI_VERSION_OFFSET (0x0000)
@@ -1923,6 +1958,7 @@ typedef struct dss_sbl {
 #define VID_VFP_LINES_ACT (0x015C)
 #define VID_VACTIVE_LINES_ACT (0x0160)
 #define SDF_3D_ACT (0x0190)
+#define DSI_MEM_CTRL (0x0194)
 #define SMC_LOCK (0x0000)
 #define SMC_MEM_LP (0x0004)
 #define SMC_GCLK_CS (0x000C)
@@ -1940,4 +1976,31 @@ typedef struct dss_sbl {
 #define SMC_DFX_RDFIFO_CNT1 (0x003C)
 #define SMC_SP_SRAM_STATE0 (0x0040)
 #define SMC_SP_SRAM_STATE1 (0x0044)
+#define MEDIA_COMMON_BASE (0xE8700000)
+#define CMDLIST_OFFSET (0x02000)
+#define VBIF0_AIF_OFFSET (0x07000)
+#define VBIF0_MIF_OFFSET (0x0A000)
+#define MCTL_SYS_OFFSET (0x10000)
+#define MCTL_MUTEX_OFFSET (0x10800)
+#define DBG_OFFSET (0x11000)
+#define GLB_OFFSET (0x12000)
+#define RCH_OFFSET (0x20000)
+#define WCH_OFFSET (0x5C000)
+#define VBIF0_SMMU_OFFSET (0x80000)
+#define MCTL_EN (0x0000)
+#define MCTL_MUTEX (0x0004)
+#define MCTL_MUTEX_ISPIF (0x0018)
+#define MCTL_MUTEX_WCH (0x0024)
+#define MCTL_MUTEX_RCH (0x0038)
+#define MCTL_SYS_RCH_OEN (0x0168)
+#define MCTL_SYS_WCH_IEN (0x01A4)
+#define MCTL_SYS_ISP_WCH_SEL (0x01AC)
+#define AIF_CMD_RELOAD (0x0A00)
+#define WCH_DFC_OFFSET (0x0100)
+#define WCH_SCF_OFFSET (0x0200)
+#define WCH_POST_CSC_OFFSET (0x0400)
+#define WCH_POST_CLIP_OFFSET (0x0480)
+#define WCH_CSC_OFFSET (0x0500)
+#define WCH_ROT_OFFSET (0x0580)
+#define WCH_SCL_LUT_OFFSET (0x1000)
 #endif

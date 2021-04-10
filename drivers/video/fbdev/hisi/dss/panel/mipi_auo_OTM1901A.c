@@ -168,16 +168,6 @@ static struct vcc_desc scharger_lcd_vcc_set_cmds[] =
 	{DTYPE_VCC_SET_VOLTAGE, VCC_LCD_VSN_NAME, &lcd_vsn_vcc,  5400000, 5400000, 0, 0},
 };
 
-#if 0
-static struct vcc_desc scharger_lcd_vcc_put_cmds[] =
-{
-	/* vcc put */
-	{DTYPE_VCC_PUT, VCC_BACKLIGHT_NAME, &lcd_bl_vcc,   0, 0, 0, 0},
-	{DTYPE_VCC_PUT, VCC_LCDBIAS_NAME,   &lcd_bias_vcc, 0, 0, 0, 0},
-	{DTYPE_VCC_PUT, VCC_LCD_VSN_NAME,   &lcd_vsn_vcc,  0, 0, 0, 0},
-	{DTYPE_VCC_PUT, VCC_LCD_VSP_NAME,   &lcd_vsp_vcc,  0, 0, 0, 0},
-};
-#endif
 
 static struct vcc_desc scharger_lcd_vcc_enable_cmds[] =
 {
@@ -1515,16 +1505,9 @@ static int mipi_auo_probe(struct platform_device *pdev)
 	if (pinfo->bl_set_type == BL_SET_BY_BLPWM)
 		pinfo->blpwm_input_ena = 0;
 
-#ifdef CONFIG_BACKLIGHT_10000
-	pinfo->bl_min = 157;
-	pinfo->bl_max = 9960;
-	pinfo->bl_default = 4000;
-	pinfo->blpwm_precision_type = BLPWM_PRECISION_10000_TYPE;
-#else
 	pinfo->bl_min = 1;
 	pinfo->bl_max = 255;
 	pinfo->bl_default = 102;
-#endif
 
 	pinfo->type = lcd_display_type;
 	pinfo->ifbc_type = lcd_ifbc_type;

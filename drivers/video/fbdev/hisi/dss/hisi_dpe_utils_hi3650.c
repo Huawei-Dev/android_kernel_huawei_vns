@@ -39,7 +39,10 @@ struct dss_clk_rate * get_dss_clk_rate(struct hisi_fb_data_type *hisifd)
 	struct hisi_panel_info *pinfo = NULL;
 	struct dss_clk_rate *pdss_clk_rate = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return NULL;
+	}
 
 	pinfo = &(hisifd->panel_info);
 	pdss_clk_rate = &(hisifd->dss_clk_rate);
@@ -80,7 +83,10 @@ int set_dss_clk_rate(struct hisi_fb_data_type *hisifd, dss_clk_rate_t dss_clk_ra
 {
 	int ret = 0;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return -EINVAL;
+	}
 
 
 	return ret;
@@ -91,7 +97,10 @@ void dss_inner_clk_common_enable(struct hisi_fb_data_type *hisifd, bool fastboot
 	char __iomem *dss_base = NULL;
 	int prev_refcount = 0;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	dss_base = hisifd->dss_base;
 
@@ -107,14 +116,12 @@ void dss_inner_clk_common_enable(struct hisi_fb_data_type *hisifd, bool fastboot
 		//gt_pclk_dss_enable
 		//outp32(hisifd->peri_crg_base + PEREN3, 0x00001000);
 
-	#ifdef CONFIG_DSS_LP_USED
 		//first DSS LP
 		//outp32(dss_base + GLB_MODULE_CLK_SEL, 0xF0000008);
 		//outp32(dss_base + GLB_MODULE1_CLK_SEL, 0x00000000);
 		//outp32(dss_base + GLB_DSS_MEM_CTRL, 0x01A800A8);
 		//outp32(dss_base + GLB_DSS_PM_CTRL, 0x00002009);
 		outp32(dss_base + GLB_PXL0_DIV2_GT_EN, 0x00000001);
-	#endif
 
 		//All dss interrupts init mask
 		//outp32(dss_base + GLB_MCU_ITF0_INT_MSK, 0x00003FFF);
@@ -147,7 +154,6 @@ void dss_inner_clk_common_enable(struct hisi_fb_data_type *hisifd, bool fastboot
 		//gt_clk_mmbuf_dss
 		//outp32(hisifd->sctrl_base + SCPEREN1, 0x01000000);
 
-	#ifdef CONFIG_DSS_LP_USED
 		//second DSS LP
 		//cmd
 		outp32(dss_base + DSS_CMDLIST_OFFSET + CMD_CLK_SEL, 0x00000000);
@@ -161,12 +167,10 @@ void dss_inner_clk_common_enable(struct hisi_fb_data_type *hisifd, bool fastboot
 		outp32(dss_base + DSS_VBIF1_AIF + AIF_CLK_SEL1, 0x00000000);
 		//mmu
 		outp32(dss_base + DSS_SMMU_OFFSET + SMMU_LP_CTRL, 0x00000001);
-	#endif
 
 		//gt_clk_enable_edc0
 		//outp32(hisifd->peri_crg_base + PEREN3, 0x00020000);
 
-	#ifdef CONFIG_DSS_LP_USED
 		//third DSS LP
 		//mif
 		outp32(dss_base + DSS_MIF_OFFSET + MIF_CLK_CTL,  0x00000001);
@@ -220,54 +224,6 @@ void dss_inner_clk_common_enable(struct hisi_fb_data_type *hisifd, bool fastboot
 		outp32(dss_base + DSS_DBUF0_OFFSET + DBUF_CLK_SEL, 0x00000000);
 		//dbuf1
 		outp32(dss_base + DSS_DBUF1_OFFSET + DBUF_CLK_SEL, 0x00000000);
-	#else
-		outp32(dss_base + DSS_CMDLIST_OFFSET + CMD_MEM_CTRL, 0x00000008);
-
-		outp32(dss_base + DSS_RCH_VG0_SHARPNESS_OFFSET + SHARPNESS_MEM_CTRL, 0x00000088);
-		outp32(dss_base + DSS_RCH_VG0_CE_OFFSET + CE_MEM_CTRL, 0x00000088);
-		outp32(dss_base + DSS_RCH_VG0_DMA_OFFSET + VPP_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_RCH_VG0_DMA_OFFSET + DMA_BUF_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_RCH_VG0_DMA_OFFSET + AFBCD_MEM_CTRL, 0x00000888);
-
-		outp32(dss_base + DSS_RCH_VG1_SHARPNESS_OFFSET + SHARPNESS_MEM_CTRL, 0x00000088);
-		outp32(dss_base + DSS_RCH_VG1_CE_OFFSET + CE_MEM_CTRL, 0x00000088);
-		outp32(dss_base + DSS_RCH_VG1_DMA_OFFSET + VPP_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_RCH_VG1_DMA_OFFSET + DMA_BUF_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_RCH_VG1_DMA_OFFSET + AFBCD_MEM_CTRL, 0x00000888);
-
-		outp32(dss_base + DSS_RCH_G0_SCL_OFFSET + SCF_COEF_MEM_CTRL, 0x00000088);
-		outp32(dss_base + DSS_RCH_G0_SCL_OFFSET + SCF_LB_MEM_CTRL, 0x0000008);
-		outp32(dss_base + DSS_RCH_G0_DMA_OFFSET + DMA_BUF_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_RCH_G0_DMA_OFFSET + AFBCD_MEM_CTRL, 0x00000888);
-
-		outp32(dss_base + DSS_RCH_G1_SCL_OFFSET + SCF_COEF_MEM_CTRL, 0x00000088);
-		outp32(dss_base + DSS_RCH_G1_SCL_OFFSET + SCF_LB_MEM_CTRL, 0x0000008);
-		outp32(dss_base + DSS_RCH_G1_DMA_OFFSET + DMA_BUF_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_RCH_G1_DMA_OFFSET + AFBCD_MEM_CTRL, 0x00000888);
-
-		outp32(dss_base + DSS_RCH_D0_DMA_OFFSET + DMA_BUF_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_RCH_D0_DMA_OFFSET + AFBCD_MEM_CTRL, 0x00000888);
-
-		outp32(dss_base + DSS_RCH_D1_DMA_OFFSET + DMA_BUF_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_RCH_D1_DMA_OFFSET + AFBCD_MEM_CTRL, 0x00000888);
-
-		outp32(dss_base + DSS_RCH_D2_DMA_OFFSET + DMA_BUF_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_RCH_D2_DMA_OFFSET + AFBCD_MEM_CTRL, 0x00000888);
-
-		outp32(dss_base + DSS_RCH_D3_DMA_OFFSET + DMA_BUF_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_RCH_D3_DMA_OFFSET + AFBCD_MEM_CTRL, 0x00000888);
-
-		outp32(dss_base + DSS_WCH0_DMA_OFFSET + DMA_BUF_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_WCH0_DMA_OFFSET + AFBCE_MEM_CTRL, 0x00000888);
-
-		outp32(dss_base + DSS_WCH1_DMA_OFFSET + DMA_BUF_MEM_CTRL, 0x00000008);
-		outp32(dss_base + DSS_WCH1_DMA_OFFSET + AFBCE_MEM_CTRL, 0x00000888);
-
-		outp32(dss_base + DSS_OVL0_OFFSET + OVL6_GATE_CTRL, 0x00000002);
-		outp32(dss_base + DSS_OVL1_OFFSET + OVL2_GATE_CTRL, 0x00000002);
-		outp32(dss_base + DSS_OVL2_OFFSET + OVL6_GATE_CTRL, 0x00000002);
-		outp32(dss_base + DSS_OVL3_OFFSET + OVL2_GATE_CTRL, 0x00000002);
-	#endif
 		//glb
 		//outp32(dss_base + DSS_GLB0_OFFSET + GLB_MODULE_CLK_SEL, 0xf0000029);
 		//cmd
@@ -300,11 +256,17 @@ void dss_inner_clk_common_disable(struct hisi_fb_data_type *hisifd)
 {
 	int new_refcount = 0;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	down(&hisi_fb_dss_inner_clk_sem);
 	new_refcount = --dss_inner_clk_refcount;
-	WARN_ON(new_refcount < 0);
+	if (new_refcount < 0) {
+		HISI_FB_ERR("dss new_refcount err");
+	}
+
 	if (!new_refcount) {
 		;
 	}
@@ -318,7 +280,10 @@ void dss_inner_clk_pdp_enable(struct hisi_fb_data_type *hisifd, bool fastboot_en
 {
 	char __iomem *dss_base = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	dss_base = hisifd->dss_base;
 
@@ -328,7 +293,6 @@ void dss_inner_clk_pdp_enable(struct hisi_fb_data_type *hisifd, bool fastboot_en
 	//enable ldi0 clk
 	//outp32(hisifd->peri_crg_base + PEREN3, 0x00008000);
 
-#ifdef CONFIG_DSS_LP_USED
 	//dpp
 	outp32(dss_base + DSS_DPP_OFFSET + DPP_CLK_SEL, 0x00000000);
 	//ifbc
@@ -337,19 +301,6 @@ void dss_inner_clk_pdp_enable(struct hisi_fb_data_type *hisifd, bool fastboot_en
 	outp32(dss_base + DSS_DSC_OFFSET + DSC_CLK_SEL, 0x00000000);
 	//ldi0
 	outp32(dss_base + DSS_LDI0_OFFSET + LDI_CLK_SEL, 0x00000004);
-#else
-	outp32(dss_base + DSS_IFBC_OFFSET + IFBC_MEM_CTRL, 0x00000088);
-	outp32(dss_base + DSS_DSC_OFFSET + DSC_MEM_CTRL, 0x00000888);
-	outp32(dss_base + DSS_LDI0_OFFSET + LDI_MEM_CTRL, 0x00000008);
-	#ifdef CONFIG_HISI_FB_6250
-	//dbuf0 mem
-	outp32(dss_base + DSS_DBUF0_OFFSET + DBUF_MEM_CTRL, 0x00000008);
-	#endif
-#endif
-	#ifdef CONFIG_HISI_FB_3650
-	//dbuf0 mem
-	outp32(dss_base + DSS_DBUF0_OFFSET + DBUF_MEM_CTRL, 0x00000008);
-	#endif
 }
 
 void dss_inner_clk_pdp_disable(struct hisi_fb_data_type *hisifd)
@@ -360,19 +311,18 @@ void dss_inner_clk_sdp_enable(struct hisi_fb_data_type *hisifd)
 {
 	char __iomem *dss_base = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	dss_base = hisifd->dss_base;
 
 	//enable ldi1 clk
 	//outp32(hisifd->peri_crg_base + PEREN3, 0x00004000);
 
-#ifdef CONFIG_DSS_LP_USED
 	//ldi1
 	outp32(dss_base + DSS_LDI1_OFFSET + LDI_CLK_SEL, 0x00000000);
-#else
-	outp32(dss_base + DSS_LDI1_OFFSET + LDI_MEM_CTRL, 0x00000008);
-#endif
 	//dbuf1 mem
 	outp32(dss_base + DSS_DBUF1_OFFSET + DBUF_MEM_CTRL, 0x00000008);
 }
@@ -386,7 +336,10 @@ void init_dpp(struct hisi_fb_data_type *hisifd)
 	char __iomem *dpp_base = NULL;
 	struct hisi_panel_info *pinfo = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
@@ -409,7 +362,10 @@ void init_sbl(struct hisi_fb_data_type *hisifd)
 	char __iomem *sbl_base = NULL;
 	uint32_t tmp = 0;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (pinfo->sbl_support != 1) {
@@ -535,7 +491,10 @@ static void init_dsc(struct hisi_fb_data_type *hisifd)
 	uint32_t slices_per_line = 0;
 	uint32_t pic_line_grp_num = 0;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 	pinfo = &(hisifd->panel_info);
 	dsc = &(pinfo->vesa_dsc);
 
@@ -743,9 +702,15 @@ void init_ifbc(struct hisi_fb_data_type *hisifd)
 	uint32_t insert_byte = 0;
 	uint32_t num_pad = 0;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 	pinfo = &(hisifd->panel_info);
-	BUG_ON((pinfo->ifbc_type < IFBC_TYPE_NONE) || (pinfo->ifbc_type >= IFBC_TYPE_MAX));
+	if ((pinfo->ifbc_type < IFBC_TYPE_NONE) || (pinfo->ifbc_type >= IFBC_TYPE_MAX)) {
+		HISI_FB_ERR("pinfo->ifbc_type is invalid");
+		return;
+	}
 
 	if (pinfo->ifbc_type == IFBC_TYPE_NONE)
 		return ;
@@ -941,7 +906,10 @@ void init_post_scf(struct hisi_fb_data_type *hisifd)
 {
 	char __iomem *scf_lut_base = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 	scf_lut_base = hisifd->dss_base + DSS_POST_SCF_LUT_OFFSET;
 
 	if (!HISI_DSS_SUPPORT_DPP_MODULE_BIT(DPP_MODULE_POST_SCF)) {
@@ -957,7 +925,10 @@ static int get_dfs_sram_valid_num(struct hisi_fb_data_type *hisifd)
 	int frame_size = 0;
 	struct hisi_panel_info *pinfo = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return -EINVAL;
+	}
 
 	pinfo = &(hisifd->panel_info);
 	frame_size = pinfo->xres * pinfo->yres;
@@ -998,7 +969,10 @@ void init_dbuf(struct hisi_fb_data_type *hisifd)
 	int dfs_time = 0;
 	int depth = 0;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
@@ -1015,13 +989,8 @@ void init_dbuf(struct hisi_fb_data_type *hisifd)
 			thd_rqos_out = GET_THD_RQOS_OUT(sram_max_mem_depth);
 			thd_wqos_in = GET_THD_WQOS_IN(sram_max_mem_depth);
 			thd_wqos_out = GET_THD_WQOS_OUT(sram_max_mem_depth);
-			#if 0
-			thd_cg_in = GET_THD_CG_IN(sram_max_mem_depth);
-			thd_cg_out = GET_THD_CG_OUT(sram_max_mem_depth);
-			#else
 			thd_cg_in = 0x3fff;
 			thd_cg_out = 0x3fff;
-			#endif
 			thd_wr_wait = GET_THD_OTHER_WR_WAIT(sram_max_mem_depth);
 			thd_cg_hold = GET_THD_OTHER_DFS_CG_HOLD(sram_max_mem_depth);
 
@@ -1065,13 +1034,8 @@ void init_dbuf(struct hisi_fb_data_type *hisifd)
 			thd_rqos_out = GET_THD_RQOS_OUT(sram_max_mem_depth);
 			thd_wqos_in = GET_THD_WQOS_IN(sram_max_mem_depth);
 			thd_wqos_out = GET_THD_WQOS_OUT(sram_max_mem_depth);
-			#if 0
-			thd_cg_in = GET_THD_CG_IN(sram_max_mem_depth);
-			thd_cg_out = GET_THD_CG_OUT(sram_max_mem_depth);
-			#else
 			thd_cg_in = 0x3fff;
 			thd_cg_out = 0x3fff;
-			#endif
 			thd_wr_wait = GET_THD_OTHER_WR_WAIT(sram_max_mem_depth);
 			thd_cg_hold = GET_THD_OTHER_DFS_CG_HOLD(sram_max_mem_depth);
 		} else {
@@ -1153,11 +1117,17 @@ static void init_ldi_pxl_div(struct hisi_fb_data_type *hisifd)
 	uint32_t pxl0_divxcfg = 0;
 	uint32_t pxl0_dsi_gt_en = 0;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	ifbc_type = pinfo->ifbc_type;
-	BUG_ON((ifbc_type < IFBC_TYPE_NONE) || (ifbc_type >= IFBC_TYPE_MAX));
+	if ((ifbc_type < IFBC_TYPE_NONE) || (ifbc_type >= IFBC_TYPE_MAX)) {
+		HISI_FB_ERR("ifbc_type is invalid");
+		return;
+	}
 
 	mipi_idx = is_dual_mipi_panel(hisifd) ? 1 : 0;
 
@@ -1182,17 +1152,18 @@ void init_ldi(struct hisi_fb_data_type *hisifd, bool fastboot_enable)
 	uint32_t te1_enable = 0;
 	uint32_t te_source = 0;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
 		ldi_base = hisifd->dss_base + DSS_LDI0_OFFSET;
 		te0_enable = 1;
-	#ifndef CONFIG_FPGA_SDP_TEST
 		if (g_fpga_flag == 1) {
 			set_reg(hisifd->dss_base + GLB_TP_SEL, 0x2, 2, 0);
 		}
-	#endif
 	} else if (hisifd->index == EXTERNAL_PANEL_IDX) {
 		te1_enable = 1;
 		ldi_base = hisifd->dss_base + DSS_LDI1_OFFSET;
@@ -1287,11 +1258,6 @@ void init_ldi(struct hisi_fb_data_type *hisifd, bool fastboot_enable)
 		// dsi_te_pin_hd_sel
 		set_reg(ldi_base + LDI_DSI_TE_CTRL, te0_enable, 1, 6);
 		set_reg(ldi_base + LDI_DSI_TE_CTRL, te1_enable, 1, 7);
-#if 0
-		// dsi_te_tri_sel te_source = 1
-		set_reg(ldi_base + LDI_DSI_TE_CTRL, te0_enable, 1, 4);
-		set_reg(ldi_base + LDI_DSI_TE_CTRL, te1_enable, 1, 5);
-#endif
 		// dsi_te_mask_en
 		set_reg(ldi_base + LDI_DSI_TE_CTRL, 0x0, 1, 8);
 		// dsi_te_mask_dis
@@ -1319,17 +1285,8 @@ void init_ldi(struct hisi_fb_data_type *hisifd, bool fastboot_enable)
 	}
 	//ldi_data_gate(hisifd, true);
 
-#ifdef CONFIG_HISI_FB_COLORBAR_USED
-	// colorbar width
-	set_reg(ldi_base + LDI_CTRL, DSS_WIDTH(0x3c), 7, 6);
-	// colorbar ort
-	set_reg(ldi_base + LDI_WORK_MODE, 0x0, 1, 1);
-	// colorbar enable
-	set_reg(ldi_base + LDI_WORK_MODE, 0x0, 1, 0);
-#else
 	// normal
 	set_reg(ldi_base + LDI_WORK_MODE, 0x1, 1, 0);
-#endif
 
 	if (is_mipi_cmd_panel(hisifd)) {
 		set_reg(ldi_base + LDI_FRM_MSK,
@@ -1347,7 +1304,10 @@ void deinit_ldi(struct hisi_fb_data_type *hisifd)
 {
 	char __iomem *ldi_base = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
 		ldi_base = hisifd->dss_base + DSS_LDI0_OFFSET;
@@ -1365,7 +1325,10 @@ void enable_ldi(struct hisi_fb_data_type *hisifd)
 {
 	char __iomem *ldi_base = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
 		ldi_base = hisifd->dss_base + DSS_LDI0_OFFSET;
@@ -1384,7 +1347,10 @@ void disable_ldi(struct hisi_fb_data_type *hisifd)
 {
 	char __iomem *ldi_base = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
 		ldi_base = hisifd->dss_base + DSS_LDI0_OFFSET;
@@ -1403,7 +1369,10 @@ void ldi_frame_update(struct hisi_fb_data_type *hisifd, bool update)
 {
 	char __iomem *ldi_base = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
 		ldi_base = hisifd->dss_base + DSS_LDI0_OFFSET;
@@ -1427,7 +1396,10 @@ void single_frame_update(struct hisi_fb_data_type *hisifd)
 	char __iomem *ldi_base = NULL;
 	struct hisi_panel_info *pinfo = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
@@ -1461,7 +1433,10 @@ void ldi_data_gate(struct hisi_fb_data_type *hisifd, bool enble)
 {
 	char __iomem *ldi_base = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	if (!is_mipi_cmd_panel(hisifd)) {
 		hisifd->ldi_data_gate_en = (enble ? 1 : 0);
@@ -1493,7 +1468,10 @@ void dpe_interrupt_clear(struct hisi_fb_data_type *hisifd)
 	char __iomem *dss_base = 0;
 	uint32_t clear = 0;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	dss_base = hisifd->dss_base;
 
@@ -1535,7 +1513,10 @@ void dpe_interrupt_unmask(struct hisi_fb_data_type *hisifd)
 	uint32_t unmask = 0;
 	struct hisi_panel_info *pinfo = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	pinfo = &(hisifd->panel_info);
 	dss_base = hisifd->dss_base;
@@ -1575,11 +1556,7 @@ void dpe_interrupt_unmask(struct hisi_fb_data_type *hisifd)
 		outp32(dss_base + GLB_GLB_CPU_ITF1_INT_MSK, unmask);
 	} else if (hisifd->index == AUXILIARY_PANEL_IDX) {
 		unmask = ~0;
-	#ifdef CONFIG_FIX_DSS_WCH_ISR_BUG
-		unmask &= ~(BIT_OFF_CMDLIST8 | BIT_OFF_CMDLIST9 | BIT_OFF_MMU_IRPT_NS);
-	#else
 		unmask &= ~(BIT_OFF_WCH0_INTS | BIT_OFF_WCH1_INTS | BIT_OFF_WCH0_WCH1_FRM_END_INT | BIT_OFF_MMU_IRPT_NS);
-	#endif
 		outp32(dss_base + GLB_CPU_OFF_INT_MSK, unmask);
 	} else {
 		HISI_FB_ERR("fb%d, not support this device!\n", hisifd->index);
@@ -1592,7 +1569,10 @@ void dpe_interrupt_mask(struct hisi_fb_data_type *hisifd)
 	char __iomem *dss_base = 0;
 	uint32_t mask = 0;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	dss_base = hisifd->dss_base;
 
@@ -1672,7 +1652,10 @@ void init_acm(struct hisi_fb_data_type *hisifd)
 	char __iomem *dpp_base = NULL;
 	struct hisi_panel_info *pinfo = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 
 	pinfo = &(hisifd->panel_info);
 	if (pinfo->acm_support != 1) {
@@ -1736,7 +1719,10 @@ void init_igm_gmp_xcc_gm(struct hisi_fb_data_type *hisifd)
 	uint32_t pos0 = 0, pos1 = 0;
 	uint32_t color_temp_rectify_R = 32768, color_temp_rectify_G = 32768, color_temp_rectify_B = 32768;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
@@ -1872,7 +1858,10 @@ void dpe_store_ct_cscValue(struct hisi_fb_data_type *hisifd, unsigned int csc_va
 {
 	struct hisi_panel_info *pinfo = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (pinfo->xcc_support == 0 || pinfo->xcc_table == NULL) {
@@ -1904,7 +1893,10 @@ int dpe_set_ct_cscValue(struct hisi_fb_data_type *hisifd)
 	char __iomem *lcp_base = NULL;
 	uint32_t color_temp_rectify_R = 32768, color_temp_rectify_G = 32768, color_temp_rectify_B = 32768;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return -EINVAL;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
@@ -1957,7 +1949,10 @@ ssize_t dpe_show_ct_cscValue(struct hisi_fb_data_type *hisifd, char *buf)
 {
 	struct hisi_panel_info *pinfo = NULL;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return -EINVAL;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (pinfo->xcc_support == 0 || pinfo->xcc_table == NULL) {
@@ -1976,7 +1971,10 @@ int dpe_set_xcc_cscValue(struct hisi_fb_data_type *hisifd)
 	char __iomem *lcp_base = NULL;
 	uint32_t color_temp_rectify_R = 32768, color_temp_rectify_G = 32768, color_temp_rectify_B = 32768;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return -EINVAL;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
@@ -2030,7 +2028,10 @@ int dpe_set_comform_ct_cscValue(struct hisi_fb_data_type *hisifd)
 	char __iomem *lcp_base = NULL;
 	uint32_t color_temp_rectify_R = 32768, color_temp_rectify_G = 32768, color_temp_rectify_B = 32768;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return -EINVAL;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {
@@ -2081,7 +2082,10 @@ int dpe_set_comform_ct_cscValue(struct hisi_fb_data_type *hisifd)
 ssize_t dpe_show_comform_ct_cscValue(struct hisi_fb_data_type *hisifd, char *buf)
 {
 	struct hisi_panel_info *pinfo = NULL;
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return -EINVAL;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (pinfo->xcc_support == 0 || pinfo->xcc_table == NULL) {
@@ -2133,7 +2137,10 @@ int dpe_set_led_rg_ct_cscValue(struct hisi_fb_data_type *hisifd)
 	char __iomem *lcp_base = NULL;
 	uint32_t color_temp_rectify_R = 32768, color_temp_rectify_G = 32768, color_temp_rectify_B = 32768;
 
-	BUG_ON(hisifd == NULL);
+	if (NULL == hisifd) {
+		HISI_FB_ERR("hisifd is NULL");
+		return -EINVAL;
+	}
 	pinfo = &(hisifd->panel_info);
 
 	if (hisifd->index == PRIMARY_PANEL_IDX) {

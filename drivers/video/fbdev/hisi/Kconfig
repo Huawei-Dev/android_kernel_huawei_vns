@@ -48,6 +48,12 @@ config HISI_FB_970
 	help
 	  This framebuffer driver supports HISI970 FB.
 
+config HISI_FB_ENG_DBG
+	tristate "HISI FB ENG DEBUG support"
+	depends on FB
+	help
+	  This config only used in eng version.
+
 config FASTBOOT_DISP_ENABLE
 	tristate "HISI fastboot display enable support"
 	depends on FB

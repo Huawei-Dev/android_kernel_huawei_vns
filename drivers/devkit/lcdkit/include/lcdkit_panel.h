@@ -452,6 +452,9 @@ struct lcdkit_panel_infos
     u8 cabc_support;
     /*cabc mode*/
     int cabc_mode;
+    
+    u8 bias_change_lm36274_from_panel_support;
+    u8 init_lm36923_after_panel_power_on_support;
 
     /*mipi tr inversion*/
     struct lcdkit_dsi_panel_cmds dot_inversion_cmds;
@@ -759,6 +762,14 @@ struct lcdkit_diff_func
 {
     int enable;
     ssize_t (*lcdkit_show)(void* pdata, char* buf);
+};
+
+struct lcdkit_esd_error_info
+{
+	int esd_error_reg_num;
+	int esd_reg_index[MAX_REG_READ_COUNT];
+	int esd_expect_reg_val[MAX_REG_READ_COUNT];
+	int esd_error_reg_val[MAX_REG_READ_COUNT];
 };
 
 extern struct lcdkit_panel_data lcdkit_info;

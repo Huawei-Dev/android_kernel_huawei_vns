@@ -77,5 +77,6 @@ ssize_t lcd_test_config_store(struct device* dev, struct lcdkit_panel_data* lcdk
 ssize_t lv_detect_show(struct device* dev, struct lcdkit_panel_data* lcdkit_info, char* buf);
 ssize_t current_detect_show(struct device* dev, struct lcdkit_panel_data* lcdkit_info, char* buf);
 ssize_t get_lcdkit_support(void);
-
+extern int lcdkit_get_vsp_voltage(void);
+extern int lcdkit_get_vsn_voltage(void);
 #endif

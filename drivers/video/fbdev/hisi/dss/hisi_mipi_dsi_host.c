@@ -31,7 +31,10 @@ int mipi_dsi_swrite(struct dsi_cmd_desc *cm, char __iomem *dsi_base)
 		return 0;
 	}
 
-	BUG_ON(cm->dlen > 2);
+	if (cm->dlen > 2) {
+		HISI_FB_ERR("cm->dlen is invalid");
+		return -EINVAL;
+	}
 	len = cm->dlen;
 
 	//len = (cm->dlen > 2) ? 2 : cm->dlen;
@@ -207,8 +210,14 @@ int mipi_dsi_cmd_add(struct dsi_cmd_desc *cm, char __iomem *dsi_base)
 {
 	int len = 0;
 
-	BUG_ON(cm == NULL);
-	BUG_ON(dsi_base == NULL);
+	if (NULL == cm) {
+		HISI_FB_ERR("cm is NULL");
+		return -EINVAL;
+	}
+	if (NULL == dsi_base) {
+		HISI_FB_ERR("dsi_base is NULL");
+		return -EINVAL;
+	}
 
 	switch (cm->dtype) {
 	case DTYPE_GEN_WRITE:
@@ -238,8 +247,14 @@ int mipi_dsi_cmds_tx(struct dsi_cmd_desc *cmds, int cnt, char __iomem *dsi_base)
 	struct dsi_cmd_desc *cm = NULL;
 	int i = 0;
 
-	BUG_ON(cmds == NULL);
-	BUG_ON(dsi_base == NULL);
+	if (NULL == cmds) {
+		HISI_FB_ERR("cmds is NULL");
+		return -EINVAL;
+	}
+	if (NULL == dsi_base) {
+		HISI_FB_ERR("dsi_base is NULL");
+		return -EINVAL;
+	}
 
 	cm = cmds;
 
@@ -249,10 +264,15 @@ int mipi_dsi_cmds_tx(struct dsi_cmd_desc *cmds, int cnt, char __iomem *dsi_base)
 		if (cm->wait) {
 			if (cm->waittype == WAIT_TYPE_US)
 				udelay(cm->wait);
-			else if (cm->waittype == WAIT_TYPE_MS)
-				mdelay(cm->wait);
+			else if (cm->waittype == WAIT_TYPE_MS) {
+				if (cm->wait <= 10) {
+					mdelay(cm->wait);
+				} else {
+					msleep(cm->wait);
+				}
+			}
 			else
-				mdelay(cm->wait * 1000);
+				msleep(cm->wait * 1000);
 		}
 		cm++;
 	}
@@ -298,8 +318,14 @@ static int mipi_dsi_read_add(uint32_t *out, struct dsi_cmd_desc *cm, char __iome
 	int is_timeout = 1;
 	int ret = 0;
 
-	BUG_ON(cm == NULL);
-	BUG_ON(dsi_base == NULL);
+	if (NULL == cm) {
+		HISI_FB_ERR("cm is NULL");
+		return -EINVAL;
+	}
+	if (NULL == dsi_base) {
+		HISI_FB_ERR("dsi_base is NULL");
+		return -EINVAL;
+	}
 
 	if (cm->dtype == DTYPE_DCS_READ) {
 		mipi_dsi_sread_request(cm, dsi_base);
@@ -372,8 +398,14 @@ int mipi_dsi_cmds_rx(uint32_t *out, struct dsi_cmd_desc *cmds, int cnt,
 	int i = 0;
 	int err_num = 0;
 
-	BUG_ON(cmds == NULL);
-	BUG_ON(dsi_base == NULL);
+	if (NULL == cmds) {
+		HISI_FB_ERR("cmds is NULL");
+		return -EINVAL;
+	}
+	if (NULL == dsi_base) {
+		HISI_FB_ERR("dsi_base is NULL");
+		return -EINVAL;
+	}
 
 	cm = cmds;
 
@@ -385,10 +417,15 @@ int mipi_dsi_cmds_rx(uint32_t *out, struct dsi_cmd_desc *cmds, int cnt,
 		if (cm->wait) {
 			if (cm->waittype == WAIT_TYPE_US)
 				udelay(cm->wait);
-			else if (cm->waittype == WAIT_TYPE_MS)
-				mdelay(cm->wait);
+			else if (cm->waittype == WAIT_TYPE_MS) {
+				if (cm->wait <= 10) {
+					mdelay(cm->wait);
+				} else {
+					msleep(cm->wait);
+				}
+			}
 			else
-				mdelay(cm->wait * 1000);
+				msleep(cm->wait * 1000);
 		}
 		cm++;
 	}
@@ -411,8 +448,14 @@ int mipi_dsi_read_compare(struct mipi_dsi_read_compare_data *data,
 	int ret = 0;
 	int i;
 
-	BUG_ON(data == NULL);
-	BUG_ON(dsi_base == NULL);
+	if (NULL == data) {
+		HISI_FB_ERR("data is NULL");
+		return -EINVAL;
+	}
+	if (NULL == dsi_base) {
+		HISI_FB_ERR("dsi_base is NULL");
+		return -EINVAL;
+	}
 
 	read_value = data->read_value;
 	expected_value = data->expected_value;
