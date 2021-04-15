@@ -5060,7 +5060,7 @@ static void hi6555c_free_resource(struct snd_soc_codec *codec)
 static int hi6555c_codec_probe(struct snd_soc_codec *codec)
 {
 	int ret = 0;
-	struct snd_soc_dapm_context *dapm = &codec->dapm;
+	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
 	struct device_node *np  = codec->dev->of_node;
 	int val = 0;
 

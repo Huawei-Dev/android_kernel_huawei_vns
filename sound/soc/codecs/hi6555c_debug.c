@@ -111,7 +111,7 @@ static void hi6555c_debug_dapm_widget_dp(char *buf)
 	}
 
 	snprintf(buf, HI6555C_DBG_SIZE_WIDGET, "BEGIN widget\n"); /*lint !e747 */
-	l = &(g_codec->dapm.card->widgets);
+	l = &(snd_soc_codec_get_dapm(g_codec)->card->widgets);
 	list_for_each_entry(w, l, list) { /*lint !e64 !e826 */
 		i++;
 		snprintf(buf + strlen(buf), HI6555C_DBG_SIZE_WIDGET - strlen(buf), "<%02d> pwr= %d \"%s\"\n", i, w->power, w->name);
@@ -135,7 +135,7 @@ static void hi6555c_debug_dapm_path_dp(char *buf)
 	}
 
 	snprintf(buf, HI6555C_DBG_SIZE_PATH, "BEGIN path\n"); /*lint !e747 */
-	l = &(g_codec->dapm.card->paths);
+	l = &(snd_soc_codec_get_dapm(g_codec)->card->paths);
 	list_for_each_entry(p, l, list) { /*lint !e64 !e826 */
 		i++;
 		snprintf(buf + strlen(buf), HI6555C_DBG_SIZE_PATH - strlen(buf), "<%d>cn_stat: %d\n", i, p->connect);
@@ -319,7 +319,7 @@ static void hi6555c_debug_state_dp(char *buf)
 
 /*
  *1 default: page outpue
- *2 single reg read: echo "r reg" > rr£¬cat rr
+ *2 single reg read: echo "r reg" > rr\A3\ACcat rr
  *3 single reg write: echo "w reg val"
  */
 /*lint -e715 */
@@ -358,7 +358,7 @@ static ssize_t hi6555c_debug_rr_read(struct file *file, char __user *user_buf,
 
 /*
  *1 default: page outpue
- *2 single reg read: echo "r reg" > rr£¬cat rr
+ *2 single reg read: echo "r reg" > rr\A3\ACcat rr
  *3 single reg write: echo "w reg val"
  */
 static ssize_t hi6555c_debug_rr_write(struct file *file, const char __user *user_buf, size_t count, loff_t *ppos)

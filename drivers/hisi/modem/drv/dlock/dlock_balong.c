@@ -10,6 +10,7 @@
 *	修改记录 :	2016年6月10日  v1.00  l00354607  创建
 *************************************************************************/
 
+#include <linux/module.h>
 #include "dlock_balong.h"
 #include "drv_nv_def.h"
 #include "drv_nv_id.h"

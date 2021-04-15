@@ -3,6 +3,7 @@
 #include <linux/clk.h>
 #include <linux/fs.h>
 #include <osl_malloc.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/spinlock.h>
