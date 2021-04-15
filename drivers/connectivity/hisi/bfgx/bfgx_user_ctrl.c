@@ -16,6 +16,7 @@
 #include "hisi_ini.h"
 #include "plat_uart.h"
 #include "board.h"
+#include "frw_ext_if.h"
 
 /*****************************************************************************
   2 Define global variable

@@ -31,6 +31,7 @@
 
 #include "oal_hcc_host_if.h"
 #include "oam_ext_if.h"
+#include "frw_ext_if.h"
 
 #undef  THIS_FILE_ID
 #define THIS_FILE_ID OAM_FILE_ID_PLAT_PM_WLAN_C
@@ -549,6 +550,8 @@ oal_int32 wlan_pm_open(oal_void)
     DECLARE_DFT_TRACE_KEY_INFO("wlan_open_succ",OAL_DFT_TRACE_SUCC);
 
     wlan_pm_enable();
+    
+    frw_timer_sys_start();
 
     /*将timeout值恢复为默认值，并启动定时器*/
     wlan_pm_set_timeout(WLAN_SLEEP_DEFAULT_CHECK_CNT);
@@ -682,6 +685,8 @@ oal_uint32 wlan_pm_close(oal_void)
         DECLARE_DFT_TRACE_KEY_INFO("wlan_power_off_fail",OAL_DFT_TRACE_FAIL);
         return OAL_FAIL;
     }
+    
+    frw_timer_sys_stop();
 
     pst_wlan_pm->ul_wlan_power_state = POWER_STATE_SHUTDOWN;
 
