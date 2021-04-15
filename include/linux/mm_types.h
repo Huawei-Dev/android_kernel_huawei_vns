@@ -489,9 +489,6 @@ struct mm_struct {
 	/* address of the bounds directory */
 	void __user *bd_addr;
 #endif
-#ifdef CONFIG_TASK_PROTECT_LRU
-	int protect;
-#endif
 	struct work_struct async_put_work;
 };
 

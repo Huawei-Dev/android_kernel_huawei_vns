@@ -37,10 +37,6 @@
 #include <linux/hisi/page_tracker.h>
 #include "internal.h"
 
-#ifdef CONFIG_TASK_PROTECT_LRU
-#include <linux/hisi/protect_lru.h>
-#endif
-
 #define CREATE_TRACE_POINTS
 #include <trace/events/filemap.h>
 
@@ -663,9 +659,6 @@ int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 			workingset_activation(page);
 		} else
 			ClearPageActive(page);
-#ifdef CONFIG_TASK_PROTECT_LRU
-		protect_lru_set_from_file(page);
-#endif
 		lru_cache_add(page);
 	}
 	return ret;
@@ -1160,11 +1153,7 @@ no_page:
 		}
 	}
 
-#ifdef CONFIG_TASK_PROTECT_LRU
-	return protect_lru_move_and_shrink(page);
-#else
 	return page;
-#endif
 }
 EXPORT_SYMBOL(pagecache_get_page);
 

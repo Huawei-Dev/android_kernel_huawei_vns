@@ -92,9 +92,6 @@
 #ifdef CONFIG_LOCKUP_DETECTOR
 #include <linux/nmi.h>
 #endif
-#ifdef CONFIG_TASK_PROTECT_LRU
-#include <linux/hisi/protect_lru.h>
-#endif
 
 #if defined(CONFIG_SYSCTL)
 
@@ -1426,15 +1423,6 @@ static struct ctl_table vm_table[] = {
 		.extra1		= &one,
 		.extra2		= &four,
 	},
-#ifdef CONFIG_TASK_PROTECT_LRU
-	/*lint -save -e785*/
-	{
-		.procname	= "protect_lru",
-		.mode		= 0440,
-		.child		= protect_lru_table,
-	},
-	/*lint -restore*/
-#endif
 #ifdef CONFIG_COMPACTION
 	{
 		.procname	= "compact_memory",

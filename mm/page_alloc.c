@@ -956,13 +956,6 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 	kmemcheck_free_shadow(page, order);
 	kasan_free_pages(page, order);
 
-#ifdef CONFIG_TASK_PROTECT_LRU
-	if (PageProtect(page)) {
-		ClearPageProtect(page);
-		set_page_num(page, 0);
-	}
-#endif
-
 	if (PageAnon(page))
 		page->mapping = NULL;
 	bad += free_pages_check(page);
@@ -3758,10 +3751,6 @@ void show_free_areas(unsigned int filter)
 
 	printk("active_anon:%lu inactive_anon:%lu isolated_anon:%lu\n"
 		" active_file:%lu inactive_file:%lu isolated_file:%lu\n"
-#ifdef CONFIG_TASK_PROTECT_LRU
-		" active_prot_anon:%lu inactive_prot_anon:%lu\n"
-		" active_prot_file:%lu inactive_prot_file:%lu\n"
-#endif
 		" unevictable:%lu dirty:%lu writeback:%lu unstable:%lu\n"
 		" slab_reclaimable:%lu slab_unreclaimable:%lu\n"
 		" mapped:%lu shmem:%lu pagetables:%lu bounce:%lu\n"
@@ -3772,12 +3761,6 @@ void show_free_areas(unsigned int filter)
 		global_page_state(NR_ACTIVE_FILE),
 		global_page_state(NR_INACTIVE_FILE),
 		global_page_state(NR_ISOLATED_FILE),
-#ifdef CONFIG_TASK_PROTECT_LRU
-		global_page_state(NR_PROTECT_ACTIVE_ANON),
-		global_page_state(NR_PROTECT_INACTIVE_ANON),
-		global_page_state(NR_PROTECT_ACTIVE_FILE),
-		global_page_state(NR_PROTECT_INACTIVE_FILE),
-#endif
 		global_page_state(NR_UNEVICTABLE),
 		global_page_state(NR_FILE_DIRTY),
 		global_page_state(NR_WRITEBACK),
@@ -3813,12 +3796,6 @@ void show_free_areas(unsigned int filter)
 			" inactive_anon:%lukB"
 			" active_file:%lukB"
 			" inactive_file:%lukB"
-#ifdef CONFIG_TASK_PROTECT_LRU
-			" active_prot_anon:%lukB"
-			" inactive_prot_anon:%lukB"
-			" active_prot_file:%lukB"
-			" inactive_prot_file:%lukB"
-#endif
 			" unevictable:%lukB"
 			" isolated(anon):%lukB"
 			" isolated(file):%lukB"
@@ -3851,12 +3828,6 @@ void show_free_areas(unsigned int filter)
 			K(zone_page_state(zone, NR_INACTIVE_ANON)),
 			K(zone_page_state(zone, NR_ACTIVE_FILE)),
 			K(zone_page_state(zone, NR_INACTIVE_FILE)),
-#ifdef CONFIG_TASK_PROTECT_LRU
-			K(zone_page_state(zone, NR_PROTECT_ACTIVE_ANON)),
-			K(zone_page_state(zone, NR_PROTECT_INACTIVE_ANON)),
-			K(zone_page_state(zone, NR_PROTECT_ACTIVE_FILE)),
-			K(zone_page_state(zone, NR_PROTECT_INACTIVE_FILE)),
-#endif
 			K(zone_page_state(zone, NR_UNEVICTABLE)),
 			K(zone_page_state(zone, NR_ISOLATED_ANON)),
 			K(zone_page_state(zone, NR_ISOLATED_FILE)),

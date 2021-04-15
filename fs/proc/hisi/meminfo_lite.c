@@ -78,10 +78,6 @@ static int meminfo_lite_proc_show(struct seq_file *m, void *v)
 
 	available += (long)global_page_state(NR_MALI_PAGES);
 
-#ifdef CONFIG_TASK_PROTECT_LRU
-	available -= (long)global_page_state(NR_PROTECT_ACTIVE_FILE);
-#endif
-
 	if (available < 0)
 		available = 0;
 

@@ -112,9 +112,6 @@ enum pageflags {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	PG_compound_lock,
 #endif
-#ifdef CONFIG_TASK_PROTECT_LRU
-	PG_protect,
-#endif
 	__NR_PAGEFLAGS,
 
 	/* Filesystems */
@@ -295,10 +292,6 @@ TESTSCFLAG(HWPoison, hwpoison)
 #else
 PAGEFLAG_FALSE(HWPoison)
 #define __PG_HWPOISON 0
-#endif
-
-#ifdef CONFIG_TASK_PROTECT_LRU
-PAGEFLAG(Protect, protect)
 #endif
 
 /*
