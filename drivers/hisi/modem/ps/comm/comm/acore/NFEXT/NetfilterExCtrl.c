@@ -48,7 +48,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_BrPreRoutingHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -62,7 +61,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_BrPostRoutingHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -76,7 +74,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_BrForwardHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -90,7 +87,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_BrLocalInHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -104,7 +100,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_BrLocalOutHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -118,7 +113,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_ArpInHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -132,7 +126,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_ArpOutHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -146,7 +139,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_Ip4PreRoutingHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -160,7 +152,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_Ip4PostRoutingHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -174,7 +165,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_Ip4LocalInHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -188,7 +178,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_Ip4LocalOutHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -202,7 +191,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_Ip4ForwardHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -216,7 +204,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_Ip6PreRoutingHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -230,7 +217,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_Ip6PostRoutingHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -244,7 +230,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_Ip6LocalInHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -258,7 +243,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_Ip6LocalOutHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -272,7 +256,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_Ip6ForwardHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
@@ -286,7 +269,6 @@ NF_EXT_MASK_OPS_STRU g_stNfExtMaskOps[]    =
         {0,0,0,0},
         {
             .hook       = NFExt_BrForwardFlowCtrlHook,
-            .owner      = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
             .priv       = NULL,
 #endif
