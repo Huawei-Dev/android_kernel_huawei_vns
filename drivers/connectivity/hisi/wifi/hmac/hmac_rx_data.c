@@ -60,6 +60,15 @@ extern "C" {
 #include "hmac_proxysta.h"
 #endif
 
+#ifdef _PRE_WLAN_WAKEUP_SRC_PARSE
+#include <linux/ip.h>
+#include <net/tcp.h>
+#include <net/udp.h>
+#include <net/icmp.h>
+#include <linux/ieee80211.h>
+#include <linux/ipv6.h>
+#endif
+
 #undef  THIS_FILE_ID
 #define THIS_FILE_ID OAM_FILE_ID_HMAC_RX_DATA_C
 
@@ -432,6 +441,67 @@ OAL_STATIC oal_uint32  hmac_rx_transmit_to_wlan(
 }
 
 /*****************************************************************************
+ 函 数 名  : hmac_rx_free_amsdu_netbuf
+ 功能描述  : 释放amsdu netbuf
+ 输入参数  :
+ 输出参数  : 无
+ 返 回 值  : 无
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2017年07月25日
+    作    者   : hanyunfeng
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+OAL_STATIC oal_void  hmac_rx_free_amsdu_netbuf(oal_netbuf_stru *pst_netbuf)
+{
+    oal_netbuf_stru        *pst_netbuf_next;
+    while (OAL_PTR_NULL != pst_netbuf)
+    {
+        pst_netbuf_next = oal_get_netbuf_next(pst_netbuf);
+        oal_netbuf_free(pst_netbuf);
+        pst_netbuf = pst_netbuf_next;
+    }
+}
+
+/*****************************************************************************
+ 函 数 名  : hmac_rx_clear_amsdu_last_netbuf_pointer
+ 功能描述  : 设置amsdu 最后一个 netbuf next指针为null
+ 输入参数  :
+ 输出参数  : 无
+ 返 回 值  : 无
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2017年07月25日
+    作    者   : hanyunfeng
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+OAL_STATIC oal_void  hmac_rx_clear_amsdu_last_netbuf_pointer(oal_netbuf_stru *pst_netbuf, oal_uint8 uc_num_buf)
+{
+    if (0 == uc_num_buf)
+    {
+        pst_netbuf->next = OAL_PTR_NULL;
+        return;
+    }
+
+    while (pst_netbuf != OAL_PTR_NULL)
+    {
+        uc_num_buf--;
+        if (0 == uc_num_buf)
+        {
+            pst_netbuf->next = OAL_PTR_NULL;
+            break;
+        }
+        pst_netbuf = oal_get_netbuf_next(pst_netbuf);
+    }
+}
+
+/*****************************************************************************
  函 数 名  : hmac_parse_amsdu
  功能描述  : 解析出每一个AMSDU中的MSDU
  输入参数  : 指向MPDU的第一个netbuf的指针
@@ -500,6 +570,7 @@ oal_uint32  hmac_rx_parse_amsdu(
     {
         OAM_ERROR_LOG0(0, OAM_SF_RX, "{hmac_rx_parse_amsdu::pst_netbuf null.}");
         OAM_STAT_VAP_INCR(0, rx_no_buff_dropped, 1);
+        hmac_rx_free_amsdu_netbuf(pst_msdu_state->pst_curr_netbuf);
         return OAL_FAIL;
     }
 
@@ -549,8 +620,7 @@ oal_uint32  hmac_rx_parse_amsdu(
            *pen_proc_state = MAC_PROC_ERROR;
 
            OAM_WARNING_LOG0(0, OAM_SF_RX, "{hmac_rx_parse_amsdu::pen_proc_state is err for uc_procd_netbuf_nums > uc_netbuf_nums_in_mpdul.}");
-           oal_netbuf_free(pst_netbuf_prev);
-
+           hmac_rx_free_amsdu_netbuf(pst_msdu_state->pst_curr_netbuf);
            return OAL_FAIL;
         }
         oal_netbuf_free(pst_netbuf_prev);
@@ -559,7 +629,7 @@ oal_uint32  hmac_rx_parse_amsdu(
     {
         *pen_proc_state = MAC_PROC_ERROR;
         OAM_WARNING_LOG0(0, OAM_SF_RX, "{hmac_rx_parse_amsdu::pen_proc_state is err for uc_procd_netbuf_nums > uc_netbuf_nums_in_mpdul.}");
-        oal_netbuf_free(pst_msdu_state->pst_curr_netbuf);
+        hmac_rx_free_amsdu_netbuf(pst_msdu_state->pst_curr_netbuf);
         return OAL_FAIL;
     }
 
@@ -688,6 +758,9 @@ OAL_STATIC oal_uint32  hmac_rx_prepare_msdu_list_to_wlan(
     {
         st_msdu_state.uc_procd_netbuf_nums    = 0;
         st_msdu_state.uc_procd_msdu_in_netbuf = 0;
+
+        /* amsdu 最后一个netbuf next指针设为 NULL 出错时方便释放amsdu netbuf */
+        hmac_rx_clear_amsdu_last_netbuf_pointer(pst_netbuf, pst_rx_ctrl->st_rx_info.bit_buff_nums);
 
         do
         {
@@ -913,6 +986,187 @@ OAL_STATIC oal_void  hmac_pkt_mem_opt_rx_pkts_stat(hmac_vap_stru *pst_vap, oal_i
     }
 }
 #endif
+
+#ifdef _PRE_WLAN_WAKEUP_SRC_PARSE
+/*****************************************************************************
+ 函 数 名  : hmac_parse_ipv4_packet
+ 功能描述  : 当报文是IPV4类型时，进一步解析type，ipaddr，port
+ 输入参数  : (1)netbuf,data指针已偏移，指向eth hdr
+ 输出参数  : NULL
+ 返 回 值  : null
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2017年2月20日
+    作    者   : zourong
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+OAL_STATIC oal_void hmac_parse_ipv4_packet(oal_void *pst_eth)
+{
+    const struct iphdr *iph;
+    oal_uint32 iphdr_len = 0;
+    struct tcphdr *th;
+    struct udphdr *uh;
+    struct icmphdr *icmph;
+
+    iph = (struct iphdr *)((mac_ether_header_stru *)pst_eth + 1);
+    iphdr_len = iph->ihl*4;
+
+    OAL_IO_PRINT(WIFI_WAKESRC_TAG"ipv4 packet. src ip:%d.x.x.%d, dst ip:%d.x.x.%d\n", IPADDR(iph->saddr), IPADDR(iph->daddr));
+    if (iph->protocol == IPPROTO_UDP){
+        uh = (struct udphdr *)((oal_uint8*)iph + iphdr_len);
+        OAL_IO_PRINT(WIFI_WAKESRC_TAG"UDP packet, src port:%d, dst port:%d.\n", OAL_NTOH_16(uh->source), OAL_NTOH_16(uh->dest));
+    }else if(iph->protocol == IPPROTO_TCP){
+        th = (struct tcphdr *)((oal_uint8*)iph + iphdr_len);
+        OAL_IO_PRINT(WIFI_WAKESRC_TAG"TCP packet, src port:%d, dst port:%d.\n", OAL_NTOH_16(th->source), OAL_NTOH_16(th->dest));
+    }else if(iph->protocol == IPPROTO_ICMP){
+        icmph = (struct icmphdr *)((oal_uint8*)iph + iphdr_len);
+        OAL_IO_PRINT(WIFI_WAKESRC_TAG"ICMP packet, type(%d):%s, code:%d.\n", icmph->type, ((icmph->type == 0)?"ping reply":((icmph->type == 8)?"ping request":"other icmp pkt")), icmph->code);
+    }else if(iph->protocol == IPPROTO_IGMP){
+        OAL_IO_PRINT(WIFI_WAKESRC_TAG"IGMP packet.\n");
+    }else{
+        OAL_IO_PRINT(WIFI_WAKESRC_TAG"other IPv4 packet, protocol:%d.\n", iph->protocol);
+    }
+
+    return;
+}
+
+/*****************************************************************************
+ 函 数 名  : hmac_parse_ipv4_packet
+ 功能描述  : 当报文是IPV6类型时，进一步解析type，ipaddr
+ 输入参数  : (1)netbuf,data指针已偏移，指向eth hdr
+ 输出参数  : NULL
+ 返 回 值  : null
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2017年2月20日
+    作    者   : zourong
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+
+OAL_STATIC oal_void hmac_parse_ipv6_packet(oal_void *pst_eth)
+{
+    struct ipv6hdr *ipv6h;
+
+    ipv6h = (struct ipv6hdr *)((mac_ether_header_stru *)pst_eth + 1);
+    OAL_IO_PRINT(WIFI_WAKESRC_TAG"ipv6 packet. version: %d, payload length: %d, nh->nexthdr: %d. \n", ipv6h->version, OAL_NTOH_16(ipv6h->payload_len), ipv6h->nexthdr);
+    OAL_IO_PRINT(WIFI_WAKESRC_TAG"ipv6 src addr:%04x:x:x:x:x:x:x:%04x, dst addr:%04x:x:x:x:x:x:x:%04x \n",IPADDR6(ipv6h->saddr), IPADDR6(ipv6h->daddr));
+    if(OAL_IPPROTO_ICMPV6==ipv6h->nexthdr)
+    {
+        oal_nd_msg_stru  *pst_rx_nd_hdr;
+        pst_rx_nd_hdr   = (oal_nd_msg_stru *)(ipv6h + 1);
+        OAL_IO_PRINT(WIFI_WAKESRC_TAG"ipv6 nd type: %d. \n", pst_rx_nd_hdr->icmph.icmp6_type);
+    }
+
+    return;
+}
+
+/*****************************************************************************
+ 函 数 名  : hmac_parse_arp_packet
+ 功能描述  : 当报文是arp类型时，进一步解析type，subtype
+ 输入参数  : (1)netbuf,data指针已偏移，指向eth hdr
+ 输出参数  : NULL
+ 返 回 值  : null
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2017年2月20日
+    作    者   : zourong
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+OAL_STATIC oal_void hmac_parse_arp_packet(oal_void *pst_eth)
+{
+    const struct iphdr *iph;
+    int iphdr_len = 0;
+    struct arphdr *arp;
+
+    iph = (struct iphdr *)((mac_ether_header_stru *)pst_eth + 1);
+    iphdr_len = iph->ihl*4;
+    arp = (struct arphdr *)((oal_uint8*)iph + iphdr_len);
+    OAL_IO_PRINT(WIFI_WAKESRC_TAG"ARP packet, hardware type:%d, protocol type:%d, opcode:%d.\n",
+                OAL_NTOH_16(arp->ar_hrd), OAL_NTOH_16(arp->ar_pro), OAL_NTOH_16(arp->ar_op));
+
+    return;
+}
+
+/*****************************************************************************
+ 函 数 名  : parse_8021x_packet
+ 功能描述  : 当报文是arp类型时，进一步解析type，subtype
+ 输入参数  : (1)netbuf,data指针已偏移，指向eth hdr
+ 输出参数  : NULL
+ 返 回 值  : null
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2017年2月20日
+    作    者   : zourong
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+OAL_STATIC oal_void  hmac_parse_8021x_packet(oal_void *pst_eth)
+{
+    struct ieee8021x_hdr *hdr = (struct ieee8021x_hdr *)((mac_ether_header_stru *)pst_eth + 1);
+
+    OAL_IO_PRINT(WIFI_WAKESRC_TAG"802.1x frame: version:%d, type:%d, length:%d\n", hdr->version, hdr->type, OAL_NTOH_16(hdr->length));
+
+    return;
+}
+
+
+/*****************************************************************************
+ 函 数 名  : hmac_parse_packet
+ 功能描述  : 当系统被wifi唤醒时，解析数据报文的格式。
+ 输入参数  : (1)netbuf,data指针已偏移，指向eth hdr
+ 输出参数  : NULL
+ 返 回 值  : null
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2017年2月20日
+    作    者   : zourong
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+oal_void hmac_parse_packet(oal_netbuf_stru *pst_netbuf_eth)
+{
+    oal_uint16 us_type;
+    mac_ether_header_stru  *pst_ether_hdr;
+
+    pst_ether_hdr = (mac_ether_header_stru *)oal_netbuf_data(pst_netbuf_eth);
+    if (OAL_UNLIKELY(OAL_PTR_NULL == pst_ether_hdr))
+    {
+        OAL_IO_PRINT(WIFI_WAKESRC_TAG"ether header is null.\n");
+        return;
+    }
+
+    us_type = pst_ether_hdr->us_ether_type;
+
+    if(us_type == OAL_HOST2NET_SHORT(ETHER_TYPE_IP)){
+        hmac_parse_ipv4_packet((oal_void*)pst_ether_hdr);
+    }else if (us_type == OAL_HOST2NET_SHORT(ETHER_TYPE_IPV6)){
+        hmac_parse_ipv6_packet((oal_void*)pst_ether_hdr);
+    }else if(us_type == OAL_HOST2NET_SHORT(ETHER_TYPE_ARP)){
+        hmac_parse_arp_packet((oal_void*)pst_ether_hdr);
+    }else if(us_type == OAL_HOST2NET_SHORT(ETHER_TYPE_PAE)){
+        hmac_parse_8021x_packet((oal_void*)pst_ether_hdr);
+    }else{
+        OAL_IO_PRINT(WIFI_WAKESRC_TAG"receive protocol type:0x%04x\n", OAL_NTOH_16(us_type));
+    }
+
+    return;
+}
+
+#endif
+
 /*****************************************************************************
  函 数 名  : hmac_rx_transmit_msdu_to_lan
  功能描述  : 将MSDU转发到LAN的接口，包括地址转换等信息的设置
@@ -970,6 +1224,15 @@ OAL_STATIC oal_void  hmac_rx_transmit_msdu_to_lan(hmac_vap_stru *pst_vap, dmac_m
         OAM_ERROR_LOG0(pst_vap->st_vap_base_info.uc_vap_id, OAM_SF_RX, "{hmac_rx_transmit_msdu_to_lan::pst_ether_hdr null.}");
         return;
     }
+
+#ifdef _PRE_WLAN_WAKEUP_SRC_PARSE
+    if(OAL_TRUE==g_uc_print_data_wakeup)
+    {
+        OAL_IO_PRINT(WIFI_WAKESRC_TAG"rx: hmac_parse_packet!\n");
+        hmac_parse_packet(pst_netbuf);
+        g_uc_print_data_wakeup = OAL_FALSE;
+    }
+#endif
 
 #if defined(_PRE_WLAN_FEATURE_WPA) || defined(_PRE_WLAN_FEATURE_WPA2)
     puc_mac_addr = pst_msdu->auc_ta;
@@ -1291,6 +1554,9 @@ oal_void  hmac_rx_lan_frame_classify(
             return;
         }
 
+        /* 重新获取该MPDU的控制信息 */
+        pst_rx_ctrl = (hmac_rx_ctl_stru *)oal_netbuf_cb(pst_netbuf);
+
         /* 打印出关键帧(dhcp)信息 */
         uc_datatype = mac_get_data_type_from_80211(pst_netbuf, pst_rx_ctrl->st_rx_info.uc_mac_header_len);
         if ((uc_datatype <= MAC_DATA_VIP) && (uc_datatype != MAC_DATA_ARP_REQ))
@@ -1326,6 +1592,9 @@ oal_void  hmac_rx_lan_frame_classify(
     {
         st_msdu_state.uc_procd_netbuf_nums    = 0;
         st_msdu_state.uc_procd_msdu_in_netbuf = 0;
+
+        /* amsdu 最后一个netbuf next指针设为 NULL 出错时方便释放amsdu netbuf */
+        hmac_rx_clear_amsdu_last_netbuf_pointer(pst_netbuf, pst_rx_ctrl->st_rx_info.bit_buff_nums);
 
         do
         {

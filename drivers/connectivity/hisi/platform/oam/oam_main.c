@@ -166,17 +166,16 @@ oam_software_feature_stru   gst_oam_feature_list[OAM_SOFTWARE_FEATURE_BUTT] =
     {OAM_SF_MWO_DET,            "mwodet"},
     {OAM_SF_CCA_OPT,            "cca"},
 
+    /* 65 */
     {OAM_SF_ROAM,               "roam"},
     {OAM_SF_DFT,                "dft"},
     {OAM_SF_DFR,                "dfr"},
     {OAM_SF_VOWIFI,             "vowifi"},
-#ifdef _PRE_WLAN_FEATURE_WMMAC
     {OAM_SF_WMMAC,              "wmmac"},
-#endif
+
     {OAM_SF_ANY,                "any"},
-#ifdef _PRE_WLAN_FEATURE_HILINK
     {OAM_SF_HILINK,             "hilink"},
-#endif
+
 };
 
 /*****************************************************************************

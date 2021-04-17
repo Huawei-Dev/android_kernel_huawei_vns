@@ -36,8 +36,8 @@ extern "C" {
 #include "hal_ext_if.h"
 #ifdef _PRE_PLAT_FEATURE_CUSTOMIZE
 #include "hal_mac.h"
-#include "hal_device.h"
 #endif
+#include "hal_device.h"
 #include "oal_mem.h"
 #ifdef _PRE_WLAN_ALG_ENABLE
 #include "alg_ext_if.h"
@@ -5841,22 +5841,25 @@ OAL_STATIC oal_uint32 dmac_config_connect(mac_vap_stru *pst_mac_vap, oal_uint8 u
         OAM_ERROR_LOG1(pst_mac_vap->uc_vap_id, OAM_SF_CFG, "{dmac_config_connect::mac_11i_init_privacy fail [%d].}", ul_ret);
         return ul_ret;
     }
-#ifdef _PRE_WLAN_FEATURE_11R
-    ul_ret = mac_mib_init_ft_cfg(pst_mac_vap, pst_conn->auc_mde);
-    if (OAL_SUCC != ul_ret)
-    {
-        OAM_ERROR_LOG1(pst_mac_vap->uc_vap_id, OAM_SF_CFG, "{dmac_config_connect::mac_mib_init_ft_cfg fail[%d]!}\r\n", ul_ret);
-        return ul_ret;
-    }
-#endif //_PRE_WLAN_FEATURE_11R
-
-    /* 更新上报的RSSI */
     pst_dmac_vap = mac_res_get_dmac_vap(pst_mac_vap->uc_vap_id);
-
     if (OAL_PTR_NULL != pst_dmac_vap)
     {
         pst_dmac_vap->st_query_stats.ul_signal = pst_conn->c_rssi;
     }
+#ifdef _PRE_WLAN_FEATURE_11R
+    if(OAL_TRUE == pst_dmac_vap->bit_11r_enable)
+    {
+        ul_ret = mac_mib_init_ft_cfg(pst_mac_vap, pst_conn->auc_mde);
+        if (OAL_SUCC != ul_ret)
+        {
+            OAM_ERROR_LOG1(pst_mac_vap->uc_vap_id, OAM_SF_CFG, "{dmac_config_connect::mac_mib_init_ft_cfg fail[%d]!}\r\n", ul_ret);
+            return ul_ret;
+        }
+    }
+
+#endif //_PRE_WLAN_FEATURE_11R
+
+    /* 更新上报的RSSI */
 
     /* 通知算法 */
     dmac_alg_cfg_start_connect_notify(pst_mac_vap, pst_conn->c_rssi);
@@ -6065,6 +6068,7 @@ OAL_STATIC oal_uint32  dmac_config_user_info(mac_vap_stru *pst_mac_vap, oal_uint
                        0, 0, OAM_OTA_TYPE_DMAC_USER);
     }
 #endif
+
     return OAL_SUCC;
 }
 
@@ -6281,7 +6285,21 @@ OAL_STATIC oal_uint32  dmac_config_get_ant(mac_vap_stru *pst_mac_vap, oal_uint8 
 *****************************************************************************/
 OAL_STATIC oal_bool_enum_uint8 is_fcc_country(oal_int8* country_code)
 {
-    oal_int8   *ac_fcc_country[] = {"AR", "BR", "CA", "CL", "IN", "MX", "PR", "US", "VE", OAL_PTR_NULL};
+    oal_int8   *ac_fcc_country[] = {"AD", "AR", "AS", "AU",
+                                    "BB", "BM", "BS",
+                                    "CA", "CO",
+                                    "DO",
+                                    "GD", "GT", "GU",
+                                    "ID",
+                                    "JM",
+                                    "MN", "MO", "MP", "MT", "MX",
+                                    "NI", "NZ",
+                                    "OM",
+                                    "PA", "PH", "PR", "PS", "PY", "RW",
+                                    "TW", "TZ",
+                                    "US", "UZ",
+                                    "VI",
+                                    OAL_PTR_NULL};
     oal_int8  **pp_country = ac_fcc_country;
 
     while (*pp_country != OAL_PTR_NULL)
@@ -6462,6 +6480,7 @@ OAL_STATIC oal_uint32  dmac_config_set_country_for_dfs(mac_vap_stru *pst_mac_vap
     return OAL_SUCC;
 }
 #endif
+#if 0
 
 /*****************************************************************************
  函 数 名  : dmac_config_alrxtx_set_pm
@@ -6492,7 +6511,6 @@ OAL_STATIC oal_uint32  dmac_config_alrxtx_set_pm(mac_vap_stru *pst_mac_vap, oal_
 
 
 
-#if 0
 /*****************************************************************************
  函 数 名  : dmac_config_list_channel
  功能描述  : 上报国家码信息
@@ -6614,17 +6632,11 @@ OAL_STATIC oal_uint32   dmac_config_set_regdomain_pwr(mac_vap_stru *pst_mac_vap,
 *****************************************************************************/
 OAL_STATIC oal_uint32 dmac_config_reduce_sar(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len, oal_uint8 *puc_param)
 {
-    mac_device_stru*        pst_mac_device;
     oal_uint32              ul_ret;
-    /* 刷新supplicant下发的芯片口功率限制值 */
-    /* 获取device */
-    pst_mac_device = mac_res_get_dev(pst_mac_vap->uc_device_id);
-    if (OAL_PTR_NULL == pst_mac_device)
-    {
-        OAM_ERROR_LOG0(pst_mac_vap->uc_vap_id, OAM_SF_CFG, "{dmac_config_reduce_sar::pst_mac_device null.}");
-        return OAL_ERR_CODE_PTR_NULL;
-    }
-    pst_mac_device->uc_sar_pwr_limit = *puc_param;
+
+    /* 刷新supplicant下发的芯片口功率限制值，如果大于等于阈值则设置为非法值 */
+    g_uc_sar_pwr_limit = (*puc_param >= HAL_SAR_PWR_LIMIT_THRESHOLD) ? INVALID_SAR_PWR_LIMIT : *puc_param;
+
     /* 通知算法信道改变 */
     ul_ret = dmac_alg_cfg_channel_notify(pst_mac_vap, CH_BW_CHG_TYPE_MOVE_WORK);
     if (OAL_SUCC != ul_ret)
@@ -7352,6 +7364,83 @@ OAL_STATIC oal_uint32  dmac_config_set_cali_vref(mac_vap_stru *pst_mac_vap, oal_
 }
 #endif
 
+#ifdef _PRE_WLAN_FEATURE_11K
+/*****************************************************************************
+ 函 数 名  : dmac_config_bcn_table_switch
+ 功能描述  : 设置table模式开关
+ 输入参数  : 无
+ 输出参数  : 无
+ 返 回 值  :
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2016年6月12日
+    作    者   : y00196452
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+
+OAL_STATIC oal_uint32  dmac_config_bcn_table_switch(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len, oal_uint8 *puc_param)
+{
+    dmac_vap_stru                   *pst_dmac_vap;
+    oal_uint8                        uc_switch;
+
+    uc_switch = puc_param[0];
+
+    pst_dmac_vap = (dmac_vap_stru *)mac_res_get_dmac_vap(pst_mac_vap->uc_vap_id);
+    if (OAL_UNLIKELY(OAL_PTR_NULL == pst_dmac_vap))
+    {
+        OAM_WARNING_LOG0(pst_mac_vap->uc_vap_id, OAM_SF_CFG, "{dmac_config_bcn_table_switch::pst_dmac_vap null.}");
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+    pst_dmac_vap->bit_bcn_table_switch = uc_switch;
+    OAM_WARNING_LOG1(pst_mac_vap->uc_vap_id, OAM_SF_CFG, "{dmac_config_bcn_table_switch:para val[%d]!}", uc_switch);
+    return OAL_SUCC;
+}
+#endif //_PRE_WLAN_FEATURE_11K
+
+/*****************************************************************************
+ 函 数 名  : dmac_config_voe_enable
+ 功能描述  : 设置voe开关
+ 输入参数  : 无
+ 输出参数  : 无
+ 返 回 值  :
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2016年6月12日
+    作    者   : y00196452
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+
+OAL_STATIC oal_uint32  dmac_config_voe_enable(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len, oal_uint8 *puc_param)
+{
+    dmac_vap_stru                   *pst_dmac_vap;
+    oal_uint8                        uc_switch;
+
+    uc_switch = puc_param[0];
+
+    pst_dmac_vap = (dmac_vap_stru *)mac_res_get_dmac_vap(pst_mac_vap->uc_vap_id);
+    if (OAL_UNLIKELY(OAL_PTR_NULL == pst_dmac_vap))
+    {
+        OAM_WARNING_LOG0(pst_mac_vap->uc_vap_id, OAM_SF_CFG, "{dmac_config_voe_enable::pst_dmac_vap null.}");
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+    //pst_dmac_vap->bit_voe_enable = uc_switch;
+#ifdef _PRE_WLAN_FEATURE_11K
+    pst_dmac_vap->bit_11k_enable = ((uc_switch & 0x07) & BIT2) ? OAL_TRUE : OAL_FALSE;
+    pst_dmac_vap->bit_11v_enable = ((uc_switch & 0x07) & BIT1) ? OAL_TRUE : OAL_FALSE;
+#endif
+#ifdef _PRE_WLAN_FEATURE_11R
+    pst_dmac_vap->bit_11r_enable = ((uc_switch & 0x07) & BIT0) ? OAL_TRUE : OAL_FALSE;
+#endif
+    OAM_WARNING_LOG1(pst_mac_vap->uc_vap_id, OAM_SF_CFG, "{dmac_config_voe_enable:para val[%d]!}", uc_switch);
+    return OAL_SUCC;
+}
+
 oal_uint32 g_ul_al_ampdu_num               = WLAN_AMPDU_TX_MAX_NUM; /*ampdu 常发聚合长度*/
 //oal_uint32 g_ul_first_timestamp = 0;    /*记录性能统计第一次时间戳*/
 
@@ -7391,6 +7480,8 @@ OAL_STATIC oal_uint32  dmac_config_always_rx_set_hal(hal_to_dmac_device_stru *ps
 
     /*清除硬件发送缓冲区*/
     hal_clear_hw_fifo(pst_hal_device_base);
+
+    hal_psm_clear_mac_rx_isr(pst_hal_device_base);
 
     /*复位macphy*/
     hal_reset_phy_machw(pst_hal_device_base,
@@ -7457,6 +7548,9 @@ OAL_STATIC oal_uint32  dmac_config_set_always_rx(mac_vap_stru *pst_mac_vap, oal_
     hal_to_dmac_device_stru         *pst_hal_device_base;
     mac_device_stru                 *pst_mac_device;
     oal_uint8                        uc_al_rx_flag = 0;
+#ifndef WIN32
+    oal_uint8                        uc_pm_off;
+#endif
 #ifdef _PRE_WLAN_FEATURE_EQUIPMENT_TEST
     oal_uint8                        uc_hipriv_ack = OAL_FALSE;
 #endif
@@ -7491,8 +7585,11 @@ OAL_STATIC oal_uint32  dmac_config_set_always_rx(mac_vap_stru *pst_mac_vap, oal_
 
     /* 设置常收模式标志 */
     uc_al_rx_flag = *(oal_bool_enum_uint8 *)puc_param;
+#ifndef WIN32
+    uc_pm_off = 0;
 
-    dmac_config_alrxtx_set_pm(pst_mac_vap, uc_al_rx_flag);
+    dmac_config_set_pm_switch(pst_mac_vap, 0, &uc_pm_off);
+#endif
 
     pst_mac_device = mac_res_get_dev(pst_mac_vap->uc_device_id);
 
@@ -8392,7 +8489,168 @@ OAL_STATIC oal_void  dmac_config_set_machw_wmm(hal_to_dmac_vap_stru *pst_hal_vap
 
 
 }
+#ifdef _PRE_WLAN_FEATURE_IP_FILTER
+/*****************************************************************************
+ 函 数 名  : dmac_clear_ip_filter_btable
+ 功能描述  : 清空表单
+ 输入参数  : 无
+ 输出参数  : 无
+ 返 回 值  : oal_uint32
+ 调用函数  :
+ 被调函数  :
 
+ 修改历史      :
+  1.日    期   : 2017年4月22日
+    作    者   : z00273164
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+oal_void dmac_clear_ip_filter_btable(mac_vap_stru *pst_mac_vap)
+{
+    /* 清空黑名单 */
+    g_st_dmac_board.st_rx_ip_filter.uc_btable_items_num = 0;
+    if (OAL_PTR_NULL == g_st_dmac_board.st_rx_ip_filter.pst_filter_btable)
+    {
+        OAM_ERROR_LOG0(0, OAM_SF_ANY, "{dmac_clear_ip_filter_btable::The pst_filter_btable is NULL!!}");
+        return;
+    }
+    OAL_MEMZERO((oal_uint8 *)(g_st_dmac_board.st_rx_ip_filter.pst_filter_btable), MAC_MAX_IP_FILTER_BTABLE_SIZE);
+    OAM_WARNING_LOG0(0, OAM_SF_ANY, "{dmac_clear_ip_filter_btable::Btable clear done.}");
+}
+
+/*****************************************************************************
+ 函 数 名  : dmac_update_ip_filter_btable
+ 功能描述  : 清空表单
+ 输入参数  : 无
+ 输出参数  : 无
+ 返 回 值  : oal_uint32
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2017年4月22日
+    作    者   : z00273164
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+oal_uint32 dmac_update_ip_filter_btable(mac_ip_filter_cmd_stru *pst_cmd_info)
+{
+    oal_uint8    uc_items_idx;
+    oal_uint8    uc_add_items_num;
+
+    if (OAL_PTR_NULL == g_st_dmac_board.st_rx_ip_filter.pst_filter_btable)
+    {
+        OAM_ERROR_LOG0(0, OAM_SF_ANY, "{dmac_update_ip_filter_btable::The pst_filter_btable is NULL!!}");
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+    g_st_dmac_board.st_rx_ip_filter.uc_btable_items_num = 0;
+    OAL_MEMZERO((oal_uint8 *)(g_st_dmac_board.st_rx_ip_filter.pst_filter_btable), MAC_MAX_IP_FILTER_BTABLE_SIZE);
+    uc_add_items_num = OAL_MIN(g_st_dmac_board.st_rx_ip_filter.uc_btable_size, pst_cmd_info->uc_item_count);
+    for(uc_items_idx = 0; uc_items_idx < uc_add_items_num; uc_items_idx++)
+    {
+        g_st_dmac_board.st_rx_ip_filter.pst_filter_btable[uc_items_idx].uc_protocol = pst_cmd_info->ast_filter_items_items[uc_items_idx].uc_protocol;
+        g_st_dmac_board.st_rx_ip_filter.pst_filter_btable[uc_items_idx].us_port = pst_cmd_info->ast_filter_items_items[uc_items_idx].us_port;
+    }
+    g_st_dmac_board.st_rx_ip_filter.uc_btable_items_num = uc_add_items_num;
+    OAM_WARNING_LOG1(0, OAM_SF_ANY, "{dmac_update_ip_filter_btable::Btable update done,renew %d items.}", uc_add_items_num);
+
+    return OAL_SUCC;
+}
+
+/*****************************************************************************
+ 函 数 名  : dmac_config_update_ip_filter
+ 功能描述  : rx ip数据包过滤功能的配置参数下发流程
+ 输入参数  : 无
+ 输出参数  : 无
+ 返 回 值  : oal_uint32
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2017年4月17日
+    作    者   : z00273164
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+oal_uint32 dmac_config_update_ip_filter(frw_event_mem_stru *pst_event_mem)
+{
+    oal_uint32                  ul_ret;
+    frw_event_stru             *pst_event;
+    dmac_tx_event_stru         *pst_dtx_event;
+    mac_ip_filter_cmd_stru     *pst_cmd_info;
+    mac_vap_stru               *pst_mac_vap;
+
+
+    if (OAL_UNLIKELY(OAL_PTR_NULL == pst_event_mem))
+    {
+        OAM_ERROR_LOG0(0, OAM_SF_CALIBRATE, "{dmac_config_update_ip_filter::pst_event_mem null.}");
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+
+    pst_event        = (frw_event_stru *)pst_event_mem->puc_data;
+    pst_dtx_event    = (dmac_tx_event_stru *)pst_event->auc_event_data;
+    if(OAL_PTR_NULL == pst_dtx_event->pst_netbuf)
+    {
+        OAM_ERROR_LOG0(0, OAM_SF_ANY, "{dmac_config_update_ip_filter::The cmd_info is NULL!.}");
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+
+    pst_cmd_info = (mac_ip_filter_cmd_stru *)OAL_NETBUF_DATA(pst_dtx_event->pst_netbuf);
+    pst_mac_vap  = mac_res_get_mac_vap(pst_event->st_event_hdr.uc_vap_id);
+    if(OAL_PTR_NULL == pst_mac_vap)
+    {
+        OAM_ERROR_LOG1(0, OAM_SF_ANY, "{dmac_config_update_ip_filter::Can not find mac_vap %d, ignore the cmd!.}",
+                        pst_event->st_event_hdr.uc_vap_id);
+        oal_netbuf_free(pst_dtx_event->pst_netbuf);
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+
+    /* 功能开关未打开，不处理参数配置动作 */
+    if (OAL_TRUE != pst_mac_vap->st_cap_flag.bit_ip_filter)
+    {
+        OAM_WARNING_LOG0(0, OAM_SF_ANY, "{dmac_config_update_ip_filter::Func not enable, ignore the cmd!.}");
+        oal_netbuf_free(pst_dtx_event->pst_netbuf);
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+
+    /* step2, 解析命令，更新控制参数 */
+    if (MAC_IP_FILTER_ENABLE == pst_cmd_info->en_cmd)
+    {
+        OAM_WARNING_LOG2(0, OAM_SF_ANY, "{dmac_config_update_ip_filter::Change state from [%d] to [%d].}",
+                        g_st_dmac_board.st_rx_ip_filter.en_state,
+                        ((OAL_TRUE == pst_cmd_info->en_enable)? MAC_RX_IP_FILTER_WORKING : MAC_RX_IP_FILTER_STOPED));
+        g_st_dmac_board.st_rx_ip_filter.en_state = (OAL_TRUE == pst_cmd_info->en_enable)? MAC_RX_IP_FILTER_WORKING : MAC_RX_IP_FILTER_STOPED;
+    }
+    else if(MAC_IP_FILTER_UPDATE_BTABLE == pst_cmd_info->en_cmd)
+    {
+        /* 更新黑名单 */
+        ul_ret = dmac_update_ip_filter_btable(pst_cmd_info);
+        if (OAL_SUCC != ul_ret)
+        {
+            OAM_ERROR_LOG0(0, OAM_SF_ANY, "{dmac_config_update_ip_filter::update_ip_filter_btable FAIL!!}");
+            oal_netbuf_free(pst_dtx_event->pst_netbuf);
+            return ul_ret;
+        }
+    }
+    else if (MAC_IP_FILTER_CLEAR == pst_cmd_info->en_cmd)
+    {
+        /* 清空黑名单 */
+        dmac_clear_ip_filter_btable(pst_mac_vap);
+
+    }
+    else
+    {
+        OAM_WARNING_LOG1(0, OAM_SF_ANY, "{dmac_config_update_ip_filter::Command does not support!cmd_len %d.}", pst_cmd_info->en_cmd);
+        oal_netbuf_free(pst_dtx_event->pst_netbuf);
+        return OAL_FAIL;
+    }
+
+    oal_netbuf_free(pst_dtx_event->pst_netbuf);
+
+    return OAL_SUCC;
+}
+
+#endif //_PRE_WLAN_FEATURE_IP_FILTER
 #ifdef _PRE_WLAN_FEATURE_VOWIFI
 /*****************************************************************************
  函 数 名  : dmac_config_vowifi_info
@@ -9443,17 +9701,21 @@ OAL_STATIC oal_uint32  dmac_config_del_vap(mac_vap_stru *pst_mac_vap, oal_uint8 
         pst_dmac_vap->puc_tim_bitmap = OAL_PTR_NULL;
     }
 #ifdef _PRE_WLAN_FEATURE_11K
-    if(WLAN_VAP_MODE_BSS_STA == pst_dmac_vap->st_vap_base_info.en_vap_mode)
+    /* 删除相关定时器并释放rrm info */
+    if (OAL_PTR_NULL != pst_dmac_vap->pst_rrm_info)
     {
-        /* 释放rrm info */
-        if (OAL_PTR_NULL != pst_dmac_vap->pst_rrm_info)
+        if (pst_dmac_vap->pst_rrm_info->st_offset_timer.en_is_registerd)
         {
-            OAL_MEM_FREE(pst_dmac_vap->pst_rrm_info, OAL_TRUE);
-            pst_dmac_vap->pst_rrm_info = OAL_PTR_NULL;
+            FRW_TIMER_IMMEDIATE_DESTROY_TIMER(&pst_dmac_vap->pst_rrm_info->st_offset_timer);
         }
+        if (pst_dmac_vap->pst_rrm_info->st_quiet_timer.en_is_registerd)
+        {
+            FRW_TIMER_IMMEDIATE_DESTROY_TIMER(&pst_dmac_vap->pst_rrm_info->st_quiet_timer);
+        }
+        OAL_MEM_FREE(pst_dmac_vap->pst_rrm_info, OAL_TRUE);
+        pst_dmac_vap->pst_rrm_info = OAL_PTR_NULL;
     }
-#endif
-
+#endif //_PRE_WLAN_FEATURE_11K
 #ifdef _PRE_WLAN_FEATURE_BTCOEX
     /* 共存恢复优先级 */
     dmac_btcoex_wlan_priority_set(pst_mac_vap, 0, 0);
@@ -11135,16 +11397,18 @@ OAL_STATIC oal_uint32 dmac_config_ip_add(dmac_vap_stru *pst_dmac_vap, dmac_ip_ad
     {
         for (ul_loop = 0; ul_loop < DMAC_MAX_IPV4_ENTRIES; ul_loop++)
         {
-            if ((OAL_FALSE == en_comp) && (0 == *(oal_uint32 *)(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].auc_ip_addr)))
+            if ((OAL_FALSE == en_comp) && (0 == (pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].un_local_ip.ul_value)))
             {
                 en_comp = OAL_TRUE; /* 增加完成 */
-                oal_memcopy(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].auc_ip_addr, pst_ip_addr_info->auc_ip_addr, OAL_IPV4_ADDR_SIZE);
+                oal_memcopy(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].un_local_ip.auc_value, pst_ip_addr_info->auc_ip_addr, OAL_IPV4_ADDR_SIZE);
+                oal_memcopy(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].un_mask.auc_value, pst_ip_addr_info->auc_mask_addr, OAL_IPV4_ADDR_SIZE);
             }
-            else if (0 == oal_memcmp(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].auc_ip_addr, pst_ip_addr_info->auc_ip_addr, OAL_IPV4_ADDR_SIZE))
+            else if (0 == oal_memcmp(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].un_local_ip.auc_value, pst_ip_addr_info->auc_ip_addr, OAL_IPV4_ADDR_SIZE))
             {
                 if (OAL_TRUE == en_comp)
                 {
-                    oal_memset(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].auc_ip_addr, 0, OAL_IPV4_ADDR_SIZE);
+                    oal_memset(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].un_local_ip.auc_value, 0, OAL_IPV4_ADDR_SIZE);
+                    oal_memset(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].un_mask.auc_value, 0, OAL_IPV4_ADDR_SIZE);
                 }
                 else
                 {
@@ -11228,10 +11492,11 @@ OAL_STATIC oal_uint32 dmac_config_ip_del(dmac_vap_stru *pst_dmac_vap, dmac_ip_ad
     {
         for (ul_loop = 0; ul_loop < DMAC_MAX_IPV4_ENTRIES; ul_loop++)
         {
-            if ((OAL_FALSE == en_comp) && (0 == oal_memcmp(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].auc_ip_addr, pst_ip_addr_info->auc_ip_addr, OAL_IPV4_ADDR_SIZE)))
+            if ((OAL_FALSE == en_comp) && (0 == oal_memcmp(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].un_local_ip.auc_value, pst_ip_addr_info->auc_ip_addr, OAL_IPV4_ADDR_SIZE)))
             {
                 en_comp = OAL_TRUE; /* 删除完成 */
-                oal_memset(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].auc_ip_addr, 0, OAL_IPV4_ADDR_SIZE);
+                oal_memset(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].un_local_ip.auc_value, 0, OAL_IPV4_ADDR_SIZE);
+                oal_memset(pst_dmac_vap->pst_ip_addr_info->ast_ipv4_entry[ul_loop].un_mask.auc_value, 0, OAL_IPV4_ADDR_SIZE);
                 break;
             }
         }
@@ -12203,6 +12468,7 @@ oal_uint32 dmac_config_set_cus_rf(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len, o
     oal_uint32      ul_offset = 0;
     oal_uint8       uc_agc_ref;
     oal_uint8       uc_band_idx;
+    mac_device_stru* pst_mac_dev;
 
     if (OAL_PTR_NULL == pst_mac_vap || OAL_PTR_NULL == puc_param)
     {
@@ -12210,9 +12476,26 @@ oal_uint32 dmac_config_set_cus_rf(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len, o
         return OAL_ERR_CODE_PTR_NULL;
     }
 
+    pst_mac_dev = mac_res_get_dev(pst_mac_vap->uc_device_id);
+    if (OAL_PTR_NULL == pst_mac_dev)
+    {
+        OAM_ERROR_LOG1(0, OAM_SF_CFG, "{dmac_config_set_cus_rf:: mac device[%d] null ptr .}", pst_mac_vap->uc_device_id);
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+
     oal_memcopy(&g_st_customize.st_rf, puc_param, OAL_SIZEOF(g_st_customize.st_rf));
     ul_offset += OAL_SIZEOF(g_st_customize.st_rf);
     oal_memcopy(&g_st_customize.st_ratio_temp_pwr_comp, puc_param + ul_offset, OAL_SIZEOF(g_st_customize.st_ratio_temp_pwr_comp));
+
+    /* refresh cca ed threshold after phy init */
+    hal_set_ed_high_th(pst_mac_dev->pst_device_stru,
+                       HAL_CCA_OPT_ED_HIGH_20TH_DEF + g_st_customize.st_rf.c_delta_cca_ed_high_20th_2g,
+                       HAL_CCA_OPT_ED_HIGH_40TH_DEF + g_st_customize.st_rf.c_delta_cca_ed_high_40th_2g);
+    OAM_WARNING_LOG4(pst_mac_vap->uc_vap_id, OAM_SF_CFG, "dmac_config_set_cus_rf::delta_20_2g=%d, delta_40_2g=%d, delta_20_5g=%d, delta_40_5g=%d.",
+                    g_st_customize.st_rf.c_delta_cca_ed_high_20th_2g,
+                    g_st_customize.st_rf.c_delta_cca_ed_high_40th_2g,
+                    g_st_customize.st_rf.c_delta_cca_ed_high_20th_5g,
+                    g_st_customize.st_rf.c_delta_cca_ed_high_40th_5g);
 
     /* 计算 2g power0 ref */
     for (uc_band_idx = 0; uc_band_idx < HAL_DEVICE_2G_BAND_NUM_FOR_LOSS; ++uc_band_idx)
@@ -12234,15 +12517,21 @@ oal_uint32 dmac_config_set_cus_rf(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len, o
         OAM_WARNING_LOG2(0, 0, "g_aul_phy_power0_ref_5g band:%d pwrref:0x%2x.\r\n", uc_band_idx+1, g_aul_phy_power0_ref_5g[uc_band_idx]);
     }
 
-    /* 如果超远距离功率增益开关关闭，将g_aus_rf_pow_limit数组置零，不做增益 */
-    OAM_WARNING_LOG1(pst_mac_vap->uc_vap_id, 0, "dmac_config_set_cus_rf far_dist_pow_gain_switch[%d].\r\n", g_st_customize.st_rf.uc_far_dist_pow_gain_switch);
-    if (0 == g_st_customize.st_rf.uc_far_dist_pow_gain_switch)
-    {
-        OAL_MEMZERO(&g_aus_rf_pow_limit, OAL_SIZEOF(g_aus_rf_pow_limit));
-    }
+    OAM_WARNING_LOG2(pst_mac_vap->uc_vap_id, 0, "dmac_config_set_cus_rf far_dist_pow_gain_switch[%d], far_dist_dsss_scale_promote_switch[%d].\r\n",
+        g_st_customize.st_rf.uc_far_dist_pow_gain_switch,
+        g_st_customize.st_rf.uc_far_dist_dsss_scale_promote_switch);
 
     return OAL_SUCC;
 }
+#ifdef _PRE_WLAN_DOWNLOAD_PM
+extern oal_uint16 g_us_download_rate_limit_pps;
+oal_uint32 dmac_config_set_download_rate_limit(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len, oal_uint8 *puc_param)
+{
+    g_us_download_rate_limit_pps = *(oal_uint16*)puc_param;
+    //OAM_WARNING_LOG1(0, OAM_SF_PWR, "dmac_config_set_download_rate_limit: %d", g_us_download_rate_limit_pps);
+    return OAL_SUCC;
+}
+#endif
 /*****************************************************************************
  函 数 名  : dmac_config_set_cus_dts_cali
  功能描述  : dts 校准参数
@@ -12670,6 +12959,16 @@ oal_void dmac_config_update_dsss_scaling_reg(dmac_alg_tpc_user_distance_enum_uin
 {
     hal_cfg_customize_nvram_params_stru* past_src = g_st_customize.ast_nvram_params;
 
+    /* 超远距DSSS SCALE PROMOTE使能开关没有打开或者当前正在降SAR(sar功率小于阈值) */
+    if (
+#ifdef _PRE_PLAT_FEATURE_CUSTOMIZE
+        (0 == g_st_customize.st_rf.uc_far_dist_dsss_scale_promote_switch) ||
+#endif
+        (g_uc_sar_pwr_limit < HAL_SAR_PWR_LIMIT_THRESHOLD))
+    {
+        return;
+    }
+
     /* 1_2M_scaling值如果并不比5.5_11M_scaling值小，则直接返回 */
     if (past_src[0].uc_dbb_scale >= past_src[1].uc_dbb_scale)
     {
@@ -12999,6 +13298,9 @@ OAL_STATIC OAL_CONST dmac_config_syn_stru g_ast_dmac_config_syn[] =
     {WLAN_CFGID_SET_POWER_REF,              {0, 0},       dmac_config_set_power_ref},
     {WLAN_CFGID_SET_PM_CFG_PARAM,           {0, 0},       dmac_config_set_pm_cfg_param},
     {WLAN_CFGID_SET_CUS_RF,                 {0, 0},       dmac_config_set_cus_rf},
+#ifdef _PRE_WLAN_DOWNLOAD_PM
+    {WLAN_CFGID_SET_CUS_DOWNLOAD_RATE_LIMIT,{0, 0},       dmac_config_set_download_rate_limit},
+#endif
     {WLAN_CFGID_SET_CUS_DTS_CALI,           {0, 0},       dmac_config_set_cus_dts_cali},
     {WLAN_CFGID_SET_CUS_NVRAM_PARAM,        {0, 0},       dmac_config_set_cus_nvram_params},
     /* show customize info */
@@ -13012,6 +13314,12 @@ OAL_STATIC OAL_CONST dmac_config_syn_stru g_ast_dmac_config_syn[] =
     {WLAN_CFGID_AUTO_CALI,                  {0, 0},         dmac_config_auto_cali},
     {WLAN_CFGID_SET_CALI_VREF,              {0, 0},         dmac_config_set_cali_vref},
 #endif
+
+#ifdef _PRE_WLAN_FEATURE_11K
+    {WLAN_CFGID_BCN_TABLE_SWITCH,           {0, 0},     dmac_config_bcn_table_switch},
+#endif
+
+    {WLAN_CFGID_VOE_ENABLE,                 {0, 0},     dmac_config_voe_enable},
     {WLAN_CFGID_BUTT,               {0, 0},             OAL_PTR_NULL},
 };
 

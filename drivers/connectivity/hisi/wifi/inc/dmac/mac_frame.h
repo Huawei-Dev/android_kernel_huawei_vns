@@ -198,7 +198,7 @@ extern "C" {
 
 #define MAC_MAX_START_SPACING               7
 
-#define MAC_MAX_BSS_INFO_TRANS              10
+#define MAC_MAX_BSS_INFO_TRANS              5
 
 /* EDCA参数相关的宏 */
 #define MAC_WMM_QOS_PARAM_AIFSN_MASK                       0x0F
@@ -1133,6 +1133,27 @@ typedef struct
     oal_uint16   us_check_sum;
 }udp_hdr_stru;
 
+/* CCMP/TKIP 加密头部 */
+/* CCMP 加密IV 字段结构
+ * PN0 PN1 RSVD [KEY_ID] PN2 PN3 PN4 PN5
+ *              |      |
+ *          b0  b4  b5  b6~b7
+ *          00000    1  key_id
+*/
+/* TKIP 加密IV 字段结构
+ * TSC1 WEPSeed[1] TSC0 [KEY_ID] TSC2 TSC3 TSC4 TSC5
+ *                      |      |
+ *                  b0  b4  b5  b6~b7
+ *                  00000    1  key_id
+ * WEPSeed[1] = (TSC1 | 0x20) & 0x7f
+*/
+
+typedef union {
+    oal_uint64 ull_pn64;
+    oal_uint32 ul_pn32[2];
+    oal_uint8  uc_pn8[8];
+} mac_pn_union;
+
 /* frame control字段结构体 */
 struct mac_header_frame_control
 {
@@ -1856,26 +1877,6 @@ struct mac_pwr_constraint_frm{
 }__OAL_DECLARE_PACKED;
 typedef struct mac_pwr_constraint_frm mac_pwr_constraint_frm_stru;
 /*lint +e958*/
-
-typedef struct
-{
-    oal_uint8           uc_meas_token;
-    oal_uint8           uc_meas_type;
-    oal_uint8           uc_opt_class;
-    oal_uint8           uc_rpt_detail;
-    oal_uint8           uc_req_ie_num;
-    mac_mr_mode_stru    st_mr_mode;
-    oal_uint16          us_meas_duration;
-    oal_uint8           *puc_reqinfo_ieid;
-}mac_bcn_req_info_stru;
-
-typedef struct
-{
-    oal_uint8   auc_chan_num[MAC_MAX_BSS_INFO_TRANS];
-    oal_uint8   auc_bssid[MAC_MAX_BSS_INFO_TRANS][WLAN_MAC_ADDR_LEN];
-    oal_uint8   uc_bss_num;
-    oal_uint8   uc_rsv;
-}mac_vap_rrm_trans_bss_info_stru;
 #endif
 
 #if (defined(_PRE_PRODUCT_ID_HI110X_DEV))
@@ -1883,6 +1884,78 @@ typedef struct
 #pragma pack()
 #endif
 
+#ifdef _PRE_WLAN_FEATURE_11K
+typedef struct
+{
+    oal_uint8           uc_dialog_token;
+    oal_uint8           uc_meas_token;
+    oal_uint8           uc_meas_type;
+    oal_uint8           uc_opt_class;
+
+    oal_uint8           uc_rpt_detail;
+    oal_uint8           uc_req_ie_num;
+    mac_mr_mode_stru    st_mr_mode;
+    oal_uint8           uc_ssid_len;
+
+    oal_uint16          us_meas_duration;
+    oal_uint16          us_repetition;
+
+    oal_uint8           *puc_reqinfo_ieid;
+    oal_uint8           *puc_ssid;
+
+    oal_uint8           auc_bssid[WLAN_MAC_ADDR_LEN];
+    oal_uint8           auc_rsv[2];
+}mac_bcn_req_info_stru;
+
+typedef struct
+{
+    /* Measurement Report field */
+    oal_uint8                   uc_eid;         /* IEEE80211_ELEMID_MEASRPT */
+    oal_uint8                   uc_len;
+    oal_uint8                   uc_token;
+    //mac_meas_rpt_mode_stru      st_rptmode;
+    oal_uint8                   bit_late        : 1,
+                                bit_incapable   : 1,
+                                bit_refused     : 1,
+                                bit_rsvd        : 5;
+
+    oal_uint8                   uc_rpttype;
+    /* beacon report field */
+    oal_uint8                   uc_optclass;
+    oal_uint8                   uc_channum;
+    oal_uint8                   bit_condensed_phy_type:7,
+                                bit_rpt_frm_type      :1;
+
+    oal_uint8                   uc_rcpi;
+    oal_uint8                   uc_rsni;
+    oal_uint8                   uc_antenna_id;
+    oal_uint8                   uc_rsv;
+
+    oal_uint8                   auc_bssid[6];
+    oal_uint8                   auc_act_meas_start_time[8];
+    oal_uint16                  us_duration;
+
+    oal_uint32                  ul_parent_tsf;
+}mac_meas_rpt_bcn_item_stru;
+
+typedef struct
+{
+    oal_dlist_head_stru         st_dlist_head;
+    mac_meas_rpt_bcn_item_stru *pst_meas_rpt_bcn_item;      /* 包含bcn rpt的meas rpt */
+    oal_uint8                  *puc_rpt_detail_data;
+    oal_uint32                  ul_rpt_detail_act_len;      /* rpt detail data实际长度 */
+}mac_meas_rpt_bcn_stru;
+
+typedef struct
+{
+    oal_uint8               auc_ssid[WLAN_SSID_MAX_LEN];
+    oal_uint8               uc_action_dialog_token;
+    oal_uint8               uc_meas_token;
+    oal_uint8               uc_oper_class;
+    oal_uint16              us_ssid_len;
+    oal_uint8               auc_rsv[2];
+}mac_vap_rrm_trans_req_info_stru;
+#endif
 
 /* ACTION帧的参数格式，注:不同的action帧下对应的参数不同 */
 typedef struct
@@ -2052,6 +2125,8 @@ extern oal_void  mac_set_vht_opern_ie(oal_void *pst_vap, oal_uint8 *puc_buffer, 
 extern oal_uint32  mac_set_csa_ie(oal_uint8 uc_channel, oal_uint8 uc_csa_cnt, oal_uint8 *puc_buffer, oal_uint8 *puc_ie_len);
 #ifdef _PRE_WLAN_FEATURE_11R
 extern oal_void mac_set_md_ie(oal_void *pst_vap, oal_uint8 *puc_buffer, oal_uint8 *puc_ie_len);
+extern oal_void mac_set_rde_ie(oal_void *pst_mac_vap, oal_uint8 *puc_buffer, oal_uint8 *puc_ie_len);
+extern oal_void mac_set_tspec_ie(oal_void *pst_mac_vap, oal_uint8 *puc_buffer, oal_uint8 *puc_ie_len, oal_uint8 uc_tid);
 #endif //_PRE_WLAN_FEATURE_11R
 
 #ifdef _PRE_WLAN_FEATURE_11K

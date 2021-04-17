@@ -521,6 +521,20 @@ oal_uint32  dmac_alg_register_cfg_double_ant_switch_notify_func(
     return OAL_SUCC;
 }
 #endif
+
+oal_uint32  dmac_alg_register_get_mgmt_tx_pow_notify_func(
+                p_alg_get_mgmt_tx_pow_notify_func   p_func)
+{
+    ALG_ASSERT_RET(OAL_PTR_NULL != p_func, OAL_ERR_CODE_PTR_NULL);
+    gst_alg_main.p_get_mgmt_tx_pow_notify_func = p_func;
+    return OAL_SUCC;
+}
+oal_uint32  dmac_alg_unregister_get_mgmt_tx_pow_notify_func(oal_void)
+{
+    gst_alg_main.p_get_mgmt_tx_pow_notify_func = OAL_PTR_NULL;
+    return OAL_SUCC;
+}
+
 /*****************************************************************************
  函 数 名  : dmac_alg_register_cfg_user_protocol_notify_func
  功能描述  : 子算法注册设置USER协议模式回调函数
@@ -5329,6 +5343,49 @@ oal_uint32  dmac_alg_anti_intf_switch(mac_device_stru *pst_device, oal_uint8 uc_
 }
 #endif
 
+/*****************************************************************************
+ 函 数 名  : dmac_alg_get_mgmt_tx_pow
+ 功能描述  : 获取管理帧的发送功率
+ 输入参数  : 无
+ 输出参数  : 无
+ 返 回 值  :
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2016年11月14日
+    作    者   : z00273164
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+oal_uint32  dmac_alg_get_mgmt_tx_pow(mac_user_stru *pst_user, wlan_channel_band_enum_uint8 en_freq_band,oal_uint8 *puc_tx_pow)
+{
+    oal_uint8   uc_mix_txpwr;
+    oal_uint16  us_tx_pow;
+    oal_uint32  ul_ret;
+    if (OAL_UNLIKELY(OAL_PTR_NULL == gst_alg_main.p_get_mgmt_tx_pow_notify_func))
+    {
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+
+    /* TBD: txpwr最小值，来源为mac_set_power_cap_ie，待补充宏 */
+    uc_mix_txpwr = (WLAN_BAND_2G == en_freq_band) ? 4 : 3;
+    us_tx_pow    = uc_mix_txpwr;
+
+    ul_ret = gst_alg_main.p_get_mgmt_tx_pow_notify_func(pst_user, en_freq_band, &us_tx_pow, OAL_FALSE);
+
+    /* TBD: us_tx_pow需要减去rf_line_txrx_gain_db_2g_band1_mult10，此值需要在host，待实现同步到divce */
+    us_tx_pow = us_tx_pow - 3;
+
+    if (us_tx_pow < uc_mix_txpwr )
+    {
+        us_tx_pow = uc_mix_txpwr;
+    }
+
+    *puc_tx_pow = (oal_uint8)us_tx_pow;
+    return ul_ret;
+}
+
 
 /*lint -e19*/
 oal_module_symbol(dmac_alg_register_add_user_notify_func);
@@ -5409,6 +5466,8 @@ oal_module_symbol(dmac_alg_unregister_cfg_get_ant_info_notify_func);
 oal_module_symbol(dmac_alg_register_cfg_double_ant_switch_notify_func);
 oal_module_symbol(dmac_alg_unregister_cfg_double_ant_switch_notify_func);
 #endif
+oal_module_symbol(dmac_alg_register_get_mgmt_tx_pow_notify_func);
+oal_module_symbol(dmac_alg_unregister_get_mgmt_tx_pow_notify_func);
 oal_module_symbol(dmac_alg_register_cfg_user_protocol_notify_func);
 oal_module_symbol(dmac_alg_unregister_cfg_user_protocol_notify_func);
 oal_module_symbol(dmac_alg_cfg_user_protocol_notify);

@@ -559,6 +559,7 @@ typedef struct netlink_skb_parms    oal_netlink_skb_parms;
 #define OAL_NLMSG_SPACE(_len)            NLMSG_SPACE(_len)
 #define OAL_NLMSG_DATA(_nlh)             NLMSG_DATA(_nlh)
 #define OAL_NLMSG_PAYLOAD(_nlh, _len)    NLMSG_PAYLOAD(_nlh, _len)
+#define OAL_NLMSG_OK(_nlh, _len)         NLMSG_OK(_nlh, _len)
 #define OAL_NETLINK_CB(_skb)             NETLINK_CB(_skb)
 
 #define OAL_NLA_FOR_EACH_ATTR(pos, head, len, rem)            nla_for_each_attr(pos, head, len, rem)
@@ -2887,6 +2888,8 @@ OAL_STATIC OAL_INLINE oal_sock_stru* oal_netlink_kernel_create(
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,44))
     // host evn android 4.4 netlink_kernel_create API is changed
     struct netlink_kernel_cfg cfg;
+
+    oal_memset(&cfg, 0, OAL_SIZEOF(cfg));
     cfg.groups = 0;
     cfg.input = input;
     cfg.cb_mutex = NULL;

@@ -63,6 +63,12 @@ endif
 ifeq ($(CONFIG_CONNECTIVITY_HI110X_HI3660),y)
 pm-objs += gps_plat_hi3660.o
 endif
+ifeq ($(CONFIG_CONNECTIVITY_HI110X_KIRIN970),y)
+pm-objs += gps_plat_hi3660.o
+endif
+ifeq ($(CONFIG_CONNECTIVITY_HI110X_KIRIN660),y)
+pm-objs += gps_plat_hi3660.o
+endif
 
 pm-objs := $(addprefix pm/,$(pm-objs))
 

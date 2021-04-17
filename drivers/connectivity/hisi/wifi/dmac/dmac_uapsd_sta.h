@@ -75,11 +75,11 @@ extern "C" {
   9 OTHERS定义
 *****************************************************************************/
 /*****************************************************************************
- 函 数 名  : dmac_is_ap_uapsd_capable
- 功能描述  : 检查对端ap是否开启UAPSD能力
+ 函 数 名  : dmac_is_uapsd_capable
+ 功能描述  : 检查对端ap是否开启UAPSD能力 && 是否staut开启UAPSD功能
  输入参数  :
  输出参数  : 无
- 返 回 值  : oal_void
+ 返 回 值  : oal_uint8
  调用函数  :
  被调函数  :
 
@@ -89,9 +89,15 @@ extern "C" {
     修改内容   : 新生成函数
 
 *****************************************************************************/
-OAL_STATIC OAL_INLINE oal_uint8 dmac_is_ap_uapsd_capable(dmac_vap_stru *pst_dmac_vap)
+OAL_STATIC OAL_INLINE oal_uint8 dmac_is_uapsd_capable(dmac_vap_stru *pst_dmac_vap)
 {
-    return pst_dmac_vap->st_vap_base_info.uc_uapsd_cap;
+    /* ap支持并且sta支持才进uapsd的处理逻辑 */
+    if ((pst_dmac_vap->st_vap_base_info.uc_uapsd_cap) && (pst_dmac_vap->st_vap_base_info.st_sta_uapsd_cfg.uc_max_sp_len != 0))
+    {
+        return OAL_TRUE;
+    }
+
+    return OAL_FALSE;
 }
 
 /*****************************************************************************

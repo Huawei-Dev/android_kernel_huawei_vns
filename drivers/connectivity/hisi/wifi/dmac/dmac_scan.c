@@ -952,9 +952,12 @@ OAL_STATIC oal_uint16  dmac_scan_encap_probe_req_frame(dmac_vap_stru *pst_dmac_v
 #endif
 
 #ifdef _PRE_WLAN_FEATURE_11K
+    if (OAL_TRUE == pst_dmac_vap->bit_11k_enable)
+    {
         mac_set_wfa_tpc_report_ie(&(pst_dmac_vap->st_vap_base_info), puc_payload_addr, &uc_ie_len);
         puc_payload_addr += uc_ie_len;
-#endif
+    }
+#endif //_PRE_WLAN_FEATURE_11K
 
     return (oal_uint16)(puc_payload_addr - puc_payload_addr_origin + MAC_80211_FRAME_LEN);
 }
@@ -1284,6 +1287,14 @@ oal_uint32  dmac_scan_handle_scan_req_entry(mac_device_stru    *pst_mac_device,
             /* 抛扫描完成事件，扫描请求被拒绝 */
             return dmac_scan_proc_scan_complete_event(pst_dmac_vap, MAC_SCAN_REFUSED);
         }
+#ifdef _PRE_WLAN_FEATURE_11K
+        else if (WLAN_SCAN_MODE_RRM_BEACON_REQ == pst_scan_req_params->en_scan_mode)
+        {
+            OAM_ERROR_LOG0(pst_dmac_vap->st_vap_base_info.uc_vap_id, OAM_SF_SCAN,
+                         "{dmac_scan_handle_scan_req_entry:: RRM BEACON REQ SCAN FAIL");
+            return  OAL_FAIL;
+        }
+#endif
         else
         {
             return OAL_SUCC;
@@ -3087,9 +3098,17 @@ oal_void dmac_scan_begin(mac_device_stru *pst_mac_device)
         hal_set_ch_measurement_period(pst_mac_device->pst_device_stru, DMAC_SCAN_CHANNEL_MEAS_PERIOD_MS);
         hal_enable_ch_statics(pst_mac_device->pst_device_stru, 1);
     }
+    pst_dmac_vap = mac_res_get_dmac_vap(pst_scan_params->uc_vap_id);
 
 #ifdef _PRE_WLAN_FEATURE_11K
-    dmac_rrm_update_start_tsf(pst_scan_params->uc_vap_id);
+    if(OAL_TRUE == pst_dmac_vap->bit_11k_enable)
+    {
+        if (WLAN_SCAN_MODE_RRM_BEACON_REQ == pst_scan_params->en_scan_mode)
+        {
+            hal_vap_tsf_get_64bit(pst_dmac_vap->pst_hal_vap, (oal_uint32 *)&(pst_dmac_vap->pst_rrm_info->auc_act_meas_start_time[4]), (oal_uint32 *)&(pst_dmac_vap->pst_rrm_info->auc_act_meas_start_time[0]));
+            OAM_WARNING_LOG1(0, OAM_SF_SCAN, "{dmac_scan_begin::update start tsf ok, vap id[%d].}", pst_scan_params->uc_vap_id);
+        }
+    }
 #endif
 
     /* dfs信道判断，如果是雷达信道，执行被动扫描 */
@@ -3118,7 +3137,18 @@ oal_void dmac_scan_begin(mac_device_stru *pst_mac_device)
             }
         }
     }
-
+#ifdef _PRE_WLAN_FEATURE_11K
+#if (_PRE_PRODUCT_ID == _PRE_PRODUCT_ID_HI1102_DEV)
+     if(OAL_TRUE == pst_dmac_vap->bit_11k_enable)
+     {
+         if (WLAN_SCAN_MODE_RRM_BEACON_REQ == pst_scan_params->en_scan_mode
+            && WLAN_SCAN_TYPE_PASSIVE == pst_scan_params->en_scan_type)
+         {
+             hal_disable_non_frame_mgmt_filter(pst_mac_device->pst_device_stru);
+         }
+     }
+#endif
+#endif
     /* 放在发送完成所有probe request报文再启动定时器,防止指定SSID扫描报文过多,定时器时间内都在发送,用于接收扫描结果时间过短 */
     /* 启动扫描定时器 */
     FRW_TIMER_CREATE_TIMER(&pst_mac_device->st_scan_timer,
@@ -3131,7 +3161,6 @@ oal_void dmac_scan_begin(mac_device_stru *pst_mac_device)
 
     /* p2p监听处理逻辑 */
     /* p2p listen时需要更改VAP的信道，组probe rsp帧(DSSS ie, ht ie)需要。listen结束后恢复 */
-    pst_dmac_vap = mac_res_get_dmac_vap(pst_scan_params->uc_vap_id);
     if (uc_do_p2p_listen)
     {
         pst_mac_device->st_p2p_vap_channel = pst_dmac_vap->st_vap_base_info.st_channel;
@@ -3283,6 +3312,19 @@ oal_void dmac_scan_end(mac_device_stru *pst_mac_device)
             OAM_WARNING_LOG0(0, OAM_SF_SCAN, "{dmac_scan_end::scan_mode BACKGROUND_CSA}");
             break;
         }
+#ifdef _PRE_WLAN_FEATURE_11K
+        case WLAN_SCAN_MODE_RRM_BEACON_REQ:
+        {
+            /* 扫描结束后组响应帧，填充并发出 */
+            /* 申请管理帧内存并填充头部信息 */
+            dmac_rrm_encap_and_send_bcn_rpt(pst_dmac_vap);
+
+#if (_PRE_PRODUCT_ID == _PRE_PRODUCT_ID_HI1102_DEV)
+            hal_enable_non_frame_filter(pst_mac_device->pst_device_stru);
+#endif
+            break;
+        }
+#endif
         default:
         {
             OAM_ERROR_LOG1(0, OAM_SF_SCAN, "{dmac_scan_end::scan_mode[%d] error.}", en_scan_mode);

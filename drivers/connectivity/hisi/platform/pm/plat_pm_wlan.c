@@ -19,7 +19,9 @@
 #include <linux/mmc/sdio_func.h>
 #include <linux/mmc/host.h>
 #include <linux/gpio.h>
-
+#ifdef CONFIG_HISI_IDLE_SLEEP
+#include <linux/hisi/hisi_idle_sleep.h>
+#endif
 #include "oal_sdio.h"
 #include "oal_sdio_comm.h"
 #include "oal_sdio_host_if.h"
@@ -72,6 +74,10 @@ int32 wlan_pm_open_bcpu_done_callback(void *data);
 int32 wlan_pm_close_bcpu_done_callback(void *data);
 int32 wlan_pm_halt_bcpu_done_callback(void *data);
 
+#ifdef _PRE_WLAN_DOWNLOAD_PM
+oal_uint16 g_us_download_rate_limit_pps = 0;
+EXPORT_SYMBOL_GPL(g_us_download_rate_limit_pps);
+#endif
 
 int32 wlan_pm_stop_wdg(struct wlan_pm_s *pst_wlan_pm_info);
 oal_int wlan_pm_work_submit(struct wlan_pm_s    *pst_wlan_pm, oal_work_stru* pst_worker);
@@ -261,7 +267,7 @@ oal_int32 wlan_pm_disallow_sleep_callback(void *data)
 struct wlan_pm_s*  wlan_pm_init(oal_void)
 {
     struct wlan_pm_s*   pst_wlan_pm;
-    BOARD_INFO *        pst_board = get_board_info();
+    BOARD_INFO *        pst_board = get_hi110x_board_info();
 
     if(OAL_PTR_NULL == pst_board)
     {
@@ -312,6 +318,9 @@ struct wlan_pm_s*  wlan_pm_init(oal_void)
     pst_wlan_pm->ul_sleep_stage                = SLEEP_STAGE_INIT;
 
     pst_wlan_pm->st_wifi_srv_handler.p_wifi_srv_get_pm_pause_func = OAL_PTR_NULL;
+#ifdef _PRE_WLAN_WAKEUP_SRC_PARSE
+    pst_wlan_pm->st_wifi_srv_handler.p_data_wkup_print_en_func = OAL_PTR_NULL;
+#endif
 
     gpst_wlan_pm_info = pst_wlan_pm;
 
@@ -495,7 +504,10 @@ oal_int32 wlan_pm_open(oal_void)
         OAM_WARNING_LOG0(0, OAM_SF_PWR, "wlan_pm_open::aleady opened");
         return OAL_ERR_CODE_ALREADY_OPEN;
     }
-
+#ifdef CONFIG_HISI_IDLE_SLEEP
+    hisi_idle_sleep_vote(ID_WIFI,1);
+    OAM_WARNING_LOG0(0, OAM_SF_PWR, "wlan_pm_open::hisi_idle_sleep_vote value 1!");
+#endif
     if(!pst_wlan_pm->pst_sdio->st_sdio_wakelock.lock_count)
     {
         /*make sure open only lock once*/
@@ -513,6 +525,9 @@ oal_int32 wlan_pm_open(oal_void)
 		oal_sdio_wake_unlock(pst_wlan_pm->pst_sdio);
 		mutex_unlock(&pm_data->host_mutex);
 		DECLARE_DFT_TRACE_KEY_INFO("wlan_power_on_fail",OAL_DFT_TRACE_FAIL);
+       #ifdef CONFIG_HISI_IDLE_SLEEP
+        hisi_idle_sleep_vote(ID_WIFI,0);
+       #endif
         return OAL_FAIL;
     }
 
@@ -524,6 +539,9 @@ oal_int32 wlan_pm_open(oal_void)
         {
             OAM_ERROR_LOG0(0,OAM_SF_PWR, "wlan_pm_open::NO g_pst_custom_process_func registered");
             mutex_unlock(&pm_data->host_mutex);
+            #ifdef CONFIG_HISI_IDLE_SLEEP
+            hisi_idle_sleep_vote(ID_WIFI,0);
+            #endif
             return OAL_FAIL;
         }
 
@@ -541,6 +559,9 @@ oal_int32 wlan_pm_open(oal_void)
                 {
                     OAL_IO_PRINT("dump device mem when cali custom failed!\n");
                 }
+                #ifdef CONFIG_HISI_IDLE_SLEEP
+                hisi_idle_sleep_vote(ID_WIFI,0);
+                #endif
                 return OAL_FAIL;
             }
         }
@@ -550,7 +571,7 @@ oal_int32 wlan_pm_open(oal_void)
     DECLARE_DFT_TRACE_KEY_INFO("wlan_open_succ",OAL_DFT_TRACE_SUCC);
 
     wlan_pm_enable();
-    
+
     frw_timer_sys_start();
 
     /*将timeout值恢复为默认值，并启动定时器*/
@@ -669,6 +690,8 @@ oal_uint32 wlan_pm_close(oal_void)
         return OAL_ERR_CODE_ALREADY_CLOSE;
     }
 
+
+
     wlan_pm_disable();
 
     wlan_pm_stop_wdg(pst_wlan_pm);
@@ -685,7 +708,7 @@ oal_uint32 wlan_pm_close(oal_void)
         DECLARE_DFT_TRACE_KEY_INFO("wlan_power_off_fail",OAL_DFT_TRACE_FAIL);
         return OAL_FAIL;
     }
-    
+
     frw_timer_sys_stop();
 
     pst_wlan_pm->ul_wlan_power_state = POWER_STATE_SHUTDOWN;
@@ -702,7 +725,10 @@ oal_uint32 wlan_pm_close(oal_void)
     mutex_unlock(&pm_data->host_mutex);
 
     hcc_dev_flowctrl_on(hcc_get_default_handler(), 0);
-
+#ifdef CONFIG_HISI_IDLE_SLEEP
+    hisi_idle_sleep_vote(ID_WIFI,0);
+    OAM_WARNING_LOG0(0, OAM_SF_PWR, "wlan_pm_close::hisi_idle_sleep_vote 0!");
+#endif
     OAM_WARNING_LOG0(0,OAM_SF_PWR,"wlan_pm_close succ!\n");
     DECLARE_DFT_TRACE_KEY_INFO("wlan_close_succ",OAL_DFT_TRACE_SUCC);
     return OAL_SUCC;
@@ -1448,6 +1474,7 @@ void wlan_pm_sleep_work(oal_work_stru *pst_worker)
    oal_uint32           ul_ret;
    oal_uint8            uc_retry;
    oal_uint32           ul_wifi_pause_pm = OAL_FALSE;
+   static oal_uint8     uc_fail_sleep_count = 0;
 
 
    hcc_tx_transfer_lock(hcc_get_default_handler());
@@ -1546,7 +1573,7 @@ void wlan_pm_sleep_work(oal_work_stru *pst_worker)
        pst_wlan_pm->ul_sleep_fail_forbid++;
        OAM_WARNING_LOG1(0, OAM_SF_PWR,"wlan_pm_sleep_work device forbid sleep %ld\n",pst_wlan_pm->ul_sleep_stage);
        DECLARE_DFT_TRACE_KEY_INFO("wlan_forbid_sleep",OAL_DFT_TRACE_SUCC);
-       goto fail_sleep;
+       goto sleep_forbid;
    }
 
    pst_wlan_pm->ul_sleep_stage = SLEEP_CMD_SND;
@@ -1561,9 +1588,31 @@ void wlan_pm_sleep_work(oal_work_stru *pst_worker)
       OAM_WARNING_LOG1(0, OAM_SF_PWR,"wlan_pm_sleep_work release wakelock %lu!\n",pst_wlan_pm->pst_sdio->st_sdio_wakelock.lock_count);
    }
 
+   uc_fail_sleep_count = 0;
+
    return;
 
 fail_sleep:
+
+    uc_fail_sleep_count++;
+    wlan_pm_feed_wdg();
+    hcc_tx_transfer_unlock(hcc_get_default_handler());
+
+    /* pm唤醒失败超出门限，启动dfr流程 */
+    if (WLAN_WAKEUP_FAIL_MAX_TIMES < uc_fail_sleep_count)
+    {
+        OAM_ERROR_LOG1(0, OAM_SF_PWR,"Now ready to enter DFR process after [%d]times wlan_sleep_fail!", uc_fail_sleep_count);
+        uc_fail_sleep_count = 0;
+        wlan_pm_stop_wdg(pst_wlan_pm);
+        oal_sdio_exception_submit(oal_get_sdio_default_handler(), WIFI_WAKEUP_FAIL);
+        //wifi_exception_work_submit(TIMER_TIMEOUT);
+    }
+    CHR_EXCEPTION(CHR_WIFI_DRV(CHR_WIFI_DRV_EVENT_PLAT, CHR_PLAT_DRV_ERROR_WAKEUP_DEV));
+    return;
+
+sleep_forbid:
+
+    uc_fail_sleep_count = 0;
     wlan_pm_feed_wdg();
     hcc_tx_transfer_unlock(hcc_get_default_handler());
     return ;
@@ -1700,7 +1749,18 @@ oal_void  wlan_pm_feed_wdg(oal_void)
     struct wlan_pm_s    *pst_wlan_pm = wlan_pm_get_drv();
 
     pst_wlan_pm->ul_sleep_feed_wdg_cnt++;
+#ifdef _PRE_WLAN_DOWNLOAD_PM
+    if (g_us_download_rate_limit_pps != 0)
+    {
+        mod_timer(&pst_wlan_pm->st_watchdog_timer, jiffies + msecs_to_jiffies(10));
+    }
+    else
+    {
+        mod_timer(&pst_wlan_pm->st_watchdog_timer, jiffies + msecs_to_jiffies(WLAN_SLEEP_TIMER_PERIOD));
+    }
+#else
     mod_timer(&pst_wlan_pm->st_watchdog_timer, jiffies + msecs_to_jiffies(WLAN_SLEEP_TIMER_PERIOD));
+#endif
 }
 
 

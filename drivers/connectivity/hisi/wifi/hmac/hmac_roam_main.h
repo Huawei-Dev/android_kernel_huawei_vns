@@ -38,7 +38,7 @@ extern "C" {
 /*****************************************************************************
   2 宏定义
 *****************************************************************************/
-#define ROAM_SCAN_TIME_MAX        (5 * 1000)       /* 扫描超时时间 单位ms*/
+#define ROAM_SCAN_TIME_MAX        (3 * 1000)       /* 扫描超时时间 单位ms*/
 #define ROAM_CONNECT_TIME_MAX     (8 * 1000)       /* 关联超时时间 单位ms*/
 #define ROAM_INVALID_SCAN_MAX     (5)              /* 连续无效扫描门限   */
 
@@ -142,7 +142,7 @@ typedef struct
 oal_uint32 hmac_roam_enable(hmac_vap_stru *pst_hmac_vap, oal_uint8 uc_enable);
 oal_uint32 hmac_roam_band(hmac_vap_stru *pst_hmac_vap, oal_uint8 uc_scan_band);
 oal_uint32 hmac_roam_org(hmac_vap_stru *pst_hmac_vap, oal_uint8 uc_scan_orthogonal);
-oal_uint32 hmac_roam_start(hmac_vap_stru *pst_hmac_vap);
+oal_uint32 hmac_roam_start(hmac_vap_stru *pst_hmac_vap,oal_bool_enum_uint8  en_no_scan);
 oal_uint32 hmac_roam_show(hmac_vap_stru *pst_hmac_vap);
 oal_uint32 hmac_roam_init(hmac_vap_stru *pst_hmac_vap);
 oal_uint32 hmac_roam_info_init(hmac_vap_stru *pst_hmac_vap);

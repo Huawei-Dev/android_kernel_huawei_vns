@@ -67,6 +67,7 @@ extern "C" {
 extern oal_uint32 g_device_wlan_pm_timeout;
 extern oal_uint32 g_pm_timer_restart_cnt;
 extern oal_uint8  g_uc_max_powersave;
+extern oal_uint16 g_us_download_rate_limit_pps;
 
 /*****************************************************************************
   5 消息头定义
@@ -181,40 +182,6 @@ OAL_STATIC OAL_INLINE oal_uint8 dmac_psm_sta_is_activity_cnt_zero(mac_sta_pm_han
     return OAL_FALSE;
 }
 /*****************************************************************************
- 函 数 名  : dmac_is_ac_legacy
- 功能描述  : sta下判断当前ac是是否是传统ac
- 输入参数  : pst_dmac_vap:dmac_vap 结构体 pst_netbuf:netbuf结构体
- 输出参数  : OAL_TRUE/OAL_FALSE
- 返 回 值  :
- 调用函数  :
- 被调函数  :
-
- 修改历史      :
-  1.日    期   : 2014年12月19日
-    作    者   : liuzhengqi
-    修改内容   : 新生成函数
-
-*****************************************************************************/
-OAL_STATIC OAL_INLINE oal_uint8 dmac_is_ac_legacy(dmac_vap_stru *pst_dmac_vap, mac_tx_ctl_stru *pst_tx_ctl)
-{
-    oal_uint8    uc_ac;
-    mac_cfg_uapsd_sta_stru  st_uapsd_cfg_sta;
-
-    uc_ac = mac_get_cb_ac(pst_tx_ctl);
-    st_uapsd_cfg_sta = pst_dmac_vap->st_vap_base_info.st_sta_uapsd_cfg;
-
-    if(uc_ac < WLAN_WME_AC_BUTT)
-    {
-        if((st_uapsd_cfg_sta.uc_trigger_enabled[uc_ac] == 0) &&
-        (st_uapsd_cfg_sta.uc_delivery_enabled[uc_ac] == 0))
-        {
-            return OAL_TRUE;
-        }
-    }
-
-    return OAL_FALSE;
-}
-/*****************************************************************************
  函 数 名  : dmac_is_legacy_ac_present
  功能描述  : sta下判断四种是否有传统的ac
  输入参数  : pst_dmac_vap:dmac_vap 结构体
@@ -246,32 +213,6 @@ OAL_STATIC OAL_INLINE oal_uint8 dmac_is_legacy_ac_present(dmac_vap_stru *pst_dma
     return OAL_FALSE;
 }
 
-/*****************************************************************************
- 函 数 名  : dmac_is_legacy_ac
- 功能描述  : sta下判断当前ac是是否是传统ac
- 输入参数  : pst_dmac_vap:dmac_vap 结构体 pst_netbuf:netbuf结构体
- 输出参数  : OAL_TRUE/OAL_FALSE
- 返 回 值  :
- 调用函数  :
- 被调函数  :
-
- 修改历史      :
-  1.日    期   : 2014年12月19日
-    作    者   : liuzhengqi
-    修改内容   : 新生成函数
-
-*****************************************************************************/
-OAL_STATIC OAL_INLINE oal_uint8 dmac_is_legacy_ac(dmac_vap_stru *pst_dmac_vap, mac_tx_ctl_stru   *pst_tx_ctl)
-{
-#ifdef _PRE_WLAN_FEATURE_STA_UAPSD
-    if(OAL_TRUE == dmac_is_ap_uapsd_capable(pst_dmac_vap))
-    {
-        return dmac_is_ac_legacy(pst_dmac_vap, pst_tx_ctl);
-    }
-#endif /* WLAN_FEATURE_STA_UAPSD */
-
-    return OAL_TRUE;
-}
 
 /*****************************************************************************
  函 数 名  : dmac_is_any_legacy_ac_present
@@ -291,7 +232,7 @@ OAL_STATIC OAL_INLINE oal_uint8 dmac_is_legacy_ac(dmac_vap_stru *pst_dmac_vap, m
 OAL_STATIC OAL_INLINE oal_uint8 dmac_is_any_legacy_ac_present(dmac_vap_stru *pst_dmac_vap)
 {
 #ifdef _PRE_WLAN_FEATURE_STA_UAPSD
-    if(OAL_TRUE == dmac_is_ap_uapsd_capable(pst_dmac_vap))
+    if(OAL_TRUE == dmac_is_uapsd_capable(pst_dmac_vap))
     {
         return dmac_is_legacy_ac_present(pst_dmac_vap);
     }
@@ -330,7 +271,7 @@ OAL_STATIC OAL_INLINE oal_void dmac_set_ps_poll_rsp_pending(dmac_vap_stru *pst_d
 OAL_STATIC OAL_INLINE oal_void dmac_process_rx_process_data_sta_prot(dmac_vap_stru *pst_dmac_vap, oal_netbuf_stru *pst_buf)
 {
 #ifdef _PRE_WLAN_FEATURE_STA_UAPSD
-    if (OAL_TRUE == dmac_is_ap_uapsd_capable(pst_dmac_vap))
+    if (OAL_TRUE == dmac_is_uapsd_capable(pst_dmac_vap))
     {
         dmac_uapsd_rx_process_data_sta(pst_dmac_vap, pst_buf);
     }
@@ -359,7 +300,7 @@ OAL_STATIC OAL_INLINE oal_void dmac_process_rx_process_data_sta_prot(dmac_vap_st
 OAL_STATIC OAL_INLINE oal_uint8 dmac_psm_process_tx_process_data_sta_prot(dmac_vap_stru *pst_dmac_vap, mac_tx_ctl_stru *pst_tx_ctl)
 {
 #ifdef _PRE_WLAN_FEATURE_STA_UAPSD
-    if (OAL_TRUE == dmac_is_ap_uapsd_capable(pst_dmac_vap))
+    if (OAL_TRUE == dmac_is_uapsd_capable(pst_dmac_vap))
     {
         return dmac_uapsd_tx_process_data_sta(pst_dmac_vap, pst_tx_ctl);
     }
@@ -385,7 +326,7 @@ OAL_STATIC OAL_INLINE oal_uint8 dmac_psm_process_tx_process_data_sta_prot(dmac_v
 OAL_STATIC OAL_INLINE oal_void dmac_psm_process_tx_complete_sta_prot(dmac_vap_stru *pst_dmac_vap, oal_uint8  uc_dscr_status, oal_netbuf_stru *pst_netbuf)
 {
 #ifdef _PRE_WLAN_FEATURE_STA_UAPSD
-    if(OAL_TRUE == dmac_is_ap_uapsd_capable(pst_dmac_vap))
+    if(OAL_TRUE == dmac_is_uapsd_capable(pst_dmac_vap))
     {
         dmac_uapsd_process_tx_complete_sta(pst_dmac_vap, uc_dscr_status, pst_netbuf);
     }
@@ -409,7 +350,7 @@ OAL_STATIC OAL_INLINE oal_void dmac_psm_process_tx_complete_sta_prot(dmac_vap_st
 OAL_STATIC OAL_INLINE oal_void dmac_psm_process_tim_set_sta_prot(dmac_vap_stru *pst_dmac_vap)
 {
 #ifdef _PRE_WLAN_FEATURE_STA_UAPSD
-    if(OAL_TRUE == dmac_is_ap_uapsd_capable(pst_dmac_vap))
+    if(OAL_TRUE == dmac_is_uapsd_capable(pst_dmac_vap))
     {
         dmac_uapsd_trigger_sp_sta(pst_dmac_vap);
     }
@@ -466,7 +407,7 @@ OAL_STATIC OAL_INLINE  oal_uint8 dmac_can_sta_doze_prot(dmac_vap_stru *pst_dmac_
     /* If the AP is UAPSD capable and UAPSD service period is in progress    */
     /* or STA is waiting for UAPSD service period to start the STA cannot go */
     /* to doze mode.                                                         */
-    if(OAL_TRUE == dmac_is_ap_uapsd_capable(pst_dmac_vap))
+    if(OAL_TRUE == dmac_is_uapsd_capable(pst_dmac_vap))
     {
         if (OAL_FALSE == dmac_is_uapsd_sp_not_in_progress(pst_mac_sta_pm_handle))
         {
@@ -498,6 +439,48 @@ OAL_STATIC OAL_INLINE oal_void dmac_send_ps_poll_to_ap_prot(dmac_vap_stru *pst_d
 #endif /* #if  defined(_PRE_WLAN_FEATURE_P2P)*/
 }
 
+/*****************************************************************************
+ 函 数 名  : dmac_psm_rx_inc_pkt_cnt
+ 功能描述  : 低功耗在active状态下收包报文统计数加1, 在所有的帧过滤处理完后再调用，仅统计需要真正处理的业务包个数。
+ 输入参数  :
+ 输出参数  : 无
+ 返 回 值  : oal_uint32
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2014年11月25日
+    作    者   : z00274374
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+OAL_STATIC OAL_INLINE oal_void  dmac_psm_rx_inc_pkt_cnt(mac_vap_stru *pst_mac_vap, oal_netbuf_stru *pst_buf)
+{
+    mac_sta_pm_handler_stru  *pst_mac_sta_pm_handle;
+    dmac_vap_stru               *pst_dmac_vap;
+
+    pst_dmac_vap = (dmac_vap_stru *)mac_res_get_dmac_vap(pst_mac_vap->uc_vap_id);
+    if (OAL_PTR_NULL == pst_dmac_vap)
+    {
+        OAM_WARNING_LOG1(0, OAM_SF_PWR, "mac_res_get_dmac_vap::pst_dmac_vap null. vap_id[%u]",pst_mac_vap->uc_vap_id);
+        return;
+    }
+
+    pst_mac_sta_pm_handle = (mac_sta_pm_handler_stru *)(pst_dmac_vap->pst_pm_handler);
+    if (OAL_PTR_NULL == pst_mac_sta_pm_handle)
+    {
+        OAM_WARNING_LOG0(pst_dmac_vap->st_vap_base_info.uc_vap_id, OAM_SF_PWR, "{dmac_psm_rx_inc_pkt_cnt::pst_mac_sta_pm_handle null}");
+        return;
+    }
+
+
+    if (STA_PWR_SAVE_STATE_ACTIVE == STA_GET_PM_STATE(pst_mac_sta_pm_handle))
+    {
+         pst_mac_sta_pm_handle->ul_psm_pkt_cnt++;
+    }
+
+    return;
+}
 
 /*****************************************************************************
   10 函数声明
@@ -508,7 +491,7 @@ extern oal_void dmac_psm_tx_complete_sta(dmac_vap_stru *pst_dmac_vap, hal_tx_dsc
 
 extern oal_void dmac_psm_process_tbtt_sta(dmac_vap_stru *pst_dmac_vap,mac_device_stru  *pst_mac_device);
 
-extern oal_void  dmac_psm_rx_process_data_sta(dmac_vap_stru *pst_dmac_vap, oal_netbuf_stru *pst_buf);
+extern oal_uint32 dmac_psm_rx_process_data_sta(dmac_vap_stru *pst_dmac_vap, oal_netbuf_stru *pst_buf);
 
 extern oal_uint8 dmac_psm_tx_process_data_sta(dmac_vap_stru *pst_dmac_vap, mac_tx_ctl_stru *pst_tx_ctl);
 extern oal_void dmac_psm_max_powersave_enable(mac_device_stru *pst_mac_device);

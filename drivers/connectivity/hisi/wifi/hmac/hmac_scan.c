@@ -174,7 +174,7 @@ oal_void  hmac_scan_ct_exit(oal_void)
     }
 }
 #endif
-
+#if 0
 /*****************************************************************************
  函 数 名  : hmac_snprintf_hex
  功能描述  : 打印16进制数据
@@ -222,7 +222,7 @@ oal_int32 hmac_snprintf_hex(oal_uint8 *puc_buf, oal_int32 l_buf_size, oal_uint8 
     puc_buf[l_buf_size - 1] = '\0';
     return puc_pos - puc_buf;
 }
-
+#endif
 /*****************************************************************************
  函 数 名  : hmac_scan_print_scan_params
  功能描述  : 打印扫描到的bss信息
@@ -2319,12 +2319,12 @@ oal_uint32  hmac_scan_proc_scan_req_event_exception(hmac_vap_stru *pst_hmac_vap,
 
     if (OAL_UNLIKELY((OAL_PTR_NULL == pst_hmac_vap) || (OAL_PTR_NULL == p_params)))
     {
-        OAM_ERROR_LOG2(0, OAM_SF_SCAN, "{hmac_mgmt_scan_req_exception::param null, %d %d.}", pst_hmac_vap, p_params);
+        OAM_ERROR_LOG2(0, OAM_SF_SCAN, "{hmac_scan_proc_scan_req_event_exception::param null, %d %d.}", pst_hmac_vap, p_params);
         return OAL_ERR_CODE_PTR_NULL;
     }
 
     /* 不支持发起扫描的状态发起了扫描 */
-    OAM_WARNING_LOG1(pst_hmac_vap->st_vap_base_info.uc_vap_id, OAM_SF_SCAN, "{hmac_mgmt_scan_req_exception::vap state is=%x.}",
+    OAM_WARNING_LOG1(pst_hmac_vap->st_vap_base_info.uc_vap_id, OAM_SF_SCAN, "{hmac_scan_proc_scan_req_event_exception::vap state is=%x.}",
                      pst_hmac_vap->st_vap_base_info.en_vap_state);
 
     OAL_MEMZERO(&st_scan_rsp, OAL_SIZEOF(hmac_scan_rsp_stru));
@@ -2333,7 +2333,7 @@ oal_uint32  hmac_scan_proc_scan_req_event_exception(hmac_vap_stru *pst_hmac_vap,
     pst_event_mem = FRW_EVENT_ALLOC(OAL_SIZEOF(hmac_scan_rsp_stru));
     if (OAL_PTR_NULL == pst_event_mem)
     {
-        OAM_ERROR_LOG0(pst_hmac_vap->st_vap_base_info.uc_vap_id, OAM_SF_SCAN, "{hmac_mgmt_scan_req_exception::pst_event_mem null.}");
+        OAM_ERROR_LOG0(pst_hmac_vap->st_vap_base_info.uc_vap_id, OAM_SF_SCAN, "{hmac_scan_proc_scan_req_event_exception::pst_event_mem null.}");
         return OAL_ERR_CODE_PTR_NULL;
     }
 
@@ -2798,11 +2798,19 @@ oal_uint32  hmac_scan_proc_scan_req_event(hmac_vap_stru *pst_hmac_vap, oal_void 
     }
 
     /* 更新此次扫描请求的扫描参数 */
+    if (pst_scan_params->uc_scan_func == MAC_SCAN_FUNC_P2P_LISTEN)
+    {
+        /* DTS2017042708713:监听状态下不设置随机MAC地址扫描，避免wlan0 监听状态下发送管理帧失败 */
+        ul_ret = hmac_scan_update_scan_params(pst_hmac_vap, pst_scan_params, OAL_FALSE);
+    }
+    else
+    {
 #ifdef _PRE_PLAT_FEATURE_CUSTOMIZE
-    ul_ret = hmac_scan_update_scan_params(pst_hmac_vap, pst_scan_params, g_st_wlan_customize.uc_random_mac_addr_scan);
+        ul_ret = hmac_scan_update_scan_params(pst_hmac_vap, pst_scan_params, g_st_wlan_customize.uc_random_mac_addr_scan);
 #else
-    ul_ret = hmac_scan_update_scan_params(pst_hmac_vap, pst_scan_params, pst_hmac_device->st_scan_mgmt.en_is_random_mac_addr_scan);
+        ul_ret = hmac_scan_update_scan_params(pst_hmac_vap, pst_scan_params, pst_hmac_device->st_scan_mgmt.en_is_random_mac_addr_scan);
 #endif
+    }
     if (OAL_SUCC != ul_ret)
     {
         OAM_WARNING_LOG1(pst_hmac_vap->st_vap_base_info.uc_vap_id, OAM_SF_SCAN,
@@ -3104,22 +3112,109 @@ oal_uint32  hmac_scan_process_chan_result_event(frw_event_mem_stru *pst_event_me
 
  修改历史      :
   1.日    期   : 2014年11月27日
-    作    者   : zhangheng
+    作    者   : yangguisen
     修改内容   : 新生成函数
 
 *****************************************************************************/
 oal_uint32 hmac_scan_rrm_proc_save_bss(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len, oal_uint8 *puc_param)
 {
-
-    frw_event_mem_stru              *pst_event_mem;
-    frw_event_stru                  *pst_event;
+    oal_netbuf_stru                 *pst_action_table_bcn_rpt;
+    oal_uint8                       *puc_data;
+    mac_user_stru                   *pst_mac_user;
+    oal_uint16                       us_index = 0;
+    mac_meas_rpt_ie_stru            *pst_meas_rpt_ie;
+    mac_bcn_rpt_stru                *pst_bcn_rpt;
+    mac_tx_ctl_stru                 *pst_tx_ctl;
+    mac_vap_rrm_trans_req_info_stru *pst_trans_req_info;
     oal_uint32                       ul_ret;
     hmac_device_stru                *pst_hmac_device;
     hmac_bss_mgmt_stru              *pst_bss_mgmt;
     oal_dlist_head_stru             *pst_entry;
     hmac_scanned_bss_info           *pst_scanned_bss;
-    mac_vap_rrm_trans_bss_info_stru *pst_trans_bss_info;
-    oal_uint32                       ul_bss_idx = 0;
+    oal_uint8                        uc_bss_idx = 0;
+
+    if (OAL_PTR_NULL == puc_param)
+    {
+        OAM_ERROR_LOG0(pst_mac_vap->uc_vap_id, OAM_SF_ASSOC, "{hmac_scan_rrm_proc_save_bss::puc_param null.}");
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+
+    pst_trans_req_info = (mac_vap_rrm_trans_req_info_stru *)puc_param;
+
+    pst_action_table_bcn_rpt = (oal_netbuf_stru *)OAL_MEM_NETBUF_ALLOC(OAL_NORMAL_NETBUF, WLAN_MEM_NETBUF_SIZE2, OAL_NETBUF_PRIORITY_MID);
+    if(OAL_PTR_NULL == pst_action_table_bcn_rpt)
+    {
+        OAM_ERROR_LOG0(pst_mac_vap->uc_vap_id, OAM_SF_ASSOC, "{hmac_scan_rrm_proc_save_bss::pst_action_table_bcn_rpt null.}");
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+
+    OAL_MEMZERO(oal_netbuf_cb(pst_action_table_bcn_rpt), OAL_NETBUF_CB_SIZE());
+
+    puc_data = (oal_uint8 *)OAL_NETBUF_HEADER(pst_action_table_bcn_rpt);
+
+    /*************************************************************************/
+    /*                        Management Frame Format                        */
+    /* --------------------------------------------------------------------  */
+    /* |Frame Control|Duration|DA|SA|BSSID|Sequence Control|Frame Body|FCS|  */
+    /* --------------------------------------------------------------------  */
+    /* | 2           |2       |6 |6 |6    |2               |0 - 2312  |4  |  */
+    /* --------------------------------------------------------------------  */
+    /*                                                                       */
+    /*************************************************************************/
+
+    /*************************************************************************/
+    /*                Set the fields in the frame header                     */
+    /*************************************************************************/
+
+    /* All the fields of the Frame Control Field are set to zero. Only the   */
+    /* Type/Subtype field is set.                                            */
+    mac_hdr_set_frame_control(puc_data, WLAN_PROTOCOL_VERSION| WLAN_FC0_TYPE_MGT | WLAN_FC0_SUBTYPE_ACTION);
+
+    /* duration */
+    puc_data[2] = 0;
+    puc_data[3] = 0;
+
+    pst_mac_user = mac_res_get_mac_user(pst_mac_vap->uc_assoc_vap_id);
+    if (OAL_PTR_NULL == pst_mac_user)
+    {
+        OAM_ERROR_LOG1(0, OAM_SF_TX, "{hmac_scan_rrm_proc_save_bss::pst_mac_user[%d] null.", pst_mac_vap->uc_assoc_vap_id);
+
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+
+    /* DA is address of STA requesting association */
+    oal_set_mac_addr(puc_data + 4, pst_mac_user->auc_user_mac_addr);
+
+    /* SA is the dot11MACAddress */
+    oal_set_mac_addr(puc_data + 10, pst_mac_vap->pst_mib_info->st_wlan_mib_sta_config.auc_dot11StationID);
+
+    oal_set_mac_addr(puc_data + 16, pst_mac_vap->auc_bssid);
+
+    /* seq control */
+    puc_data[22] = 0;
+    puc_data[23] = 0;
+
+    /*************************************************************************/
+    /*                    Radio Measurement Report Frame - Frame Body        */
+    /* --------------------------------------------------------------------- */
+    /* |Category |Action |Dialog Token| Measurement Report Elements         |*/
+    /* --------------------------------------------------------------------- */
+    /* |1        |1      | 1          |  var                                 */
+    /* --------------------------------------------------------------------- */
+    /*                                                                       */
+    /*************************************************************************/
+
+    /* Initialize index and the frame data pointer */
+    us_index = MAC_80211_FRAME_LEN;
+
+    /* Category */
+    puc_data[us_index++] = MAC_ACTION_CATEGORY_RADIO_MEASURMENT;
+
+    /* Action */
+    puc_data[us_index++] = MAC_RM_ACTION_RADIO_MEASUREMENT_REPORT;
+
+    /* Dialog Token  */
+    puc_data[us_index++]  = pst_trans_req_info->uc_action_dialog_token;
 
     pst_hmac_device = hmac_res_get_mac_dev(pst_mac_vap->uc_device_id);
     if (OAL_UNLIKELY(OAL_PTR_NULL == pst_hmac_device))
@@ -3129,51 +3224,57 @@ oal_uint32 hmac_scan_rrm_proc_save_bss(mac_vap_stru *pst_mac_vap, oal_uint8 uc_l
         return OAL_ERR_CODE_PTR_NULL;
     }
 
-    pst_event_mem = FRW_EVENT_ALLOC(OAL_SIZEOF(mac_vap_rrm_trans_bss_info_stru));
-    if (OAL_PTR_NULL == pst_event_mem)
-    {
-        OAM_ERROR_LOG0(pst_mac_vap->uc_vap_id, OAM_SF_P2P, "{hmac_scan_rrm_proc_save_bss::pst_event_mem null.}");
-        return OAL_ERR_CODE_PTR_NULL;
-    }
-
-    /* 填写事件 */
-    pst_event = (frw_event_stru *)pst_event_mem->puc_data;
-
-    FRW_EVENT_HDR_INIT(&(pst_event->st_event_hdr),
-                       FRW_EVENT_TYPE_HOST_CTX,
-                       DMAC_WLAN_CTX_EVENT_SUB_TYPE_RPT_SAVE_BSS_INFO,
-                       OAL_SIZEOF(mac_vap_rrm_trans_bss_info_stru),
-                       FRW_EVENT_PIPELINE_STAGE_0,
-                       pst_mac_vap->uc_chip_id,
-                       pst_mac_vap->uc_device_id,
-                       pst_mac_vap->uc_vap_id);
-
-    pst_trans_bss_info = (mac_vap_rrm_trans_bss_info_stru *)(pst_event->auc_event_data);
-
     /* 获取管理扫描的bss结果的结构体 */
     pst_bss_mgmt = &(pst_hmac_device->st_scan_mgmt.st_scan_record_mgmt.st_bss_mgmt);
+
+
+    pst_meas_rpt_ie = (mac_meas_rpt_ie_stru *)(puc_data + us_index);
+
     /* 对链表删操作前加锁 */
     oal_spin_lock(&(pst_bss_mgmt->st_lock));
 
     OAL_DLIST_SEARCH_FOR_EACH(pst_entry, &(pst_bss_mgmt->st_bss_list_head))
     {
         pst_scanned_bss = OAL_DLIST_GET_ENTRY(pst_entry, hmac_scanned_bss_info, st_dlist_head);
-
-        oal_memcopy(pst_trans_bss_info->auc_bssid[ul_bss_idx], pst_scanned_bss->st_bss_dscr_info.auc_bssid, WLAN_MAC_ADDR_LEN);
-        pst_trans_bss_info->auc_chan_num[ul_bss_idx++] = pst_scanned_bss->st_bss_dscr_info.st_channel.uc_chan_number;
-
-        if (ul_bss_idx >= MAC_MAX_BSS_INFO_TRANS)
+        if (0 == oal_memcmp(pst_scanned_bss->st_bss_dscr_info.ac_ssid, pst_trans_req_info->auc_ssid, pst_trans_req_info->us_ssid_len))
         {
-            break;
+            /*************************************************************************/
+            /*                   Measurement Report IE - Frame Body                  */
+            /* --------------------------------------------------------------------- */
+            /* |Element ID |Length |Meas Token| Meas Rpt Mode | Meas Type | Meas Rpt|*/
+            /* --------------------------------------------------------------------- */
+            /* |1          |1      | 1        |  1            | 1         | var      */
+            /* --------------------------------------------------------------------- */
+            /*                                                                       */
+            /*************************************************************************/
+            pst_meas_rpt_ie->uc_eid = MAC_EID_MEASREP;
+            pst_meas_rpt_ie->uc_len = 3 + MAC_BEACON_RPT_FIX_LEN;
+            pst_meas_rpt_ie->uc_token = pst_trans_req_info->uc_meas_token;
+            OAL_MEMZERO(&(pst_meas_rpt_ie->st_rptmode), OAL_SIZEOF(mac_meas_rpt_mode_stru));
+            pst_meas_rpt_ie->uc_rpttype = 5;
+
+            pst_bcn_rpt = (mac_bcn_rpt_stru *)pst_meas_rpt_ie->auc_meas_rpt;
+            OAL_MEMZERO(pst_bcn_rpt, OAL_SIZEOF(mac_bcn_rpt_stru));
+            oal_memcopy(pst_bcn_rpt->auc_bssid, pst_scanned_bss->st_bss_dscr_info.auc_bssid, WLAN_MAC_ADDR_LEN);
+            pst_bcn_rpt->uc_channum = pst_scanned_bss->st_bss_dscr_info.st_channel.uc_chan_number;
+            pst_bcn_rpt->uc_optclass = pst_trans_req_info->uc_oper_class;
+            pst_meas_rpt_ie = (mac_meas_rpt_ie_stru *)pst_bcn_rpt->auc_subelm;
+            uc_bss_idx++;
         }
     }
     oal_spin_unlock(&(pst_bss_mgmt->st_lock));
+    pst_tx_ctl = (mac_tx_ctl_stru *)oal_netbuf_cb(pst_action_table_bcn_rpt);
+    pst_tx_ctl->us_mpdu_len  = us_index + uc_bss_idx * (MAC_MEASUREMENT_RPT_FIX_LEN + MAC_BEACON_RPT_FIX_LEN);
+    pst_tx_ctl->us_tx_user_idx  = 0xffff;                        /* 发送完成需要获取user结构体 */
 
-    pst_trans_bss_info->uc_bss_num = ul_bss_idx;
+    oal_netbuf_put(pst_action_table_bcn_rpt, pst_tx_ctl->us_mpdu_len);
 
-    /* 分发事件 */
-    ul_ret = frw_event_dispatch_event(pst_event_mem);
-    FRW_EVENT_FREE(pst_event_mem);
+    ul_ret = hmac_tx_mgmt_send_event(pst_mac_vap, pst_action_table_bcn_rpt, pst_tx_ctl->us_mpdu_len);
+    if (OAL_SUCC != ul_ret)
+    {
+        oal_netbuf_free(pst_action_table_bcn_rpt);
+        OAM_WARNING_LOG1(pst_mac_vap->uc_vap_id, OAM_SF_ANY, "{hmac_scan_rrm_proc_save_bss::hmac_tx_mgmt_send_event failed[%d].}", ul_ret);
+    }
 
     return OAL_SUCC;
 }

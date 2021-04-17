@@ -1314,6 +1314,7 @@ oal_void dmac_btcoex_vap_down_handle(mac_vap_stru *pst_mac_vap)
         /* 状态上报BT */
         OAM_WARNING_LOG0(pst_mac_vap->uc_vap_id, OAM_SF_CFG, "{dmac_btcoex_vap_down_handle::Notify BT cancel AFH.}");
         hal_set_btcoex_soc_gpreg1(OAL_FALSE, BIT3, 3);
+        hal_set_btcoex_soc_gpreg0(OAL_FALSE, BIT13, 13);
         hal_coex_sw_irq_set(BIT5);
     }
 }
@@ -1397,8 +1398,6 @@ oal_uint32 dmac_config_btcoex_assoc_state_syn(mac_vap_stru *pst_mac_vap, mac_use
     hal_set_btcoex_soc_gpreg0(pst_mac_vap->st_channel.en_bandwidth, BIT8 | BIT7 | BIT6, 6); // 带宽
     hal_set_btcoex_soc_gpreg0(OAL_TRUE, BIT13, 13);
     hal_set_btcoex_soc_gpreg1(OAL_FALSE, BIT2, 2);
-    hal_set_btcoex_soc_gpreg1(OAL_TRUE, BIT3, 3);
-    hal_coex_sw_irq_set(BIT5);
 
     pst_dmac_vap = (dmac_vap_stru *)pst_mac_vap;
 
@@ -1413,14 +1412,24 @@ oal_uint32 dmac_config_btcoex_assoc_state_syn(mac_vap_stru *pst_mac_vap, mac_use
         {
             /* Notify Bt the P2P Connected state */
             hal_set_btcoex_soc_gpreg0(OAL_TRUE, BIT15, 15);
-            hal_coex_sw_irq_set(BIT5);
         }
+        else
+        {
+            /* Notify Bt the AP-Mode connect */
+            hal_set_btcoex_soc_gpreg1(OAL_TRUE, BIT3, 3);
+        }
+        hal_coex_sw_irq_set(BIT5);
         OAM_WARNING_LOG3(0, OAM_SF_COEX, "{dmac_config_btcoex_assoc_state_syn::ba process skip! vap mode is %d, p2p mode is %d, vap_state: %d.}",
             pst_mac_vap->en_vap_mode, pst_mac_vap->en_p2p_mode, pst_mac_vap->en_vap_state);
         return OAL_SUCC;
     }
 
     /* 以上AP STA模式都适用，下面仅对STA */
+
+    /* Notify Bt the Sta-Mode connected state */
+    hal_set_btcoex_soc_gpreg1(OAL_TRUE, BIT3, 3);
+    hal_coex_sw_irq_set(BIT5);
+
     pst_dmac_user = (dmac_user_stru *)pst_mac_user;
 
     pst_dmac_user_btcoex_delba = &(pst_dmac_user->st_dmac_user_btcoex_stru.st_dmac_user_btcoex_delba);
@@ -1536,8 +1545,13 @@ oal_uint32 dmac_config_btcoex_disassoc_state_syn(mac_vap_stru *pst_mac_vap)
         {
             /* Notify Bt the P2P Disconnected state */
             hal_set_btcoex_soc_gpreg0(OAL_FALSE, BIT15, 15);
-            hal_coex_sw_irq_set(BIT5);
         }
+        else
+        {
+            /* Notify Bt the AP-Mode vap disconnected */
+            hal_set_btcoex_soc_gpreg1(OAL_FALSE, BIT3, 3);
+        }
+        hal_coex_sw_irq_set(BIT5);
         OAM_WARNING_LOG2(0, OAM_SF_COEX, "{dmac_config_btcoex_disassoc_state_syn::ba process skip! vap mode is %d, p2p mode is %d.}",
                 pst_mac_vap->en_vap_mode, pst_mac_vap->en_p2p_mode);
         return OAL_SUCC;
@@ -1556,6 +1570,10 @@ oal_uint32 dmac_config_btcoex_disassoc_state_syn(mac_vap_stru *pst_mac_vap)
     FRW_TIMER_IMMEDIATE_DESTROY_TIMER(&(pst_dmac_vap_btcoex_rx_statistics->bt_coex_sco_statistics_timer));
     FRW_TIMER_IMMEDIATE_DESTROY_TIMER(&(pst_dmac_vap_btcoex_occupied->bt_coex_occupied_timer));
     FRW_TIMER_IMMEDIATE_DESTROY_TIMER(&(pst_dmac_vap_btcoex_occupied->bt_coex_priority_timer));
+
+    /* Notify Bt the Station-VAP disconnected */
+    hal_set_btcoex_soc_gpreg1(OAL_FALSE, BIT3, 3);
+    hal_coex_sw_irq_set(BIT5);
 
     return OAL_SUCC;
 }

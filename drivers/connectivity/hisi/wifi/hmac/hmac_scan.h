@@ -45,9 +45,13 @@ extern "C" {
 *****************************************************************************/
 
 /* 扫描到的bss的老化时间，小于此值，下发新扫描请求时，不删除此bss信息 */
-#define HMAC_SCAN_MAX_SCANNED_BSS_EXPIRE     3000       /* 3000 milliseconds */
+#define HMAC_SCAN_MAX_SCANNED_BSS_EXPIRE         25000   /* 25000 milliseconds */
+
+/* 扫描结果中有效性高的时间范围，可用于漫游目标的挑选等操作 */
+#define HMAC_SCAN_MAX_VALID_SCANNED_BSS_EXPIRE   3000    /* 3000 milliseconds */
+
 /* 扫描到的bss的rssi老化时间 */
-#define HMAC_SCAN_MAX_SCANNED_RSSI_EXPIRE    1000       /* 1000 milliseconds */
+#define HMAC_SCAN_MAX_SCANNED_RSSI_EXPIRE        1000    /* 1000 milliseconds */
 
 #define HMAC_INIT_SCAN_TIMEOUT_MS   10000
 /*****************************************************************************

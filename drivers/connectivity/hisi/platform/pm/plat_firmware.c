@@ -1282,7 +1282,7 @@ int32 exec_number_type_cmd(uint8 *Key, uint8 *Value)
     int32       l_ret = -EFAIL;
     BOARD_INFO* board_info = NULL;
 
-    board_info = get_board_info();
+    board_info = get_hi110x_board_info();
     if (NULL == board_info)
     {
         PS_PRINT_ERR("board_info is null!\n");
@@ -1302,13 +1302,25 @@ int32 exec_number_type_cmd(uint8 *Key, uint8 *Value)
 
         if (!OS_STR_CMP((int8 *)Key, WMEM_CMD_KEYWORD))
         {
+            if (NULL != OS_STR_STR((int8 *)Value, (int8 *)STR_REG_NFC_EN_KEEP))
+            {
+                if(V100 == get_ec_version())
+                {
+                    PS_PRINT_INFO("hi110x V100\n");
+                }
+                else
+                {
+                    PS_PRINT_INFO("hi110x V120\n");
+                    return SUCC;
+                }
+            }
+
             l_ret = number_type_cmd_send(Key, Value);
             if (0 > l_ret)
             {
                 PS_PRINT_ERR("send key=[%s],value=[%s] fail\n", Key, Value);
                 return l_ret;
             }
-
 
             l_ret = recv_expect_result(MSG_FROM_DEV_WRITEM_OK);
             if (0 > l_ret)
@@ -1422,7 +1434,7 @@ int32 exec_quit_type_cmd(void)
     uint8   buf[8];
     BOARD_INFO* board_info = NULL;
 
-    board_info = get_board_info();
+    board_info = get_hi110x_board_info();
     if (NULL == board_info)
     {
         PS_PRINT_ERR("board_info is null!\n");
@@ -1486,7 +1498,7 @@ int32 exec_file_type_cmd(uint8 *Key, uint8 *Value)
     OS_KERNEL_FILE_STRU *fp;
     BOARD_INFO* board_info = NULL;
 
-    board_info = get_board_info();
+    board_info = get_hi110x_board_info();
     if (NULL == board_info)
     {
         PS_PRINT_ERR("board_info is null!\n");
@@ -2393,7 +2405,9 @@ int32 firmware_cfg_init(void)
 {
     int32  l_ret;
     uint32 i;
-    /*int32  firmware_in_boot = 0;
+
+#ifdef _PRE_HI110X_FIRMWARE_NOT_BUILDIN
+    int32  firmware_in_boot = 1;
 
     l_ret = get_cust_conf_int32(INI_MODU_PLAT, "firmware_buildin", &firmware_in_boot);
     if (l_ret < 0)
@@ -2411,8 +2425,10 @@ int32 firmware_cfg_init(void)
     {
         PS_PRINT_INFO("Hi110x firmware is not buildin\n");
         g_auc_cfg_path = g_auc_cfg_in_system_path;
-    }*/
+    }
+#endif
 
+    /*½âÎöcfgÎÄ¼þ*/
     for (i = 0; i < CFG_FILE_TOTAL; i++)
     {
         l_ret = firmware_get_cfg(g_auc_cfg_path[i], i);

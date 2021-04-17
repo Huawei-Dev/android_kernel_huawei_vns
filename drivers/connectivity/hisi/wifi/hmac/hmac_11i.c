@@ -608,6 +608,7 @@ oal_uint32 hmac_config_11i_remove_key(mac_vap_stru *pst_mac_vap, oal_uint16 us_l
 #endif
         {
             mac_user_set_port(pst_mac_user, OAL_FALSE);
+            mac_user_init_key(pst_mac_user);
         }
     }
 

@@ -3963,7 +3963,6 @@ oal_void mac_set_power_cap_ie(oal_uint8 *pst_vap, oal_uint8 *puc_buffer, oal_uin
 
     /* 成功获取管制域信息则根据国家码和TPC设置最大和最小发射功率，否则默认为0 */
     pst_regclass_info = mac_get_channel_num_rc_info(pst_mac_vap->st_channel.en_band, pst_mac_vap->st_channel.uc_chan_number);
-
     if (OAL_PTR_NULL != pst_regclass_info)
     {
         *(puc_buffer + 2) = (oal_uint8)((pst_mac_vap->st_channel.en_band == WLAN_BAND_2G) ? 4 : 3);
@@ -4732,7 +4731,7 @@ oal_void mac_set_ft_ie(oal_void *pst_vap, oal_uint8 *puc_buffer, oal_uint16 *pus
     *pus_ie_len = 84;
 }
 
-oal_void mac_set_rde_ie(mac_vap_stru *pst_mac_vap, , oal_uint8 *puc_buffer, oal_uint16 *pus_ie_len)
+oal_void mac_set_rde_ie(oal_void *pst_mac_vap, oal_uint8 *puc_buffer, oal_uint8 *puc_ie_len)
 {
     /*********************************************************************************************
               -------------------------------------------------------------------
@@ -4748,10 +4747,10 @@ oal_void mac_set_rde_ie(mac_vap_stru *pst_mac_vap, , oal_uint8 *puc_buffer, oal_
     *(puc_buffer + 1) = 1;
     *(puc_buffer + 1) = 0;
 
-    *pus_ie_len = 6;
+    *puc_ie_len = 6;
 }
 
-oal_void mac_set_tspec_ie(mac_vap_stru *pst_mac_vap, , oal_uint8 *puc_buffer, oal_uint16 *pus_ie_len, oal_uint8 uc_tid)
+oal_void mac_set_tspec_ie(oal_void *pst_mac_vap, oal_uint8 *puc_buffer, oal_uint8 *puc_ie_len, oal_uint8 uc_tid)
 {
     oal_uint8           uc_len = 0;
     mac_ts_info_stru    *pst_ts_info;
@@ -4794,13 +4793,27 @@ oal_void mac_set_tspec_ie(mac_vap_stru *pst_mac_vap, , oal_uint8 *puc_buffer, oa
 
     *(oal_uint16 *)(puc_buffer + uc_len) = 0x3000;//Surplus BW Allowance
 
-    *pus_ie_len = 57;
+    *puc_ie_len = 57;
 
 }
 
 #endif //_PRE_WLAN_FEATURE_11R
 
 #ifdef _PRE_WLAN_FEATURE_11K
+/*****************************************************************************
+ 函 数 名  : mac_set_rrm_enabled_cap_field
+ 功能描述  : 填充RRM Enabled Cap IE
+ 输入参数  : pst_vap: 指向vap
+             puc_buffer: 指向buffer
+ 输出参数  : puc_ie_len: element的长度
+ 返 回 值  : 无
+ 调用函数  :
+ 被调函数  :
+ 修改历史      :
+  1.日    期   : 2016年9月22日
+    作    者   : y00196452
+    修改内容   : 新生成函数
+*****************************************************************************/
 oal_void mac_set_rrm_enabled_cap_field(oal_void *pst_vap, oal_uint8 *puc_buffer, oal_uint8 *puc_ie_len)
 {
     mac_vap_stru                *pst_mac_vap = (mac_vap_stru *)pst_vap;
@@ -4812,7 +4825,7 @@ oal_void mac_set_rrm_enabled_cap_field(oal_void *pst_vap, oal_uint8 *puc_buffer,
     pst_rrm_enabled_cap_ie = (mac_rrm_enabled_cap_ie_stru *)(puc_buffer + MAC_IE_HDR_LEN);
 
     OAL_MEMZERO(pst_rrm_enabled_cap_ie, OAL_SIZEOF(mac_rrm_enabled_cap_ie_stru));
-
+    /* 只有bit0 4 5 6位置1 */
     pst_rrm_enabled_cap_ie->bit_link_cap        = pst_mac_vap->pst_mib_info->st_wlan_mib_sta_config.en_dot11RMLinkMeasurementActivated;
     pst_rrm_enabled_cap_ie->bit_bcn_passive_cap = pst_mac_vap->pst_mib_info->st_wlan_mib_sta_config.en_dot11RMBeaconPassiveMeasurementActivated;
     pst_rrm_enabled_cap_ie->bit_bcn_active_cap  = pst_mac_vap->pst_mib_info->st_wlan_mib_sta_config.en_dot11RMBeaconActiveMeasurementActivated;
@@ -4821,6 +4834,20 @@ oal_void mac_set_rrm_enabled_cap_field(oal_void *pst_vap, oal_uint8 *puc_buffer,
     *puc_ie_len = MAC_IE_HDR_LEN + MAC_RRM_ENABLE_CAP_IE_LEN;
 }
 
+/*****************************************************************************
+ 函 数 名  : mac_set_wfa_tpc_report_ie
+ 功能描述  : 填充WFA TPC Report IE
+ 输入参数  : pst_vap: 指向vap
+             puc_buffer: 指向buffer
+ 输出参数  : puc_ie_len: element的长度
+ 返 回 值  : 无
+ 调用函数  :
+ 被调函数  :
+ 修改历史      :
+  1.日    期   : 2016年9月22日
+    作    者   : y00196452
+    修改内容   : 新生成函数
+*****************************************************************************/
 oal_void mac_set_wfa_tpc_report_ie(oal_void *pst_vap, oal_uint8 *puc_buffer, oal_uint8 *puc_ie_len)
 {
     oal_uint8      uc_index = 0;
@@ -4849,7 +4876,7 @@ oal_void mac_set_wfa_tpc_report_ie(oal_void *pst_vap, oal_uint8 *puc_buffer, oal
     *puc_ie_len = MAC_IE_HDR_LEN + MAC_WFA_TPC_RPT_LEN;
 }
 
-#endif
+#endif //_PRE_WLAN_FEATURE_11K
 
 #ifdef _PRE_WLAN_FEATURE_HISTREAM
 /*****************************************************************************

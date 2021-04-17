@@ -237,9 +237,17 @@ typedef struct
 #ifdef _PRE_WLAN_FEATURE_ARP_OFFLOAD
 #define DMAC_MAX_IPV4_ENTRIES         8
 #define DMAC_MAX_IPV6_ENTRIES         8
+
+typedef union
+{
+    oal_uint32                    ul_value;
+    oal_uint8                     auc_value[OAL_IPV4_ADDR_SIZE];
+}un_ipv4_addr;
+
 typedef struct
 {
-    oal_uint8                         auc_ip_addr[OAL_IPV4_ADDR_SIZE];
+    un_ipv4_addr        un_local_ip;
+    un_ipv4_addr        un_mask;
 }dmac_vap_ipv4_addr_stru;
 
 typedef struct
@@ -264,6 +272,41 @@ typedef struct
 } dmac_vap_psta_stru;
 #define dmac_vap_psta_lut_idx(vap)   ((vap)->st_psta.uc_lut_idx)
 #endif
+
+#ifdef _PRE_WLAN_FEATURE_11K
+typedef struct mac_rrm_info_tag
+{
+    mac_action_rm_rpt_stru              *pst_rm_rpt_action;
+    mac_meas_rpt_ie_stru                *pst_meas_rpt_ie;           /* Measurement Report IE Addr */
+    mac_bcn_rpt_stru                    *pst_bcn_rpt_item;          /* Beacon Report Addr */
+    oal_netbuf_stru                     *pst_rm_rpt_mgmt_buf;       /* Report Frame Addr for Transfer */
+    mac_scan_req_stru                   *pst_scan_req;
+
+    oal_uint8                            uc_quiet_count;
+    oal_uint8                            uc_quiet_period;
+    oal_mac_quiet_state_uint8            en_quiet_state;
+    oal_uint8                            uc_link_dialog_token;
+
+    oal_uint8                            uc_ori_max_reg_pwr;
+    oal_uint8                            uc_local_pwr_constraint;
+    oal_uint8                            uc_ori_max_pwr_flush_flag;
+    oal_uint8                            uc_rsv;
+
+    oal_int8                             c_link_tx_pwr_used;
+    oal_int8                             c_link_max_tx_pwr;
+    oal_uint8                            auc_act_meas_start_time[8];
+    oal_uint16                           us_quiet_duration;
+
+    oal_uint16                           us_quiet_offset;
+    oal_uint16                           us_rm_rpt_action_len;      /* Report Frame Length for Transfer */
+
+    oal_dlist_head_stru                  st_meas_rpt_list;
+    mac_bcn_req_info_stru                st_bcn_req_info;
+    frw_timeout_stru                     st_quiet_timer;    /* quiet定时器，每次进入quiet时启动，quiet duration后超时处理退出quiet */
+    frw_timeout_stru                     st_offset_timer;   /* 最后一个tbtt中断开始时启动offset定时器，offset时间后超时处理进入quiet，并启动quiet定时器 */
+}mac_rrm_info_stru;
+
+#endif //_PRE_WLAN_FEATURE_11K
 
 #ifdef _PRE_WLAN_FEATURE_VOWIFI
 typedef struct
@@ -354,9 +397,41 @@ typedef struct dmac_vap_tag
     oal_netbuf_stru                 *pst_wow_probe_resp;                                /* wow使能时,准备的probe response帧*/
     oal_netbuf_stru                 *pst_wow_null_data;                                 /* wow使能时,准备的null data帧,STA模式时采用*/
     oal_uint16                       us_wow_probe_resp_len;
-    oal_uint8                        auc_resv2[1];
+
+#ifdef _PRE_WLAN_FEATURE_11K
+    oal_uint8                        bit_bcn_table_switch: 1;
+    oal_uint8                        bit_11k_enable      : 1;
+    oal_uint8                        bit_11v_enable      : 1;
+    oal_uint8                        bit_rsv1            : 5;
 #else
-    oal_uint8                        auc_resv3[11];
+    oal_uint8                        auc_resv2[1];
+#endif
+
+#ifdef _PRE_WLAN_FEATURE_11R
+    oal_uint8                        bit_11r_enable      : 1;
+    oal_uint8                        bit_rsv2            : 7;
+#else
+    oal_uint8                        auc_resv3[1];
+#endif
+
+#else
+
+#ifdef _PRE_WLAN_FEATURE_11K
+    oal_uint8                        bit_bcn_table_switch: 1;
+    oal_uint8                        bit_11k_enable      : 1;
+    oal_uint8                        bit_11v_enable      : 1;
+    oal_uint8                        bit_rsv3            : 5;
+
+#else
+    oal_uint8                        auc_resv4[11];
+#endif
+#ifdef _PRE_WLAN_FEATURE_11R
+    oal_uint8                        bit_11r_enable      : 1;
+    oal_uint8                        bit_rsv4            : 7;
+#else
+    oal_uint8                        auc_resv5[1];
+#endif
+
 #endif
 #ifdef _PRE_WLAN_FEATURE_PROXYSTA
     dmac_vap_psta_stru               st_psta;
@@ -419,7 +494,7 @@ typedef struct dmac_vap_tag
 #endif  //_PRE_WLAN_FEATURE_ROAM
 #ifdef _PRE_WLAN_FEATURE_11K
     mac_rrm_info_stru                  *pst_rrm_info;
-#endif
+#endif //_PRE_WLAN_FEATURE_11K
 #ifdef _PRE_WLAN_FEATURE_BTCOEX
     dmac_vap_btcoex_stru            st_dmac_vap_btcoex;
 #endif

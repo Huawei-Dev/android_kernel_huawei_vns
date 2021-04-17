@@ -1351,10 +1351,11 @@ typedef enum
 #ifdef _PRE_WLAN_FEATURE_11K
     WLAN_CFGID_SEND_NEIGHBOR_REQ            = 644,
     WLAN_CFGID_REQ_SAVE_BSS_INFO            = 645,
+    WLAN_CFGID_BCN_TABLE_SWITCH             = 646,
 #endif
-
+    WLAN_CFGID_VOE_ENABLE                   = 647,
 #if (_PRE_PRODUCT_ID == _PRE_PRODUCT_ID_HI1151)
-    WLAN_CFGID_SET_TXRX_CHAIN               = 646,          /* 设置收发通道 */
+    WLAN_CFGID_SET_TXRX_CHAIN               = 648,          /* 设置收发通道 */
 #endif
 
     WLAN_CFGID_VENDOR_CMD_GET_CHANNEL_LIST  = 650,          /* 1102 vendor cmd, 获取信道列表 */
@@ -1374,6 +1375,14 @@ typedef enum
     WLAN_CFGID_DELTS                        = 658,      /* 发送DELTS的配置命令 */
     WLAN_CFGID_REASSOC_REQ                  = 659,      /* 发送reassoc req 的配置命令*/
     WLAN_CFGID_WMMAC_SWITCH                 = 660,      /* 设置WMMAC SWITCH开关的配置命令 */
+#endif
+
+#ifdef _PRE_WLAN_FEATURE_IP_FILTER
+    WLAN_CFGID_IP_FILTER                  = 661,      /* 配置IP端口过滤的命令 */
+#endif //_PRE_WLAN_FEATURE_IP_FILTER
+
+#ifdef _PRE_WLAN_DOWNLOAD_PM
+    WLAN_CFGID_SET_CUS_DOWNLOAD_RATE_LIMIT,           /* 限流参数定制化 */
 #endif
 
     /************************************************************************

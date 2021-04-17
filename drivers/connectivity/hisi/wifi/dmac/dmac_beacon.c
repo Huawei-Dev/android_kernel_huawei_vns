@@ -1393,6 +1393,13 @@ OAL_STATIC void dmac_sta_tbtt_prior_linkloss_handler(dmac_vap_stru *pst_dmac_vap
     pst_dmac_vap->uc_beacon_miss_cnt++;
 #endif
 
+#ifdef _PRE_WLAN_DOWNLOAD_PM
+    if(g_us_download_rate_limit_pps)
+    {
+        return;
+    }
+#endif
+
     dmac_sta_tbtt_prior_linkloss_handler(pst_dmac_vap);
 
 #ifdef _PRE_WLAN_FEATURE_VOWIFI
@@ -2026,8 +2033,11 @@ oal_uint32  dmac_tbtt_event_handler(frw_event_mem_stru *pst_event_mem)
         }
 #endif
 #ifdef _PRE_WLAN_FEATURE_11K
-       dmac_rrm_handle_quiet(pst_dmac_vap);
-#endif
+        if (OAL_TRUE == pst_dmac_vap->bit_11k_enable)
+        {
+            dmac_rrm_handle_quiet(pst_dmac_vap);
+        }
+#endif //_PRE_WLAN_FEATURE_11K
     }
     /* 清除mac错误计数器，保证每一个tbtt间隙中，最多处理的错误数 */
     /* 当多vap时，会有误差，暂不处理误差*/
@@ -2723,6 +2733,7 @@ oal_uint32  dmac_sta_up_rx_beacon(
     dmac_rx_ctl_stru           *pst_rx_ctl;
     mac_rx_ctl_stru            *pst_rx_info;
     oal_uint8                  *puc_payload;
+    oal_uint8                   uc_frame_channel;
     oal_uint16                  us_ie_offset;
     oal_uint16                  us_msg_len;
     oal_uint32                  ul_change_flag = MAC_NO_CHANGE;
@@ -2750,7 +2761,18 @@ oal_uint32  dmac_sta_up_rx_beacon(
         return OAL_SUCC;
     }
 
-    dmac_vap_linkloss_clean(pst_dmac_vap);
+    /* BEGIN:DTS2017022700518:判断接收到的beacon 帧和本VAP 是相同信道，才清零linkloss 计数 */
+    /* 获取beacon 帧中的信道 */
+    uc_frame_channel = mac_ie_get_chan_num(puc_payload,
+                                            (us_msg_len - MAC_80211_FRAME_LEN),
+                                            MAC_TIME_STAMP_LEN + MAC_BEACON_INTERVAL_LEN + MAC_CAP_INFO_LEN,
+                                            pst_rx_ctl->st_rx_info.uc_channel_number);
+    if ((pst_mac_vap->st_channel.uc_chan_number == uc_frame_channel)
+        && (0 != uc_frame_channel))
+    {
+        dmac_vap_linkloss_clean(pst_dmac_vap);
+    }
+    /* END:DTS2017022700518:判断接收到的beacon 帧和本VAP 是相同信道，才清零linkloss 计数 */
 
     /* 成功接收到beacon, beacon timeout超时的计数清零 */
     pst_dmac_vap->bit_beacon_timeout_times = 0;

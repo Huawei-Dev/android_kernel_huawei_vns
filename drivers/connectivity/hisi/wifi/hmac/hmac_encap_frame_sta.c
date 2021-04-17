@@ -51,6 +51,37 @@ extern "C" {
   3 函数实现
 *****************************************************************************/
 /*****************************************************************************
+ 函 数 名  : hmac_sta_check_need_set_ext_cap_ie
+ 功能描述  : 判断是否需要在assoc req 中包含Extended Capability IE
+ 输入参数  : pst_mac_vap: 指向vap
+ 输出参数  : 无
+ 返 回 值  : OAL_TRUE    需要包含Extended Capability IE
+             OAL_FALSE 不需要包含Extended Capability IE
+ 调用函数  :
+ 被调函数  :
+
+ 修改历史      :
+  1.日    期   : 2017年8月18日
+    作    者   : duankaiyong 00194999
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+OAL_STATIC oal_bool_enum hmac_sta_check_need_set_ext_cap_ie(mac_vap_stru *pst_mac_vap)
+{
+    oal_uint8       *puc_ext_cap_ie;
+    oal_uint16       us_ext_cap_index;
+
+    puc_ext_cap_ie = hmac_sta_find_ie_in_probe_rsp(pst_mac_vap, MAC_EID_EXT_CAPS, &us_ext_cap_index);
+    if (OAL_PTR_NULL == puc_ext_cap_ie)
+    {
+        return OAL_FALSE;
+    }
+
+    return OAL_TRUE;
+}
+
+
+/*****************************************************************************
  函 数 名  : mac_set_supported_rates_ie
  功能描述  : 设置速率集
  输入参数  : pst_hmac_sta: 指向vap
@@ -175,10 +206,6 @@ oal_uint32 hmac_mgmt_encap_asoc_req_sta(hmac_vap_stru *pst_hmac_sta, oal_uint8 *
 
 #ifdef _PRE_WLAN_FEATURE_TXBF
     mac_txbf_cap_stru *pst_txbf_cap;
-#endif
-
-#ifdef _PRE_WLAN_FEATURE_11K
-        mac_cap_info_stru   *pst_user_cap_info;
 #endif
 
 #ifdef _PRE_WLAN_FEATURE_11R
@@ -361,18 +388,20 @@ oal_uint32 hmac_mgmt_encap_asoc_req_sta(hmac_vap_stru *pst_hmac_sta, oal_uint8 *
     puc_req_frame += uc_ie_len;
 
 #ifdef _PRE_WLAN_FEATURE_11K
-        pst_user_cap_info = (mac_cap_info_stru *)(&(pst_mac_vap->us_assoc_user_cap_info));
-
-        if (OAL_TRUE == pst_user_cap_info->bit_radio_measurement)
-        {
-            mac_set_rrm_enabled_cap_field((oal_void *)pst_mac_vap, puc_req_frame, &uc_ie_len);
-            puc_req_frame += uc_ie_len;
-        }
-#endif
+    if (OAL_TRUE == pst_hmac_sta->bit_11k_enable)
+    {
+        mac_set_rrm_enabled_cap_field((oal_void *)pst_mac_vap, puc_req_frame, &uc_ie_len);
+        puc_req_frame += uc_ie_len;
+    }
+#endif //_PRE_WLAN_FEATURE_11K
 
     /* 设置 Extended Capability IE */
-    mac_set_ext_capabilities_ie((oal_void *)pst_mac_vap, puc_req_frame, &uc_ie_len);
-    puc_req_frame += uc_ie_len;
+    /* DTS2017081707172: 如果AP 不包含Extended Capability IE，则在assoc req 中不包含该IE */
+    if (hmac_sta_check_need_set_ext_cap_ie(pst_mac_vap) == OAL_TRUE)
+    {
+        mac_set_ext_capabilities_ie((oal_void *)pst_mac_vap, puc_req_frame, &uc_ie_len);
+        puc_req_frame += uc_ie_len;
+    }
 
     /* 设置 VHT Capability IE */
     mac_set_vht_capabilities_ie((oal_void *) pst_mac_vap, puc_req_frame, &uc_ie_len);
@@ -385,26 +414,30 @@ oal_uint32 hmac_mgmt_encap_asoc_req_sta(hmac_vap_stru *pst_hmac_sta, oal_uint8 *
 #endif
 
 #ifdef _PRE_WLAN_FEATURE_11R
-    mac_set_md_ie((oal_void *)pst_mac_vap, puc_req_frame, &uc_ie_len);
-    puc_req_frame += uc_ie_len;
-
-    /* Reasoc中包含RIC-Req */
-    if (pst_hmac_sta->bit_reassoc_flag)
+    if (OAL_TRUE == pst_hmac_sta->bit_11r_enable)
     {
-        for (en_aci = WLAN_WME_AC_BE; en_aci < WLAN_WME_AC_BUTT; en_aci++)
-        {
-            if (pst_mac_vap->pst_mib_info->st_wlan_mib_qap_edac[en_aci].en_dot11QAPEDCATableMandatory)
-            {
-                en_target_ac = en_aci;
-                uc_tid = WLAN_WME_AC_TO_TID(en_target_ac);
-                mac_set_rde_ie(pst_mac_vap,puc_req_frame, &uc_ie_len);
-                puc_req_frame += uc_ie_len;
+        mac_set_md_ie((oal_void *)pst_mac_vap, puc_req_frame, &uc_ie_len);
+        puc_req_frame += uc_ie_len;
 
-                mac_set_tspec_ie(pst_mac_vap, puc_req_frame, &uc_ie_len, uc_tid);
-                puc_req_frame += uc_ie_len;
+        /* Reasoc中包含RIC-Req */
+        if (pst_hmac_sta->bit_reassoc_flag)
+        {
+            for (en_aci = WLAN_WME_AC_BE; en_aci < WLAN_WME_AC_BUTT; en_aci++)
+            {
+                if (pst_mac_vap->pst_mib_info->st_wlan_mib_qap_edac[en_aci].en_dot11QAPEDCATableMandatory)
+                {
+                    en_target_ac = en_aci;
+                    uc_tid = WLAN_WME_AC_TO_TID(en_target_ac);
+                    mac_set_rde_ie((oal_void *)pst_mac_vap,puc_req_frame, &uc_ie_len);
+                    puc_req_frame += uc_ie_len;
+
+                    mac_set_tspec_ie((oal_void *)pst_mac_vap, puc_req_frame, &uc_ie_len, uc_tid);
+                    puc_req_frame += uc_ie_len;
+                }
             }
         }
     }
+
 #endif //_PRE_WLAN_FEATURE_11R
 
     en_app_ie_type = OAL_APP_ASSOC_REQ_IE;
@@ -414,10 +447,14 @@ oal_uint32 hmac_mgmt_encap_asoc_req_sta(hmac_vap_stru *pst_hmac_sta, oal_uint8 *
     {
         en_app_ie_type = OAL_APP_REASSOC_REQ_IE;
 #ifdef _PRE_WLAN_FEATURE_11R
-        if (OAL_TRUE == pst_mac_vap->pst_mib_info->st_wlan_mib_fast_bss_trans_cfg.en_dot11FastBSSTransitionActivated)
+        if(OAL_TRUE == pst_hmac_sta->bit_11r_enable)
         {
-            en_app_ie_type = OAL_APP_FT_IE;
+            if (OAL_TRUE == pst_mac_vap->pst_mib_info->st_wlan_mib_fast_bss_trans_cfg.en_dot11FastBSSTransitionActivated)
+            {
+                en_app_ie_type = OAL_APP_FT_IE;
+            }
         }
+
 #endif //_PRE_WLAN_FEATURE_11R
     }
 #endif //_PRE_WLAN_FEATURE_ROAM
@@ -531,17 +568,22 @@ oal_uint16  hmac_mgmt_encap_auth_req(hmac_vap_stru *pst_hmac_sta, oal_uint8 *puc
                    MAC_STATUS_CODE_LEN;
 
 #ifdef _PRE_WLAN_FEATURE_11R
-    if (OAL_TRUE == pst_hmac_sta->st_vap_base_info.pst_mib_info->st_wlan_mib_fast_bss_trans_cfg.en_dot11FastBSSTransitionActivated)
+    if(OAL_TRUE == pst_hmac_sta->bit_11r_enable)
     {
-        /* FT System */
-        puc_mgmt_frame[MAC_80211_FRAME_LEN]     = 0x02;
-        puc_mgmt_frame[MAC_80211_FRAME_LEN + 1] = 0x00;
-        puc_mgmt_frame       += us_auth_req_len;
+        if ((OAL_TRUE == pst_hmac_sta->st_vap_base_info.pst_mib_info->st_wlan_mib_fast_bss_trans_cfg.en_dot11FastBSSTransitionActivated)
+             && (MAC_VAP_STATE_ROAMING == pst_hmac_sta->st_vap_base_info.en_vap_state))
+        {
+            /* FT System */
+            puc_mgmt_frame[MAC_80211_FRAME_LEN] = 0x02;
+            puc_mgmt_frame[MAC_80211_FRAME_LEN + 1] = 0x00;
+            puc_mgmt_frame += us_auth_req_len;
 
-        mac_add_app_ie((oal_void *)&pst_hmac_sta->st_vap_base_info, puc_mgmt_frame, &us_app_ie_len, OAL_APP_FT_IE);
-        us_auth_req_len      += us_app_ie_len;
-        puc_mgmt_frame       += us_app_ie_len;
+            mac_add_app_ie((oal_void *)&pst_hmac_sta->st_vap_base_info, puc_mgmt_frame, &us_app_ie_len, OAL_APP_FT_IE);
+            us_auth_req_len += us_app_ie_len;
+            puc_mgmt_frame += us_app_ie_len;
+        }
     }
+
 #endif //_PRE_WLAN_FEATURE_11R
 
     pst_user_ap = (hmac_user_stru *)mac_res_get_hmac_user((oal_uint16)pst_hmac_sta->st_vap_base_info.uc_assoc_vap_id);

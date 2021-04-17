@@ -20,6 +20,15 @@ config CONNECTIVITY_HI110X_HI3650
 config CONNECTIVITY_HI110X_HI3660
 	bool "Connectivity diff between 3660 with 6250"
 	default n
+config CONNECTIVITY_HI110X_KIRIN660
+	bool "Connectivity diff between 660 with 3650"
+	default n
+config CONNECTIVITY_HI110X_KIRIN970
+	bool "Connectivity diff between 970 with 6250"
+	default n
+config CONNECTIVITY_HI110X_KIRIN980
+	bool "Connectivity diff between 980 with 6250"
+	default n
 
 source "drivers/connectivity/hisi/Kconfig"
 source "drivers/connectivity/hisi/platform/Kconfig"

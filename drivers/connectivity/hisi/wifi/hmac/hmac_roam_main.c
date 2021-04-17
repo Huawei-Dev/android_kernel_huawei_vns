@@ -226,7 +226,6 @@ OAL_STATIC oal_uint32 hmac_roam_renew_privacy(hmac_vap_stru *pst_hmac_vap, mac_b
     oal_uint8                           uc_wpa_version;
     oal_uint8                           uc_rsn_grp_policy;
     oal_uint8                          *puc_pairwise_policy;
-    oal_uint8                          *puc_auth_policy;
     oal_uint8                           uc_idx;
 
     pst_cap_info = (mac_cap_info_stru *)&pst_bss_dscr->us_cap_info;
@@ -251,14 +250,12 @@ OAL_STATIC oal_uint32 hmac_roam_renew_privacy(hmac_vap_stru *pst_hmac_vap, mac_b
         uc_wpa_version       = WITP_WPA_VERSION_2;
         uc_rsn_grp_policy    = pst_bss_dscr->st_bss_sec_info.uc_rsn_grp_policy;
         puc_pairwise_policy  = pst_bss_dscr->st_bss_sec_info.auc_rsn_pairwise_policy;
-        puc_auth_policy      = pst_bss_dscr->st_bss_sec_info.auc_rsn_auth_policy;
     }
     else
     {
         uc_wpa_version       = WITP_WPA_VERSION_1;
         uc_rsn_grp_policy    = pst_bss_dscr->st_bss_sec_info.uc_wpa_grp_policy;
         puc_pairwise_policy  = pst_bss_dscr->st_bss_sec_info.auc_wpa_pairwise_policy;
-        puc_auth_policy      = pst_bss_dscr->st_bss_sec_info.auc_wpa_auth_policy;
     }
 
     st_conn_sec.en_privacy                    = OAL_TRUE;
@@ -273,17 +270,9 @@ OAL_STATIC oal_uint32 hmac_roam_renew_privacy(hmac_vap_stru *pst_hmac_vap, mac_b
         st_conn_sec.st_crypto.ciphers_pairwise[uc_idx] = puc_pairwise_policy[uc_idx];
     }
     st_conn_sec.st_crypto.n_ciphers_pairwise = uc_idx;
+    st_conn_sec.st_crypto.akm_suites[0] = pst_hmac_vap->st_vap_base_info.pst_mib_info->ast_wlan_mib_rsna_cfg_auth_suite[0].uc_dot11RSNAConfigAuthenticationSuiteImplemented;
 
-    for (uc_idx = 0; uc_idx < MAC_AUTHENTICATION_SUITE_NUM; uc_idx++)
-    {
-        if (0xff == puc_auth_policy[uc_idx])
-        {
-            break;
-        }
-        st_conn_sec.st_crypto.akm_suites[uc_idx] = puc_auth_policy[uc_idx];
-    }
-    st_conn_sec.st_crypto.n_akm_suites = uc_idx;
-
+    st_conn_sec.st_crypto.n_akm_suites = 1;
     ul_ret = mac_vap_init_privacy(&pst_hmac_vap->st_vap_base_info, &st_conn_sec);
     if (OAL_SUCC != ul_ret)
     {
@@ -751,7 +740,7 @@ oal_uint32 hmac_roam_band(hmac_vap_stru *pst_hmac_vap, oal_uint8 uc_scan_band)
     修改内容   : 新生成函数
 
 *****************************************************************************/
-oal_uint32 hmac_roam_start(hmac_vap_stru *pst_hmac_vap)
+oal_uint32 hmac_roam_start(hmac_vap_stru *pst_hmac_vap,oal_bool_enum_uint8  en_no_scan)
 {
     oal_uint32             ul_ret;
     hmac_roam_info_stru   *pst_roam_info;
@@ -777,11 +766,25 @@ oal_uint32 hmac_roam_start(hmac_vap_stru *pst_hmac_vap)
 
     hmac_roam_alg_init(pst_roam_info, ROAM_RSSI_CMD_TYPE);
 
-    ul_ret = hmac_roam_main_fsm_action(pst_roam_info, ROAM_MAIN_FSM_EVENT_START, OAL_PTR_NULL);
-    if (OAL_SUCC != ul_ret)
+    /* 触发漫游是否搭配扫描true表示不扫描 */
+    if (OAL_TRUE == en_no_scan)
     {
-        OAM_ERROR_LOG1(pst_hmac_vap->st_vap_base_info.uc_vap_id, OAM_SF_ROAM, "{hmac_roam_start::START fail[%d].}", ul_ret);
-        return ul_ret;
+        hmac_roam_main_change_state(pst_roam_info, ROAM_MAIN_STATE_SCANING);
+        ul_ret = hmac_roam_main_fsm_action(pst_roam_info, ROAM_MAIN_FSM_EVENT_TIMEOUT, OAL_PTR_NULL);
+        if (OAL_SUCC != ul_ret)
+        {
+            OAM_ERROR_LOG1(pst_hmac_vap->st_vap_base_info.uc_vap_id, OAM_SF_ROAM, "{hmac_roam_start::START fail[%d].}", ul_ret);
+            return ul_ret;
+        }
+    }
+    else
+    {
+        ul_ret = hmac_roam_main_fsm_action(pst_roam_info, ROAM_MAIN_FSM_EVENT_START, OAL_PTR_NULL);
+        if (OAL_SUCC != ul_ret)
+        {
+            OAM_ERROR_LOG1(pst_hmac_vap->st_vap_base_info.uc_vap_id, OAM_SF_ROAM, "{hmac_roam_start::START fail[%d].}", ul_ret);
+            return ul_ret;
+        }
     }
     OAM_INFO_LOG0(pst_hmac_vap->st_vap_base_info.uc_vap_id, OAM_SF_ROAM, "{hmac_roam_start::START succ.}");
     return OAL_SUCC;
@@ -1021,7 +1024,6 @@ OAL_STATIC oal_uint32  hmac_roam_scan_channel(hmac_roam_info_stru *pst_roam_info
     if (OAL_SUCC != ul_ret)
     {
         OAM_WARNING_LOG0(0, OAM_SF_ROAM, "{hmac_roam_scan_channel::start scan failed!}");
-        return ul_ret;
     }
 
     /* 启动扫描超时定时器 */
@@ -1450,7 +1452,7 @@ OAL_STATIC oal_uint32  hmac_roam_scan_timeout(hmac_roam_info_stru *pst_roam_info
         return ul_ret;
     }
 
-    hmac_roam_main_clear(pst_roam_info);
+    hmac_roam_scan_complete(pst_roam_info->pst_hmac_vap);
     return OAL_SUCC;
 }
 

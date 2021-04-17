@@ -332,7 +332,14 @@ typedef struct hmac_vap_tag
     oal_uint8                       bit_sta_protocol_cfg    :   1;
 	oal_uint8                       bit_protocol_fall       :   1;              /* 降协议标志位 */
     oal_uint8                       bit_reassoc_flag        :   1;             /* 关联过程中判断是否为重关联动作 */
+#ifdef _PRE_WLAN_FEATURE_11K
+    oal_uint8                       bit_11k_enable          :   1;
+    oal_uint8                       bit_11v_enable          :   1;
+    oal_uint8                       bit_11r_enable          :   1;
+    oal_uint8                       bit_resv                :   2;
+#else
     oal_uint8                       bit_resv                :   5;
+#endif //_PRE_WLAN_FEATURE_11K
     oal_int8                        ac_desired_country[3];                      /* 要加入的AP的国家字符串，前两个字节为国家字母，第三个为\0 */
     oal_uint32                      ul_asoc_req_ie_len;
     oal_uint8                      *puc_asoc_req_ie_buff;

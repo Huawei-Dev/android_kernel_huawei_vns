@@ -334,6 +334,7 @@ extern oal_uint32 wal_del_p2p_group(mac_device_stru *pst_mac_device);
 extern oal_uint32 wal_cfg80211_add_vap(mac_cfg_add_vap_param_stru *pst_add_vap_param);
 
 extern oal_void wal_cfg80211_reset_bands(oal_void);
+extern oal_void wal_cfg80211_save_bands(oal_void);
 
 #ifdef __cplusplus
     #if __cplusplus

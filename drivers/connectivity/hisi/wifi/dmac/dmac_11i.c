@@ -730,6 +730,8 @@ OAL_STATIC oal_uint32  dmac_11i_del_ptk_key(mac_vap_stru *pst_mac_vap, oal_uint8
 
     /*4.1 关闭1X端口认证状态*/
     mac_user_set_port(&pst_current_dmac_user->st_user_base_info, OAL_FALSE);
+    /* 初始化用户的密钥信息 */
+    mac_user_init_key(&pst_current_dmac_user->st_user_base_info);
 
     /*5.1 关闭发送描述符的加密属性*/
     pst_current_dmac_user->st_user_base_info.st_user_tx_info.st_security.en_cipher_key_type = HAL_KEY_TYPE_BUTT;
@@ -799,8 +801,7 @@ OAL_STATIC oal_uint32  dmac_11i_del_gtk_key(mac_vap_stru *pst_mac_vap, oal_uint8
 
     /*4.1 关闭1X端口认证状态*/
     mac_user_set_port(pst_current_mac_user, OAL_FALSE);
-    pst_current_mac_user->st_key_info.uc_last_gtk_key_idx = 0xFF;
-    pst_current_mac_user->st_key_info.bit_gtk = 0;
+    mac_user_init_key(pst_current_mac_user);
 
     /*5.1 关闭发送描述符的加密属性*/
     if (HAL_KEY_TYPE_TX_GTK == en_key_type)
@@ -1042,6 +1043,7 @@ oal_uint32  dmac_config_11i_add_key(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len,
     oal_uint8                        uc_key_index;
 #if (_PRE_MULTI_CORE_MODE_OFFLOAD_DMAC == _PRE_MULTI_CORE_MODE)
     mac_user_stru                   *pst_mac_user;
+    dmac_user_stru                  *pst_dmac_user;
     mac_key_params_stru             *pst_key;
     oal_uint16                       us_user_idx;
 #endif
@@ -1098,6 +1100,13 @@ oal_uint32  dmac_config_11i_add_key(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len,
         return OAL_ERR_CODE_SECURITY_USER_INVAILD;
     }
 
+    pst_dmac_user = (dmac_user_stru *)mac_res_get_dmac_user(us_user_idx);
+    if (pst_dmac_user == OAL_PTR_NULL)
+    {
+        OAM_ERROR_LOG1(pst_mac_vap->uc_vap_id, OAM_SF_WPA, "{dmac_config_11i_add_key::get_dmac_user null.user_idx [%d]}", us_user_idx);
+        return OAL_ERR_CODE_SECURITY_USER_INVAILD;
+    }
+
     /*3.1 将加密属性更新到用户中*/
     ul_ret = mac_vap_add_key(pst_mac_vap, pst_mac_user, uc_key_index, pst_key);
     if (OAL_SUCC != ul_ret)
@@ -1118,6 +1127,23 @@ oal_uint32  dmac_config_11i_add_key(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len,
     {
         puc_mac_addr = OAL_PTR_NULL;
     }
+#if (_PRE_MULTI_CORE_MODE_OFFLOAD_DMAC == _PRE_MULTI_CORE_MODE)
+    else
+    {
+        pst_dmac_user->bit_ptk_need_install = OAL_TRUE;
+
+        if (pst_dmac_user->bit_is_rx_eapol_key_open == OAL_FALSE
+            && pst_dmac_user->bit_eapol_key_4_4_tx_succ == OAL_FALSE)
+        {
+            pst_dmac_user->bit_ptk_key_idx = uc_key_index;
+            OAM_WARNING_LOG2(pst_mac_vap->uc_vap_id, OAM_SF_WPA,
+                            "{dmac_config_11i_add_key::delay to add ptk key.user id %d, key_idx %d}",
+                            us_user_idx,
+                            uc_key_index);
+            return OAL_SUCC;
+        }
+    }
+#endif
 
     /* 设置硬件寄存器 */
     ul_ret = dmac_config_11i_add_key_set_reg(pst_mac_vap, uc_key_index, puc_mac_addr);
@@ -1127,6 +1153,14 @@ oal_uint32  dmac_config_11i_add_key(mac_vap_stru *pst_mac_vap, oal_uint8 uc_len,
         return ul_ret;
     }
 
+#if (_PRE_MULTI_CORE_MODE_OFFLOAD_DMAC == _PRE_MULTI_CORE_MODE)
+    if (OAL_TRUE == pst_payload_addkey_params->en_pairwise)
+    {
+        pst_dmac_user->bit_ptk_need_install      = OAL_FALSE;
+        pst_dmac_user->bit_eapol_key_4_4_tx_succ = OAL_FALSE;
+        pst_dmac_user->bit_ptk_key_idx           = 0;
+    }
+#endif
     return OAL_SUCC;
 }
 

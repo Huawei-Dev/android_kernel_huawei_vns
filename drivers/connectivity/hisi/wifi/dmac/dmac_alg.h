@@ -155,6 +155,8 @@ typedef struct
     p_alg_get_ant_info_notify_func          p_cfg_get_ant_info_notify_func;
     p_alg_double_ant_switch_notify_func     p_cfg_double_ant_switch_notify_func;
 #endif
+
+    p_alg_get_mgmt_tx_pow_notify_func       p_get_mgmt_tx_pow_notify_func;
 }dmac_alg_stru;
 
 
@@ -1000,7 +1002,7 @@ extern oal_uint32 dmac_edca_opt_stat_event_process(frw_event_mem_stru *pst_event
 #ifdef _PRE_WLAN_FEATURE_ANTI_INTERF
 extern oal_uint32 dmac_alg_anti_intf_switch(mac_device_stru *pst_device, oal_uint8 uc_alg_enable);
 #endif
-
+extern oal_uint32  dmac_alg_get_mgmt_tx_pow(mac_user_stru *pst_user, wlan_channel_band_enum_uint8 en_freq_band,oal_uint8 *puc_tx_pow);
 
 #ifdef __cplusplus
     #if __cplusplus

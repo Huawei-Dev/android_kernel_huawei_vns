@@ -78,12 +78,14 @@ extern "C" {
 /*****************************************************************************
   10 º¯ÊýÉùÃ÷
 *****************************************************************************/
+
 extern oal_uint32  frw_timer_timeout_proc(frw_event_mem_stru *pst_timeout_event);
 extern oal_void  frw_timer_init(oal_uint32 ul_delay, oal_timer_func p_func, oal_uint ui_arg);
 extern oal_void  frw_timer_exit(oal_void);
 extern oal_void  frw_timer_timeout_proc_event(oal_uint ui_arg);
 extern oal_void  frw_timer_restart(oal_void);
 extern oal_void  frw_timer_stop(oal_void);
+
 
 
 #ifdef __cplusplus

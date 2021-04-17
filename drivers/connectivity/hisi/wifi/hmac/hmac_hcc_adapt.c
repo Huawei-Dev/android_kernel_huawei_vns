@@ -46,8 +46,12 @@ OAL_STATIC oal_uint8  g_hcc_flowctrl_stat[FRW_EVENT_TYPE_BUTT];
 OAL_STATIC oal_uint32  g_hcc_sched_event_pkts[FRW_EVENT_TYPE_BUTT]={0};
 OAL_STATIC oal_uint8  g_wlan_queue_to_dmac_queue[WLAN_NET_QUEUE_BUTT];
 
+#ifdef _PRE_WLAN_WAKEUP_SRC_PARSE
 extern oal_uint32 g_ul_pm_wakeup_event;
 oal_uint32  g_ul_print_wakeup_mgmt = OAL_FALSE;
+oal_uint8   g_uc_print_data_wakeup = OAL_FALSE;
+#endif
+
 
 extern oal_uint32 hmac_hcc_tx_netbuf(frw_event_mem_stru * pst_hcc_event_mem,
                                     oal_netbuf_stru *pst_netbuf,oal_uint32 ul_hdr_len,
@@ -325,6 +329,13 @@ oal_void hmac_adjust_netbuf_data(oal_netbuf_stru *pst_netbuf, mac_tx_ctl_stru *p
     }
 }
 
+#ifdef _PRE_WLAN_WAKEUP_SRC_PARSE
+oal_void hmac_print_data_wakeup_en(oal_bool_enum_uint8 uc_en)
+{
+    g_uc_print_data_wakeup = uc_en;
+}
+#endif
+
 /*****************************************************************************
  函 数 名  : hmac_hcc_tx_netbuf_auto
  功能描述  :
@@ -374,6 +385,15 @@ oal_uint32 hmac_hcc_tx_netbuf_auto(frw_event_mem_stru * pst_hcc_event_mem,
         }
     }
 #endif
+
+#ifdef _PRE_WLAN_WAKEUP_SRC_PARSE
+    if(OAL_TRUE == g_uc_print_data_wakeup)
+    {
+        OAM_WARNING_LOG2(0, OAM_SF_ANY, "{hmac_hcc_tx_netbuf_auto::Host wkup dev event[%d],subtype[%d]}",en_type,pst_event_hdr->uc_sub_type);
+        g_uc_print_data_wakeup = OAL_FALSE;
+    }
+#endif
+
     return hmac_hcc_tx_netbuf(pst_hcc_event_mem,pst_netbuf,ul_hdr_len,fc_type,queue_id);
 }
 
@@ -1401,7 +1421,38 @@ oal_uint32   hmac_send_cali_data_tx_adapt(frw_event_mem_stru *pst_event_mem)
     //OAL_IO_PRINT("hmac_send_cali_data_tx_adapt : pst_dmac_tx_event->us_frame_len %d\r\n", pst_dmac_tx_event->us_frame_len);
     return hmac_hcc_tx_event_buf_to_netbuf(pst_event_mem, (oal_uint8*)OAL_NETBUF_DATA(pst_dmac_tx_event->pst_netbuf), pst_dmac_tx_event->us_frame_len);
 }
+#ifdef _PRE_WLAN_FEATURE_IP_FILTER
+/*****************************************************************************
+ 函 数 名  : hmac_config_update_ip_filter_tx_adapt
+ 功能描述  : rx ip包过滤功能参数配置流程的hmac侧适配函数
+ 输入参数  : frw_event_mem_stru *pst_event_mem
+ 输出参数  : 无
+ 返 回 值  : oal_uint32
+ 调用函数  :
+ 被调函数  :
 
+ 修改历史      :
+  1.日    期   : 2017年4月18日
+    作    者   : z00273164
+    修改内容   : 新生成函数
+
+*****************************************************************************/
+oal_uint32 hmac_config_update_ip_filter_tx_adapt(frw_event_mem_stru *pst_event_mem)
+{
+    dmac_tx_event_stru          *pst_dmac_tx_event;
+
+    if(OAL_PTR_NULL == pst_event_mem)
+    {
+        OAM_ERROR_LOG0(0, OAM_SF_ANY, "{hmac_config_update_ip_filter_tx_adapt:: pst_event_mem null.}");
+        return OAL_ERR_CODE_PTR_NULL;
+    }
+
+    pst_dmac_tx_event = (dmac_tx_event_stru *)frw_get_event_payload(pst_event_mem);
+    return hmac_hcc_tx_event_buf_to_netbuf(pst_event_mem, (oal_uint8*)OAL_NETBUF_DATA(pst_dmac_tx_event->pst_netbuf), pst_dmac_tx_event->us_frame_len);
+
+}
+
+#endif //_PRE_WLAN_FEATURE_IP_FILTER
 /*****************************************************************************
  函 数 名  : hmac_scan_proc_sched_scan_req_event_tx_adapt
  功能描述  : 通过SDIO下发PNO调度扫描配置前的适配函数
@@ -1507,12 +1558,6 @@ oal_uint32 hmac_proc_join_set_dtim_reg_event_tx_adapt(frw_event_mem_stru *pst_ev
     return hmac_hcc_tx_event_payload_to_netbuf(pst_event_mem, OAL_SIZEOF(dmac_ctx_set_dtim_tsf_reg_stru));
 }
 
-#ifdef _PRE_WLAN_FEATRUE_11K
-oal_uint32 hmac_proc_rpt_bss_info_tx_adapt(frw_event_mem_stru *pst_event_mem)
-{
-    return hmac_hcc_tx_event_payload_to_netbuf(pst_event_mem, OAL_SIZEOF(mac_vap_rrm_trans_bss_info_stru));
-}
-#endif
 /*****************************************************************************
  函 数 名  : hmac_hcc_tx_convert_event_to_netbuf_uint32
  功能描述  : hmac 将event 转换为 netbuf,在dmac 将netbuf还原为event,event的payload长度为4B
@@ -1750,6 +1795,7 @@ oal_int32 hmac_rx_wifi_post_action_function(oal_uint8 stype,
     frw_event_task_unlock();
 #endif
 
+#ifdef _PRE_WLAN_WAKEUP_SRC_PARSE
     if(OAL_TRUE == g_ul_pm_wakeup_event)
     {
         g_ul_pm_wakeup_event = OAL_FALSE;
@@ -1758,6 +1804,8 @@ oal_int32 hmac_rx_wifi_post_action_function(oal_uint8 stype,
           g_ul_print_wakeup_mgmt = OAL_TRUE;
         }
     }
+#endif
+
 
     pst_event_mem = FRW_EVENT_ALLOC(OAL_SIZEOF(hcc_event_stru));
     if (NULL == pst_event_mem)
@@ -1827,6 +1875,14 @@ oal_int32 hmac_hcc_adapt_init(oal_void)
     hcc_rx_register(hcc_get_default_handler(), HCC_ACTION_TYPE_WIFI, hmac_rx_wifi_post_action_function, NULL);
 #ifdef _PRE_CONFIG_HISI_PANIC_DUMP_SUPPORT
     hwifi_panic_log_register(&hmac_panic_hcc_adapt,NULL);
+#endif
+    return OAL_SUCC;
+}
+oal_int32 hmac_hcc_adapt_deinit(oal_void)
+{
+    hcc_rx_unregister(hcc_get_default_handler(), HCC_ACTION_TYPE_WIFI);
+#ifdef _PRE_CONFIG_HISI_PANIC_DUMP_SUPPORT
+    hwifi_panic_log_unregister(&hmac_panic_hcc_adapt);
 #endif
     return OAL_SUCC;
 }

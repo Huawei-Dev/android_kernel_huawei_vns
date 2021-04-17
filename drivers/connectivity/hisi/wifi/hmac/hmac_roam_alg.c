@@ -37,6 +37,7 @@ extern "C" {
 #include "hmac_sme_sta.h"
 #include "hmac_resource.h"
 #include "hmac_device.h"
+#include "hmac_scan.h"
 #include "hmac_roam_main.h"
 #include "hmac_roam_connect.h"
 #include "hmac_roam_alg.h"
@@ -800,6 +801,12 @@ oal_uint32 hmac_roam_alg_bss_check(hmac_roam_info_stru *pst_roam_info, mac_bss_d
         return OAL_SUCC;
     }
     pst_roam_alg = &(pst_roam_info->st_alg);
+
+    /* 挑选HMAC_SCAN_MAX_VALID_SCANNED_BSS_EXPIRE时间以内的有效bss */
+    if (oal_time_after((oal_uint32)OAL_TIME_GET_STAMP_MS(),(pst_bss_dscr->ul_timestamp + HMAC_SCAN_MAX_VALID_SCANNED_BSS_EXPIRE)))
+    {
+        return OAL_SUCC;
+    }
 
     /* 检查黑名单 */
     ul_ret = hmac_roam_alg_find_in_blacklist(pst_roam_info, pst_bss_dscr->auc_bssid);

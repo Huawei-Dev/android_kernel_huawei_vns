@@ -135,10 +135,13 @@ oal_void dmac_uapsd_trigger_sp_sta(dmac_vap_stru *pst_dmac_vap)
 *****************************************************************************/
 oal_void dmac_uapsd_rx_process_data_sta(dmac_vap_stru *pst_dmac_vap, oal_netbuf_stru *pst_netbuf)
 {
-    oal_uint8                   uc_tid;
-    mac_tx_ctl_stru             *pst_ctl;
+    oal_uint8                    uc_tid;
     mac_sta_pm_handler_stru     *pst_mac_sta_pm_handle;
     mac_ieee80211_frame_stru    *pst_frame_hdr;
+    oal_uint8                    uc_subtype;
+    oal_bool_enum_uint8          en_is_4addr;
+    oal_uint8                    uc_is_tods;
+    oal_uint8                    uc_is_from_ds;
 
     pst_mac_sta_pm_handle = (mac_sta_pm_handler_stru *)(pst_dmac_vap->pst_pm_handler);
     if (OAL_PTR_NULL == pst_mac_sta_pm_handle)
@@ -148,8 +151,20 @@ oal_void dmac_uapsd_rx_process_data_sta(dmac_vap_stru *pst_dmac_vap, oal_netbuf_
     }
 
     pst_frame_hdr = (mac_ieee80211_frame_stru *)OAL_NETBUF_HEADER(pst_netbuf);
-    pst_ctl = (mac_tx_ctl_stru *)oal_netbuf_cb(pst_netbuf);
-    uc_tid = mac_get_cb_tid(pst_ctl);
+
+    uc_subtype = mac_get_frame_sub_type((oal_uint8 *)pst_frame_hdr);
+
+    if ((uc_subtype != (WLAN_FC0_SUBTYPE_QOS | WLAN_FC0_TYPE_DATA))
+            && (uc_subtype != (WLAN_FC0_SUBTYPE_QOS_NULL | WLAN_FC0_TYPE_DATA)))
+    {
+        return;
+    }
+
+    /* 考虑四地址情况获取报文的tid */
+    uc_is_tods    = mac_hdr_get_to_ds((oal_uint8 *)pst_frame_hdr);
+    uc_is_from_ds = mac_hdr_get_from_ds((oal_uint8 *)pst_frame_hdr);
+    en_is_4addr   = uc_is_tods && uc_is_from_ds;
+    uc_tid = mac_get_tid_value((oal_uint8 *)pst_frame_hdr, en_is_4addr);
 
     /* Received frames are processed only for delivery enabled ACs */
    if(OAL_TRUE == dmac_is_delivery_enabled(pst_dmac_vap, uc_tid))
@@ -228,7 +243,7 @@ oal_uint8 dmac_uapsd_tx_process_data_sta(dmac_vap_stru *pst_dmac_vap, mac_tx_ctl
     /* service period. This is done during transmit complete processing.     */
     /* The power save state is STA_DOZE so that the AP continues to buffer   */
     /* packets for this STA                                                  */
-    if(OAL_TRUE == dmac_is_ap_uapsd_capable(pst_dmac_vap))
+    if(OAL_TRUE == dmac_is_uapsd_capable(pst_dmac_vap))
     {
         if(OAL_TRUE == dmac_is_trigger_enabled(pst_dmac_vap, uc_tid))
         {

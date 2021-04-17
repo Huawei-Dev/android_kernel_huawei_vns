@@ -69,6 +69,9 @@ extern "C" {
 oal_uint16 g_us_occupied_point[BTCOEX_LINKLOSS_OCCUPIED_NUMBER];
 #endif
 
+#ifdef _PRE_WLAN_FEATURE_11K
+extern oal_uint8 g_pm_switch;
+#endif
 /*****************************************************************************
   3 函数实现
 *****************************************************************************/
@@ -309,7 +312,8 @@ oal_uint32  dmac_vap_init(
         }
 
         /* DTS2015050301014,双芯片实现时bitmap_len计算要乘以device(也即是chip)个数  */
-        pst_dmac_vap->uc_tim_bitmap_len = (oal_uint8)(2 + (((g_us_max_asoc_user + WLAN_SERVICE_VAP_MAX_NUM_PER_DEVICE)* MAC_RES_MAX_DEV_NUM + 7 ) >> 3));
+        /* 下述计算tim_bitmap需要的字节数((user_num + 7)>>3表示多少字节的bitmap能表达所有的用户 ) */
+        pst_dmac_vap->uc_tim_bitmap_len = (oal_uint8)(2 + ((MAC_RES_MAX_USER_NUM + 7 ) >> 3));
         pst_dmac_vap->puc_tim_bitmap = OAL_MEM_ALLOC(OAL_MEM_POOL_ID_LOCAL, pst_dmac_vap->uc_tim_bitmap_len, OAL_TRUE);
         if (OAL_PTR_NULL == pst_dmac_vap->puc_tim_bitmap)
         {
@@ -327,18 +331,34 @@ oal_uint32  dmac_vap_init(
 #ifdef _PRE_WLAN_FEATURE_DFS
         mac_mib_set_SpectrumManagementImplemented(&pst_dmac_vap->st_vap_base_info, OAL_TRUE);
 #endif
-#ifdef _PRE_WLAN_FEATURE_11K
-        pst_dmac_vap->pst_rrm_info = OAL_MEM_ALLOC(OAL_MEM_POOL_ID_LOCAL, OAL_SIZEOF(mac_rrm_info_stru), OAL_TRUE);
-        if (OAL_PTR_NULL == pst_dmac_vap->pst_rrm_info)
-        {
-            OAM_ERROR_LOG0(uc_vap_id, OAM_SF_ANY, "{dmac_vap_init::pst_rrm_info null.}");
-
-            return OAL_ERR_CODE_ALLOC_MEM_FAIL;
-        }
-
-        OAL_MEMZERO(pst_dmac_vap->pst_rrm_info, OAL_SIZEOF(mac_rrm_info_stru));
-#endif
     }
+
+#ifdef _PRE_WLAN_FEATURE_11K
+    pst_dmac_vap->pst_rrm_info = OAL_MEM_ALLOC(OAL_MEM_POOL_ID_LOCAL, OAL_SIZEOF(mac_rrm_info_stru), OAL_TRUE);
+    if (OAL_PTR_NULL == pst_dmac_vap->pst_rrm_info)
+    {
+        if ((WLAN_VAP_MODE_BSS_AP == pst_dmac_vap->st_vap_base_info.en_vap_mode) && (OAL_PTR_NULL != pst_dmac_vap->puc_tim_bitmap))
+        {
+            OAL_MEM_FREE(pst_dmac_vap->puc_tim_bitmap, OAL_TRUE);
+            pst_dmac_vap->puc_tim_bitmap = OAL_PTR_NULL;
+        }
+        OAM_ERROR_LOG0(uc_vap_id, OAM_SF_ANY, "{dmac_vap_init::pst_rrm_info null.}");
+        return OAL_ERR_CODE_ALLOC_MEM_FAIL;
+    }
+
+    OAL_MEMZERO(pst_dmac_vap->pst_rrm_info, OAL_SIZEOF(mac_rrm_info_stru));
+    oal_dlist_init_head(&(pst_dmac_vap->pst_rrm_info->st_meas_rpt_list));
+
+    pst_dmac_vap->bit_bcn_table_switch  = OAL_FALSE; //宏打开时默认使能，可修改
+    //pst_dmac_vap->bit_voe_enable        = OAL_FALSE;
+    pst_dmac_vap->bit_11k_enable        = OAL_FALSE;
+    pst_dmac_vap->bit_11v_enable        = OAL_FALSE;
+
+#endif //_PRE_WLAN_FEATURE_11K
+
+#ifdef _PRE_WLAN_FEATURE_11R
+    pst_dmac_vap->bit_11r_enable        = OAL_FALSE;
+#endif
 
     /* 初始化重排序超时时间 */
     pst_dmac_vap->us_del_timeout                = DMAC_BA_DELBA_TIMEOUT;
@@ -352,6 +372,13 @@ oal_uint32  dmac_vap_init(
             OAL_MEM_FREE(pst_dmac_vap->puc_tim_bitmap, OAL_TRUE);
             pst_dmac_vap->puc_tim_bitmap = OAL_PTR_NULL;
         }
+#ifdef _PRE_WLAN_FEATURE_11K
+        if(OAL_PTR_NULL != pst_dmac_vap->pst_rrm_info)
+        {
+            OAL_MEM_FREE(pst_dmac_vap->pst_rrm_info, OAL_TRUE);
+            pst_dmac_vap->pst_rrm_info = OAL_PTR_NULL;
+        }
+#endif
         OAM_ERROR_LOG0(uc_vap_id, OAM_SF_PWR, "{dmac_vap_init::Alloc memory for IP address record array failed.}");
         return OAL_ERR_CODE_ALLOC_MEM_FAIL;
     }

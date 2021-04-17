@@ -36,15 +36,12 @@ extern "C" {
 #include "oal_mem.h"
 #include "mac_vap.h"
 #include "dmac_user.h"
-
+#include "dmac_vap.h"
 #undef  THIS_FILE_ID
 #define THIS_FILE_ID OAM_FILE_ID_DMAC_11K_H
 /*****************************************************************************
   2 宏定义
 *****************************************************************************/
-#define MAC_11K_SUPPORT_AP_CHAN_RPT_NUM 8
-#define MAC_MEASUREMENT_RPT_FIX_LEN     5
-#define MAC_BEACON_RPT_FIX_LEN          26
 
 /*****************************************************************************
   3 枚举定义
@@ -82,10 +79,10 @@ extern "C" {
 /*****************************************************************************
   10 函数声明
 *****************************************************************************/
-extern oal_uint8  dmac_rrm_send_link_meas_rpt_action(dmac_vap_stru *pst_dmac_vap);
-extern oal_uint32 dmac_rrm_save_bss_info_event_process(frw_event_mem_stru *pst_event_mem);
-extern oal_uint8 dmac_rrm_proc_rm_request(dmac_vap_stru* pst_dmac_vap, oal_netbuf_stru *pst_netbuf);
-extern oal_void dmac_rrm_encap_meas_rpt_basic(dmac_vap_stru *pst_dmac_vap);
+extern oal_void  dmac_rrm_send_link_meas_rpt_action(dmac_vap_stru *pst_dmac_vap, oal_netbuf_stru *pst_rx_netbuf);
+//extern oal_uint32 dmac_rrm_save_bss_info_event_process(frw_event_mem_stru *pst_event_mem);
+extern oal_void dmac_rrm_proc_rm_request(dmac_vap_stru* pst_dmac_vap, oal_netbuf_stru *pst_netbuf);
+extern oal_void dmac_rrm_encap_meas_rpt(dmac_vap_stru *pst_dmac_vap);
 extern oal_uint32 dmac_rrm_send_rm_rpt_action(dmac_vap_stru* pst_dmac_vap);
 extern oal_uint32  dmac_send_sys_event(
                 mac_vap_stru                     *pst_mac_vap,
@@ -93,13 +90,13 @@ extern oal_uint32  dmac_send_sys_event(
                 oal_uint16                        us_len,
                 oal_uint8                        *puc_param);
 extern oal_void dmac_rrm_get_link_req_info(dmac_vap_stru *pst_dmac_vap, oal_uint8 *puc_link_req_frame);
-extern oal_void dmac_rrm_update_start_tsf(oal_uint8 uc_vap_id);
-extern oal_uint32 dmac_rrm_start_scan_for_bcn_req(oal_void *p_arg);
+extern oal_uint32 dmac_rrm_start_scan_for_bcn_req(dmac_vap_stru *pst_dmac_vap);
 extern oal_void dmac_rrm_get_bcn_info_from_rx(dmac_vap_stru *pst_dmac_vap, oal_netbuf_stru  *pst_netbuf);
-extern oal_uint32 dmac_rrm_send_rm_rpt_action(dmac_vap_stru* pst_dmac_vap);
 extern oal_uint32 dmac_rrm_handle_quiet(dmac_vap_stru  *pst_dmac_vap);
 extern oal_uint32 dmac_rrm_proc_pwr_constraint(dmac_vap_stru  *pst_dmac_vap, oal_netbuf_stru *pst_netbuf);
 extern oal_uint32 dmac_rrm_parse_quiet(dmac_vap_stru  *pst_dmac_vap, oal_netbuf_stru *pst_netbuf);
+extern oal_uint32 dmac_rrm_fill_basic_rm_rpt_action(dmac_vap_stru *pst_dmac_vap);
+extern oal_void dmac_rrm_encap_and_send_bcn_rpt(dmac_vap_stru* pst_dmac_vap);
 #endif //_PRE_WLAN_FEATURE_11K
 
 #ifdef __cplusplus

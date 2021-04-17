@@ -170,6 +170,13 @@ extern "C" {
 
 #endif
 
+#ifdef _PRE_WLAN_FEATURE_11K
+#define MAC_11K_SUPPORT_AP_CHAN_RPT_NUM 8
+#define MAC_MEASUREMENT_RPT_FIX_LEN     5
+#define MAC_BEACON_RPT_FIX_LEN          26
+#define MAC_MAX_RPT_DETAIL_LEN          224   /*255 - 26(bcn fix) - 3(Meas rpt fix) - 2(subid 1)*/
+#endif
+
 /*****************************************************************************
   3 枚举定义
 *****************************************************************************/
@@ -712,7 +719,8 @@ typedef struct
                 bit_11ntxbf                        : 1,                 /* 11n txbf能力 */
                 bit_disable_2ght40                 : 1,                 /* 2ght40禁止位，1-禁止，0-不禁止 */
                 bit_peer_obss_scan                 : 1,                 /* 对端支持obss scan能力: 0-不支持, 1-支持 */
-                bit_resv                           : 13;
+                bit_ip_filter                      : 1,                 /* rx方向ip包过滤的功能 */
+                bit_resv                           : 12;
 }mac_cap_flag_stru;
 
 /* VAP收发包统计 */
@@ -2739,7 +2747,12 @@ typedef struct
     oal_uint8                   uc_ext_pa_isexist_5g;               /* 是否使用外部pa */
     oal_uint8                   uc_ext_lna_isexist_5g;              /* 是否使用外部lna */
     oal_uint8                   uc_far_dist_pow_gain_switch;        /* 超远距离功率增益开关 */
-    oal_uint8                   auc_resv[1];
+    oal_uint8                   uc_far_dist_dsss_scale_promote_switch;   /* 超远距11b 1m 2m dbb scale提升使能开关 */
+
+    oal_int8                    c_delta_cca_ed_high_20th_2g;
+    oal_int8                    c_delta_cca_ed_high_40th_2g;
+    oal_int8                    c_delta_cca_ed_high_20th_5g;
+    oal_int8                    c_delta_cca_ed_high_40th_5g;
 }mac_cfg_customize_rf;
 typedef struct
 {
@@ -2816,29 +2829,7 @@ typedef struct
 }mac_cus_dts_cali_stru;
 #endif /* #ifdef _PRE_PLAT_FEATURE_CUSTOMIZE */
 
-#ifdef _PRE_WLAN_FEATURE_11K
-typedef struct mac_rrm_info_tag
-{
-    mac_action_rm_rpt_stru              *pst_rm_rpt_action;         /* Radio Measurement Report Addr */
-    mac_meas_rpt_ie_stru                *pst_meas_rpt_ie;           /* Measurement Report IE Addr */
-    mac_bcn_rpt_stru                    *pst_bcn_rpt_item;          /* Beacon Report Addr */
-    oal_netbuf_stru                     *pst_rm_rpt_mgmt_buf;       /* Report Frame Addr for Transfer */
-    oal_void                            *p_scan_req;
-    oal_uint8                            uc_quiet_count;
-    oal_uint8                            uc_quiet_period;
-    oal_mac_quiet_state_uint8            en_quiet_state;
-    oal_uint8                            uc_link_dialog_token;
-    oal_int8                             c_link_tx_pwr_used;
-    oal_int8                             c_link_max_tx_pwr;
-    oal_uint8                            auc_act_meas_start_time[8];
-    oal_uint16                           us_quiet_duration;
-    oal_uint16                           us_quiet_offset;
-    oal_uint16                           us_rm_rpt_action_len;      /* Report Frame Length for Transfer */
-    mac_bcn_req_info_stru                st_bcn_req_info;
-    frw_timeout_stru                     st_quiet_timer;
-}mac_rrm_info_stru;
 
-#endif
 
 #ifdef _PRE_WLAN_FEATURE_UAPSD
 extern oal_uint8 g_uc_uapsd_cap;

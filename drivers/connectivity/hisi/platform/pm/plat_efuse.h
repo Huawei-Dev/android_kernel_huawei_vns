@@ -40,20 +40,27 @@ extern "C" {
 /*****************************************************************************
   2 宏定义
 *****************************************************************************/
-#define GET_EFUSE_CMD       "0x50000744,512"
-#define EFUSE_FILE_PATH     "/data/misc/wifi/efuse"
-#define EFUSE_REG_NUM       (16)
-#define EFUSE_VALUE_WIDTH   (16)
-#define EFUSE_REG_WIDTH     (4)
-#define EFUSE_REG_ADDR_BASE (0x50000744)
-#define EFUSE_BUFF_LEN      (128)
-#define EFUSE_RETRY         (3)
-#define DIEID_BIT_4         (4)
-#define DIEID_BIT_21        (21)
-#define DIEID_BIT_45        (45)
-#define DIEID_BIT_53        (53)
-#define DIEID_BIT_79        (79)
-#define DIEID_BIT_95        (95)
+#define GET_EFUSE_CMD          "0x50000744,64"
+#define GET_EFUSE_EC_VERSION   "0x50000770,4"
+#define EFUSE_FILE_PATH        "/data/misc/wifi/efuse"
+#define EFUSE_REG_NUM          (16)
+#define EFUSE_VALUE_WIDTH      (16)
+#define EFUSE_REG_WIDTH        (4)
+#define EFUSE_REG_ADDR_BASE    (0x50000744)
+#define EFUSE_BUFF_LEN         (128)
+#define EFUSE_RETRY            (3)
+#define DIEID_BIT_4            (4)
+#define DIEID_BIT_21           (21)
+#define DIEID_BIT_45           (45)
+#define DIEID_BIT_53           (53)
+#define DIEID_BIT_79           (79)
+#define DIEID_BIT_95           (95)
+
+/*ec version define*/
+#define V100                   (0x00)
+#define V120                   (0x01)
+
+#define STR_REG_NFC_EN_KEEP    ("0x60001044")
 
 /*****************************************************************************
   3 枚举定义
@@ -96,6 +103,7 @@ extern "C" {
 extern int32 number_type_cmd_send(uint8 *Key, uint8 *Value);
 extern int32 read_msg(uint8 *data, int32 len);
 extern void  store_efuse_info(void);
+extern uint8 get_ec_version(void);
 
 #ifdef __cplusplus
     #if __cplusplus

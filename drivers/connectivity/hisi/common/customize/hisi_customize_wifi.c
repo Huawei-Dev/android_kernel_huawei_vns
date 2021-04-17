@@ -390,6 +390,14 @@ OAL_STATIC wlan_cfg_cmd g_ast_wifi_config_cmds[] =
     {"lte_ism_priority",                WLAN_ATCMDSRV_LTE_ISM_PRIORITY},
     {"lte_rx_act",                      WLAN_ATCMDSRV_LTE_RX_ACT},
     {"lte_tx_act",                      WLAN_ATCMDSRV_LTE_TX_ACT},
+    {"far_dist_dsss_scale_promote_switch",      WLAN_CFG_INIT_FAR_DIST_DSSS_SCALE_PROMOTE_SWITCH},
+    {"delta_cca_ed_high_20th_2g",       WLAN_CFG_INIT_DELTA_CCA_ED_HIGH_20TH_2G},
+    {"delta_cca_ed_high_40th_2g",       WLAN_CFG_INIT_DELTA_CCA_ED_HIGH_40TH_2G},
+    {"delta_cca_ed_high_20th_5g",       WLAN_CFG_INIT_DELTA_CCA_ED_HIGH_20TH_5G},
+    {"delta_cca_ed_high_40th_5g",       WLAN_CFG_INIT_DELTA_CCA_ED_HIGH_40TH_5G},
+#ifdef _PRE_WLAN_DOWNLOAD_PM
+    {"download_rate_limit_pps",         WLAN_CFG_INIT_DOWNLOAD_RATE_LIMIT_PPS},
+#endif
     {OAL_PTR_NULL, 0}
 };
 
@@ -589,8 +597,8 @@ OAL_STATIC oal_void host_params_init_first(oal_void)
     g_al_host_init_params[WLAN_CFG_INIT_RF_LINE_TXRX_GAIN_DB_5G_BAND6_MULT10]   = -20;
     g_al_host_init_params[WLAN_CFG_INIT_RF_LINE_TXRX_GAIN_DB_5G_BAND7_MULT4]    = -8;
     g_al_host_init_params[WLAN_CFG_INIT_RF_LINE_TXRX_GAIN_DB_5G_BAND7_MULT10]   = -20;
-    g_al_host_init_params[WLAN_CFG_INIT_RF_LINE_RX_GAIN_DB_5G]             = -12;
-    g_al_host_init_params[WLAN_CFG_INIT_LNA_GAIN_DB_5G]                    = 20;
+    g_al_host_init_params[WLAN_CFG_INIT_RF_LINE_RX_GAIN_DB_5G]             = -36;
+    g_al_host_init_params[WLAN_CFG_INIT_LNA_GAIN_DB_5G]                    = 48;
     g_al_host_init_params[WLAN_CFG_INIT_RF_LINE_TX_GAIN_DB_5G]             = -12;
     g_al_host_init_params[WLAN_CFG_INIT_EXT_SWITCH_ISEXIST_5G]             = 1;
     g_al_host_init_params[WLAN_CFG_INIT_EXT_PA_ISEXIST_5G]                 = 1;
@@ -608,7 +616,7 @@ OAL_STATIC oal_void host_params_init_first(oal_void)
     /* SCAN */
     g_al_host_init_params[WLAN_CFG_INIT_RANDOM_MAC_ADDR_SCAN]              = 0;
     /* 11AC2G */
-    g_al_host_init_params[WLAN_CFG_INIT_11AC2G_ENABLE]                     = 1;
+    g_al_host_init_params[WLAN_CFG_INIT_11AC2G_ENABLE]                     = 0;
     g_al_host_init_params[WLAN_CFG_INIT_DISABLE_CAPAB_2GHT40]              = 0;
     g_al_host_init_params[WLAN_CFG_INIT_DUAL_ANTENNA_ENABLE]            = 0;
     g_al_host_init_params[WLAN_CFG_INIT_FAR_DIST_POW_GAIN_SWITCH]          = 1;
@@ -616,7 +624,14 @@ OAL_STATIC oal_void host_params_init_first(oal_void)
     g_al_host_init_params[WLAN_ATCMDSRV_LTE_ISM_PRIORITY]                  = 0;
     g_al_host_init_params[WLAN_ATCMDSRV_LTE_RX_ACT]                        = 0;
     g_al_host_init_params[WLAN_ATCMDSRV_LTE_TX_ACT]                        = 0;
-
+    g_al_host_init_params[WLAN_CFG_INIT_FAR_DIST_DSSS_SCALE_PROMOTE_SWITCH]     = 1;
+    g_al_host_init_params[WLAN_CFG_INIT_DELTA_CCA_ED_HIGH_20TH_2G]         = 0;
+    g_al_host_init_params[WLAN_CFG_INIT_DELTA_CCA_ED_HIGH_40TH_2G]         = 0;
+    g_al_host_init_params[WLAN_CFG_INIT_DELTA_CCA_ED_HIGH_20TH_5G]         = 0;
+    g_al_host_init_params[WLAN_CFG_INIT_DELTA_CCA_ED_HIGH_40TH_5G]         = 0;
+#ifdef _PRE_WLAN_DOWNLOAD_PM
+    g_al_host_init_params[WLAN_CFG_INIT_DOWNLOAD_RATE_LIMIT_PPS]           = 0;
+#endif
 }
 
 /*****************************************************************************

@@ -1092,9 +1092,9 @@ typedef enum
     OAM_SF_ANY,                             /* rifs protection shortgi frag datarate countrycode
                                                 coustom_security startup_time lsig monitor wds
                                                 hidessid */
-#ifdef _PRE_WLAN_FEATURE_HILINK
+
     OAM_SF_HILINK,
-#endif
+
     OAM_SOFTWARE_FEATURE_BUTT
 }oam_feature_enum;
 typedef oal_uint8   oam_feature_enum_uint8;

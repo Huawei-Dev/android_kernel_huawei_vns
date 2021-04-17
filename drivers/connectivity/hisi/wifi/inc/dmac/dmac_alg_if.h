@@ -177,6 +177,9 @@ typedef oal_uint32 (*p_alg_anti_intf_switch_func)(mac_device_stru *pst_device, o
 typedef oal_uint32 (*p_alg_get_ant_info_notify_func)(mac_vap_stru *pst_vap, oal_uint8 *puc_param, oal_uint32 *pul_param1, oal_uint32 *pul_param2, oal_uint32 *pul_param3, oal_uint32 *pul_param4, oal_uint32 *pul_param5);
 typedef oal_uint32 (*p_alg_double_ant_switch_notify_func)(mac_device_stru *pst_mac_device, oal_uint8 uc_param);
 #endif
+
+typedef oal_uint32 (*p_alg_get_mgmt_tx_pow_notify_func)(mac_user_stru *pst_user, wlan_channel_band_enum_uint8 en_freq_band,oal_uint16 *pus_tx_pow, oal_bool_enum_uint8 en_is_presicion_shift);
+
 /*****************************************************************************
   3 Ã¶¾Ù¶¨Òå
 *****************************************************************************/
@@ -517,6 +520,9 @@ typedef enum
     DMAC_ALG_CFG_CHANNEL_NOTIFY_ACS,
     DMAC_ALG_CFG_CHANNEL_NOTIFY_TPC,
     DMAC_ALG_CFG_CHANNEL_NOTIFY_TXBF,
+#ifdef _PRE_PLAT_FEATURE_CUSTOMIZE
+    DMAC_ALG_CFG_CHANNEL_NOTIFY_CCA_OPT,
+#endif
 
     DMAC_ALG_CFG_CHANNEL_NOTIFY_BUTT,
 }dmac_alg_cfg_channel_notify_enum;
@@ -772,6 +778,9 @@ extern oal_uint32  dmac_alg_register_cfg_user_ant_changed_notify_func(
 extern oal_uint32  dmac_alg_register_cfg_get_ant_info_notify_func( p_alg_get_ant_info_notify_func   p_func);
 extern oal_uint32  dmac_alg_register_cfg_double_ant_switch_notify_func( p_alg_double_ant_switch_notify_func   p_func);
 #endif
+extern oal_uint32  dmac_alg_register_get_mgmt_tx_pow_notify_func(p_alg_get_mgmt_tx_pow_notify_func   p_func);
+extern oal_uint32  dmac_alg_unregister_get_mgmt_tx_pow_notify_func(oal_void);
+
 extern oal_uint32  dmac_alg_register_cfg_user_protocol_notify_func(dmac_alg_cfg_user_protocol_notify_enum_uint8  en_notify_sub_type,
                                                                       p_alg_cfg_user_protocol_notify_func      p_func);
 extern oal_uint32  dmac_alg_register_cfg_user_spatial_stream_notify_func(

@@ -487,10 +487,13 @@ oal_uint8  mac_ie_get_chan_num(oal_uint8 *puc_frame_body, oal_uint16 us_frame_le
 
     /* 在DSSS Param set ie中解析chan num */
     puc_ie_start_addr = mac_find_ie(MAC_EID_DSPARMS, puc_frame_body + us_offset, us_frame_len - us_offset);
-    if ((OAL_PTR_NULL != puc_ie_start_addr) && (puc_ie_start_addr[1] >= MAC_DSPARMS_LEN))
+    if ((OAL_PTR_NULL != puc_ie_start_addr) && (puc_ie_start_addr[1] == MAC_DSPARMS_LEN))
     {
         uc_chan_num = puc_ie_start_addr[2];
-        return  uc_chan_num;
+        if (mac_is_channel_num_valid(mac_get_band_by_channel_num(uc_chan_num), uc_chan_num) == OAL_SUCC)
+        {
+            return  uc_chan_num;
+        }
     }
 
     /* 在HT operation ie中解析 chan num */
@@ -499,7 +502,10 @@ oal_uint8  mac_ie_get_chan_num(oal_uint8 *puc_frame_body, oal_uint16 us_frame_le
     if ((OAL_PTR_NULL != puc_ie_start_addr) && (puc_ie_start_addr[1] >= 1))
     {
         uc_chan_num = puc_ie_start_addr[2];
-        return  uc_chan_num;
+        if (mac_is_channel_num_valid(mac_get_band_by_channel_num(uc_chan_num), uc_chan_num) == OAL_SUCC)
+        {
+            return  uc_chan_num;
+        }
     }
 
     uc_chan_num = uc_curr_chan;
