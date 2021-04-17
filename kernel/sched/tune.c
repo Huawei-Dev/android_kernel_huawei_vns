@@ -390,7 +390,7 @@ int schedtune_can_attach(struct cgroup_subsys_state *css,
 	if (!unlikely(schedtune_initialized))
 		return 0;
 
-	cgroup_taskset_for_each(task, tset) {
+	cgroup_taskset_for_each(task, css, tset) {
 
 		/*
 		 * Lock the CPU's RQ the task is enqueued to avoid race
