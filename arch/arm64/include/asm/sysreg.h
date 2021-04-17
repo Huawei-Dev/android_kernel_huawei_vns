@@ -81,12 +81,6 @@
 #define SET_PSTATE_PAN(x) __inst_arm(0xd5000000 | REG_PSTATE_PAN_IMM |\
 				     (!!x)<<8 | 0x1f)
 
-/* SCTLR_EL1 */
-#define SCTLR_EL1_CP15BEN	(0x1 << 5)
-#define SCTLR_EL1_SED		(0x1 << 8)
-#define SCTLR_EL1_SPAN		(0x1 << 23)
-
-
 /* id_aa64isar0 */
 #define ID_AA64ISAR0_RDM_SHIFT		28
 #define ID_AA64ISAR0_ATOMICS_SHIFT	20
