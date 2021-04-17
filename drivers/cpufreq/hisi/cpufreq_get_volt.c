@@ -32,7 +32,6 @@
 #include <asm/compiler.h>
 #include <linux/proc_fs.h>
 
-
 #define CPU_VOLT_FN_GET_VAL				(0xc800aa01)
 #define AVS_VOLT_MAX_BYTE				(192)
 
@@ -46,7 +45,6 @@ static struct tag_cpu_volt_data g_cpu_volt_data;
 extern char *g_lpmcu_rdr_ddr_addr;
 extern u32 rdr_lpm3_buf_len;
 
-/*lint -e715 -e838*/
 noinline int atfd_hisi_service_get_val_smc(u64 function_id, u64 arg0, u64 arg1, u64 arg2)
 {
 	asm volatile (
@@ -82,8 +80,10 @@ static int get_volt_show(struct seq_file *m, void *v)
 			seq_printf(m, "\n");
 	}
 
-	if (rdr_lpm3_buf_len < AVS_VOLT_MAX_BYTE)
+	if (rdr_lpm3_buf_len < AVS_VOLT_MAX_BYTE) {
+		mutex_unlock(&g_cpu_volt_data.cpu_mutex);
 		return -ENOSPC;
+	}
 
 	memcpy((void *)(g_lpmcu_rdr_ddr_addr+rdr_lpm3_buf_len-AVS_VOLT_MAX_BYTE), g_cpu_volt_data.virt_addr, (size_t)AVS_VOLT_MAX_BYTE);
 
@@ -97,14 +97,13 @@ static int get_volt_open(struct inode *inode, struct file *file)
 	return single_open(file, get_volt_show, NULL);
 }
 
-/*lint -e785*/
 static const struct file_operations get_volt_operations = {
 	.open		= get_volt_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
-/*lint +e785*/
+
 static int __init cpufreq_get_volt_init(void)
 {
 	int ret;
@@ -141,10 +140,5 @@ static int __init cpufreq_get_volt_init(void)
 
 	return 0;
 }
-/*lint +e715 +e838*/
-/*lint -e528 -esym(528,*)*/
-/*lint -e753 -esym(753,*)*/
-module_init(cpufreq_get_volt_init);
-/*lint -e528 +esym(528,*)*/
-/*lint -e753 +esym(753,*)*/
 
+module_init(cpufreq_get_volt_init);
