@@ -148,7 +148,7 @@ static struct usb_cdc_header_desc acm_header_desc = {
 	.bLength =		sizeof(acm_header_desc),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_HEADER_TYPE,
-	.bcdCDC =		cpu_to_le16(0x0110),
+	.bcdCDC =		cpu_to_le16(0x0110), /* cdc version */
 };
 
 static struct usb_cdc_call_mgmt_descriptor
@@ -466,14 +466,16 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	 */
 	switch ((ctrl->bRequestType << 8) | ctrl->bRequest) {
 
-	case ((0x21 << 8) | 0x02):
+	case ((USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
+			| USB_CDC_SET_COMM_FEATURE:
 		pr_debug("@@@@ wValue: 0x%04x, wIndex: 0x%04x, wLength: 0x%04x\n",
 			w_value, w_index, w_length);
 		value = w_length;
 		cdev->gadget->ep0->driver_data = acm;
 		req->complete = acm_complete_2102;
 		break;
-	case ((0x41 << 8) | 0xa3):
+	case ((USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_INTERFACE) << 8)
+			| USB_CDC_SEND_PORT_STATUS:
 		pr_debug("@@@@ wValue: 0x%04x, wIndex: 0x%04x, wLength: 0x%04x\n",
 			w_value, w_index, w_length);
 		value = w_length;
@@ -559,6 +561,13 @@ static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	if (intf == acm->ctrl_id) {
 		is_setting = 1;
 		if (acm->notify) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
+			VDBG(cdev, "reset acm control interface %d\n", intf);
+			usb_ep_disable(acm->notify);
+			VDBG(cdev, "init acm ctrl interface %d\n", intf);
+			if (config_ep_by_speed(cdev->gadget, f, acm->notify))
+				return -EINVAL;
+#else
 			if (acm->notify->driver_data) {
 				VDBG(cdev, "reset acm control interface %d\n", intf);
 				usb_ep_disable(acm->notify);
@@ -567,18 +576,25 @@ static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 				if (config_ep_by_speed(cdev->gadget, f, acm->notify))
 					return -EINVAL;
 			}
+#endif
 			ret = usb_ep_enable(acm->notify);
 			if (ret < 0) {
 				ERROR(cdev, "Enable acm interface ep failed\n");
 				return ret;
 			}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0)
 			acm->notify->driver_data = acm;
+#endif
 		}
 	}
 
 	if (intf == acm->data_id) {
 		is_setting = 1;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
+		if (acm->port.in->enabled) {
+#else
 		if (acm->port.in->driver_data) {
+#endif
 			DBG(cdev, "reset acm ttyGS%d\n", acm->port_num);
 			hw_gserial_disconnect(&acm->port);
 		}
@@ -601,7 +617,6 @@ static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	return 0;
 }
-
 static void acm_disable(struct usb_function *f)
 {
 	struct f_acm	*acm = func_to_acm(f);
@@ -611,10 +626,11 @@ static void acm_disable(struct usb_function *f)
 	hw_gserial_disconnect(&acm->port);
 	if (acm->notify) {
 		usb_ep_disable(acm->notify);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0)
 		acm->notify->driver_data = NULL;
+#endif
 	}
 }
-
 /*-------------------------------------------------------------------------*/
 
 /**
@@ -694,6 +710,11 @@ static int acm_notify_serial_state(struct f_acm *acm)
 
 static int acm_notify_flow_control(struct f_acm *acm)
 {
+	if (!acm) {
+		pr_err("%s:acm NULL pointer\n", __func__);
+		return -EINVAL;
+	}
+
 	int status;
 	u16 value = (acm->rx_is_on ? 0x1 : 0x0) | (acm->tx_is_on ? 0x2 : 0x0);
 
@@ -748,6 +769,10 @@ static void acm_disconnect(struct gserial *port)
 static void acm_notify_state(struct gserial *port, u16 state)
 {
 	struct f_acm        *acm = port_to_acm(port);
+	if (!acm) {
+		pr_err("%s:acm NULL pointer\n", __func__);
+		return;
+	}
 
 	acm->serial_state = state;
 	(void)acm_notify_serial_state(acm);
@@ -756,6 +781,10 @@ static void acm_notify_state(struct gserial *port, u16 state)
 static void acm_flow_control(struct gserial *port, u32 rx_is_on, u32 tx_is_on)
 {
 	struct f_acm        *acm = port_to_acm(port);
+	if (!acm) {
+		pr_err("%s:acm NULL pointer\n", __func__);
+		return;
+	}
 
 	acm->rx_is_on = rx_is_on;
 	acm->tx_is_on = tx_is_on;
@@ -832,20 +861,25 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 	if (!ep)
 		goto fail;
 	acm->port.in = ep;
-	ep->driver_data = cdev;	/* claim */
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0)
+	ep->driver_data = cdev; /* claim */
+#endif
 	ep = usb_ep_autoconfig(cdev->gadget, &acm_fs_out_desc);
 	if (!ep)
 		goto fail;
 	acm->port.out = ep;
-	ep->driver_data = cdev;	/* claim */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0)
+	ep->driver_data = cdev; /* claim */
+#endif
 
 	if (acm->support_notify) {
 		ep = usb_ep_autoconfig(cdev->gadget, &acm_fs_notify_desc);
 		if (!ep)
 			goto fail;
 		acm->notify = ep;
-		ep->driver_data = cdev;	/* claim */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0)
+		ep->driver_data = cdev; /* claim */
+#endif
 
 		/* allocate notification */
 		acm->notify_req = hw_gs_alloc_req(ep,
@@ -876,8 +910,13 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 	acm_ss_out_desc.bEndpointAddress = acm_fs_out_desc.bEndpointAddress;
 
 	acm_single_interface_desc.bInterfaceProtocol = ACM_GET_TYPE(acm);
+/*#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
+	status = usb_assign_descriptors(f, acm_fs_cur_function, acm_hs_cur_function,
+	                                acm_ss_cur_function, acm_ss_cur_function);
+#else*/
 	status = usb_assign_descriptors(f, acm_fs_cur_function, acm_hs_cur_function,
 	                                acm_ss_cur_function);
+//#endif
 	if (status)
 		goto fail;
 #if 0
@@ -893,7 +932,7 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 fail:
 	if (acm->notify_req)
 		hw_gs_free_req(acm->notify, acm->notify_req);
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0)
 	/* we might as well release our claims on endpoints */
 	if (acm->notify)
 		acm->notify->driver_data = NULL;
@@ -901,7 +940,7 @@ fail:
 		acm->port.out->driver_data = NULL;
 	if (acm->port.in)
 		acm->port.in->driver_data = NULL;
-
+#endif
 	ERROR(cdev, "%s/%p: can't bind, err %d\n", f->name, f, status);
 
 	return status;
@@ -919,6 +958,11 @@ static void acm_unbind(struct usb_configuration *c, struct usb_function *f)
 
 static inline void acm_set_config_vendor(struct f_acm *acm)
 {
+	if (!acm) {
+		pr_err("%s:acm NULL pointer\n", __func__);
+		return;
+	}
+
 	if (g_acm_is_single_interface) {
 
 		if (acm->support_notify) {
@@ -1002,6 +1046,7 @@ static inline struct f_serial_opts *to_f_serial_opts(struct config_item *item)
 			func_inst.group);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0)
 CONFIGFS_ATTR_STRUCT(f_serial_opts);
 static ssize_t f_acm_attr_show(struct config_item *item,
 				 struct configfs_attribute *attr,
@@ -1016,6 +1061,7 @@ static ssize_t f_acm_attr_show(struct config_item *item,
 		ret = f_serial_opts_attr->show(opts, page);
 	return ret;
 }
+#endif
 
 static void acm_attr_release(struct config_item *item)
 {
@@ -1026,7 +1072,9 @@ static void acm_attr_release(struct config_item *item)
 
 static struct configfs_item_operations acm_item_ops = {
 	.release                = acm_attr_release,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0)
 	.show_attribute		= f_acm_attr_show,
+#endif
 };
 
 static ssize_t f_acm_port_num_show(struct f_serial_opts *opts, char *page)
@@ -1034,6 +1082,14 @@ static ssize_t f_acm_port_num_show(struct f_serial_opts *opts, char *page)
 	return sprintf(page, "%u\n", opts->port_num);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
+
+CONFIGFS_ATTR_RO(f_acm_port_, num);
+static struct configfs_attribute *acm_attrs[] = {
+	&f_acm_port_attr_num,
+	NULL,
+};
+#else
 static struct f_serial_opts_attribute f_acm_port_num =
 	__CONFIGFS_ATTR_RO(port_num, f_acm_port_num_show);
 
@@ -1042,6 +1098,7 @@ static struct configfs_attribute *acm_attrs[] = {
 	&f_acm_port_num.attr,
 	NULL,
 };
+#endif
 
 static struct config_item_type acm_func_type = {
 	.ct_item_ops    = &acm_item_ops,

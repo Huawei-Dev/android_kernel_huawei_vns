@@ -613,14 +613,12 @@ static unsigned int hook_local_in(const struct nf_hook_ops *ops,
 static struct nf_hook_ops net_hooks[] = {
 	{
 		.hook		= hook_local_in,
-		.owner		= THIS_MODULE,
 		.pf			= PF_INET,
 		.hooknum	= NF_INET_LOCAL_IN,
 		.priority	= NF_IP_PRI_FILTER - 1,
 	},
 	{
 		.hook		= hook_local_out,
-		.owner		= THIS_MODULE,
 		.pf			= PF_INET,
 		.hooknum	= NF_INET_POST_ROUTING,
 		.priority	= NF_IP_PRI_FILTER - 1,

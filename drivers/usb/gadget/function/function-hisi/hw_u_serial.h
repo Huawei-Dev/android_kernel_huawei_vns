@@ -20,7 +20,8 @@
 #define HW_ACM_IS_SINGLE		1
 #define HW_ACM_SUPPORT_NOTIFY	0
 
-
+#define USB_CDC_SET_COMM_FEATURE 0x02
+#define USB_CDC_SEND_PORT_STATUS 0xa3
 
 struct f_serial_opts {
 	struct usb_function_instance func_inst;
