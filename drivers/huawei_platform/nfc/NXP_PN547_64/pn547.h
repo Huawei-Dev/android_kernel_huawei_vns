@@ -42,7 +42,7 @@
 
 #define MAX_NFC_CHIP_TYPE_SIZE		32
 #define MAX_NFC_FW_VERSION_SIZE	32
-#define MAX_DETECT_SE_SIZE	16
+#define MAX_DETECT_SE_SIZE	32
 
 #define NFC_SVDD_SW_ON	1
 #define NFC_SVDD_SW_OFF	0
@@ -54,32 +54,54 @@
 #define NFC_CLK_SRC_CPU		  0
 #define NFC_CLK_SRC_PMU		  1
 #define NFC_CLK_SRC_PMU_HI6555 2
+#define NFC_CLK_SRC_PMU_HI6421V600 3
+#define NFC_CLK_SRC_XTAL        4
 
 #define WAKE_LOCK_TIMEOUT_DISABLE		  0
 #define WAKE_LOCK_TIMEOUT_ENALBE		  1
 #define MAX_WAKE_LOCK_TIMEOUT_SIZE	16
 
 #define NFC_DMD_NUMBER_MIN  923002000
-#define NFC_DMD_NUMBER_MAX  923002017
+#define NFC_DMD_NUMBER_MAX  923002016
 
 #define TEL_HUAWEI_NV_NFCCAL_NUMBER   372
 #define TEL_HUAWEI_NV_NFCCAL_NAME     "NFCCAL"
 #define TEL_HUAWEI_NV_NFCCAL_LEGTH    104
 
+#define CLR_BIT     0
+#define SET_BIT     1
+
+#define CHAR_0 48
 extern int nfc_record_dmd_info(long dmd_no, const char *dmd_info);
+
+typedef struct pmu_reg_control {
+    int addr;  /* reg address */
+    int pos;   /* bit position */
+} t_pmu_reg_control;
 
 /*
  * NFCC VEN GPIO could be controlled by different gpio type
  * NFC_ON_BY_GPIO: normal gpio in AP
- * NFC_ON_BY_HISI_PMIC: a gpio in PMU, usually notely PMU0_NFC_ON
+ * NFC_ON_BY_HISI_PMIC: a gpio in PMU(HI6421V500 or before), usually notely PMU0_NFC_ON
+ * NFC_ON_BY_HI6421V600_PMIC: a gpio in HI6421V600 PMU Platform, usually notely PMU0_NFC_ON
  * NFC_ON_BY_REGULATOR_BULK: a gpio used when pn544 chip which can
  * keep high when system shutdown
  * */
 enum NFC_ON_TYPE {
 	NFC_ON_BY_GPIO = 0,
-	NFC_ON_BY_HISI_PMIC,
+	NFC_ON_BY_HISI_PMIC,        // chicago platform, Hi6421V530
+	NFC_ON_BY_HI6421V600_PMIC,  // boston platform, Hi6421V600
 	NFC_ON_BY_REGULATOR_BULK,
+	NFC_ON_BY_HI6555V110_PMIC,  // V8R5 platform, Hi555V110
 };
+
+enum NFC_SWP_SWITCH_PMU_PLATFROM_TYPE {
+	NFC_SWP_WITHOUT_SW = 0,
+	NFC_SWP_SW_HI6421V500 = 1,
+	NFC_SWP_SW_HI6421V600 = 2,
+	NFC_SWP_SW_HI6555V110 = 3,
+};
+
 
 /*
  * NFCC can wired different eSEs by SWP/DWP

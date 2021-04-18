@@ -56,15 +56,21 @@
 #define HWLOG_TAG nfc
 HWLOG_REGIST();
 
+#define SET_PMU_REG_BIT(reg_val, bit_pos) ((reg_val) |= 1<<(bit_pos))
+#define CLR_PMU_REG_BIT(reg_val, bit_pos) ((reg_val) &= ~(1<<(bit_pos)))
+
+/*lint -save -e528 -e529*/
 static bool ven_felica_status;
 static struct wake_lock wlock_read;
 static int firmware_update;
+static int nfc_switch_state;
+static int nfc_at_result;
 static char g_nfc_nxp_config_name[MAX_CONFIG_NAME_SIZE];
 static char g_nfc_brcm_conf_name[MAX_CONFIG_NAME_SIZE];
 static char g_nfc_chip_type[MAX_NFC_CHIP_TYPE_SIZE];
 static char g_nfc_fw_version[MAX_NFC_FW_VERSION_SIZE];
 static int g_nfc_ext_gpio; /* use extented gpio, eg.codec */
-static bool g_nfc_svdd_sw; /* use for svdd switch */
+static int g_nfc_svdd_sw; /* use for svdd switch */
 static int g_nfc_on_type; /* nfc ven controlled by which type of gpio: gpio/hisi_pmic/regulator_bulk*/
 /*0 -- hisi cpu(default); 1 -- hisi pmu*/
 static int g_nfc_clk_src = NFC_CLK_SRC_CPU;
@@ -78,7 +84,11 @@ static int g_nfc_ese_type = NFC_WITHOUT_ESE; /* record ese type wired to nfcc by
 static int g_nfc_activated_se_info; /* record activated se info when nfc enable process */
 static int g_nfc_hal_dmd_no;	/* record last hal dmd no */
 static int g_clk_status_flag = 0;/* use for judging whether clk has been enabled */
+static t_pmu_reg_control nfc_on_hi6421v600 = {0x240, 0};
+static t_pmu_reg_control nfc_on_hi6421v500 = {0x0C3, 4};
+static t_pmu_reg_control nfc_on_hi6555v110 = {0x158, 0};
 
+/*lint -save -e* */
 struct pn547_dev {
 	wait_queue_head_t read_wq;
 	struct mutex read_mutex;
@@ -100,7 +110,7 @@ struct pn547_dev {
 	struct regulator_bulk_data ven_felica;
 	struct clk *nfc_clk;
 };
-
+/*lint -restore*/
 static struct pn547_dev *nfcdev;
 
 #ifdef CONFIG_HUAWEI_DSM
@@ -116,6 +126,13 @@ static struct dsm_dev dsm_nfc = {
 static struct dsm_client *nfc_dclient;
 
 #endif
+/*lint -save -e* */
+void realse_read(void)
+{
+	hwlog_info("realse_read\n");
+	wake_up(&nfcdev->read_wq);
+}
+EXPORT_SYMBOL(realse_read);
 
 static int nfc_nv_opera(int opr, int idx, const char *name, int len, void *data)
 {
@@ -138,35 +155,113 @@ static int nfc_nv_opera(int opr, int idx, const char *name, int len, void *data)
 	memcpy((char *)data, (char *)user_info.nv_data, len);
 	return 0;
 }
-
-static void hisi_pmic_on(void)
+/*lint -restore*/
+/*lint -save -e* */
+static int hisi_pmu_reg_operate_by_bit(int reg_addr, int bit_pos, int op)
 {
-	int ret;
-
-	ret = hisi_pmic_reg_read(0xc3);
-	ret |= 0x10;
-	hisi_pmic_reg_write(0xc3, ret);
+	int ret = 0;
+	if (reg_addr <= 0 || bit_pos < 0 || op < 0) {
+		hwlog_err("%s: reg_addr[%x], bit_pos[%d], op[%d], error!\n", __func__, reg_addr, bit_pos, op);
+		return -1;
+	}
+	ret = hisi_pmic_reg_read(reg_addr);
+	if (op == CLR_BIT) {
+		CLR_PMU_REG_BIT(ret, bit_pos);
+	} else {
+		SET_PMU_REG_BIT(ret, bit_pos);
+	}
+	hisi_pmic_reg_write(reg_addr, ret);
+	hwlog_info("%s: reg: 0x%x, pos: %d, value: 0x%x\n", __func__, reg_addr, bit_pos, ret);
+	return 0;
 }
 
-static void hisi_pmic_off(void)
+static int get_hisi_pmic_reg_status(int reg_addr, int bit_pos)
 {
-	int ret;
+	int ret = 0;
+	if (reg_addr <= 0 || bit_pos < 0 || bit_pos > 31) {
+		hwlog_err("%s: reg_addr[%x], bit_pos[%d], error!\n", __func__, reg_addr, bit_pos);
+		return -1;
+	}
+	ret = hisi_pmic_reg_read(reg_addr);
 
-	ret = hisi_pmic_reg_read(0xc3);
-	ret &= 0x0f;
-	hisi_pmic_reg_write(0xc3, ret);
+	ret = (ret >> bit_pos) & 0x01;
+
+	hwlog_info("%s: reg: 0x%x, pos: %d, value: 0x%x\n", __func__, reg_addr, bit_pos, ret);
+	return ret;
+}
+
+static int hisi_pmic_on(void)
+{
+	int ret = -1;
+	if (g_nfc_on_type == NFC_ON_BY_HI6421V600_PMIC) {
+		ret = hisi_pmu_reg_operate_by_bit(nfc_on_hi6421v600.addr, nfc_on_hi6421v600.pos, SET_BIT);
+	} else if (g_nfc_on_type == NFC_ON_BY_HISI_PMIC) {
+		ret = hisi_pmu_reg_operate_by_bit(nfc_on_hi6421v500.addr, nfc_on_hi6421v500.pos, SET_BIT);
+	} else if (g_nfc_on_type == NFC_ON_BY_HI6555V110_PMIC) {
+		ret = hisi_pmu_reg_operate_by_bit(nfc_on_hi6555v110.addr, nfc_on_hi6555v110.pos, SET_BIT);
+	} else {
+		hwlog_err("%s: bad g_nfc_on_type: %d\n", __func__, g_nfc_on_type);
+	}
+	return ret;
+}
+
+static int hisi_pmic_off(void)
+{
+	int ret = -1;
+	if (g_nfc_on_type == NFC_ON_BY_HI6421V600_PMIC) {
+		ret = hisi_pmu_reg_operate_by_bit(nfc_on_hi6421v600.addr, nfc_on_hi6421v600.pos, CLR_BIT);
+	}  else if (g_nfc_on_type == NFC_ON_BY_HISI_PMIC) {
+		ret = hisi_pmu_reg_operate_by_bit(nfc_on_hi6421v500.addr, nfc_on_hi6421v500.pos, CLR_BIT);
+	}  else if (g_nfc_on_type == NFC_ON_BY_HI6555V110_PMIC) {
+		ret = hisi_pmu_reg_operate_by_bit(nfc_on_hi6555v110.addr, nfc_on_hi6555v110.pos, CLR_BIT);
+	} else {
+		hwlog_err("%s: bad g_nfc_on_type: %d\n", __func__, g_nfc_on_type);
+	}
+	return ret;
 }
 
 static void pmu0_svdd_sel_on(void)
 {
-	hwlog_info("%s: in\n", __func__);
-	return hisi_pmic_on();
+	hwlog_info("%s: in g_nfc_svdd_sw: %d\n", __func__, g_nfc_svdd_sw);
+	if (g_nfc_svdd_sw == NFC_SWP_SW_HI6421V600) {
+		hisi_pmu_reg_operate_by_bit(nfc_on_hi6421v600.addr, nfc_on_hi6421v600.pos, SET_BIT);
+	} else if (g_nfc_svdd_sw == NFC_SWP_SW_HI6421V500) {
+		hisi_pmu_reg_operate_by_bit(nfc_on_hi6421v500.addr, nfc_on_hi6421v500.pos, SET_BIT);
+	} else if (g_nfc_svdd_sw == NFC_SWP_SW_HI6555V110) {
+		hisi_pmu_reg_operate_by_bit(nfc_on_hi6555v110.addr, nfc_on_hi6555v110.pos, SET_BIT);
+	} else {
+		hwlog_info("%s: pmu gpio don't connect to switch\n", __func__);
+	}
 }
 
 static void pmu0_svdd_sel_off(void)
 {
-	hwlog_info("%s: in\n", __func__);
-	return hisi_pmic_off();
+	hwlog_info("%s: in g_nfc_svdd_sw: %d\n", __func__, g_nfc_svdd_sw);
+	if (g_nfc_svdd_sw == NFC_SWP_SW_HI6421V600) {
+		hisi_pmu_reg_operate_by_bit(nfc_on_hi6421v600.addr, nfc_on_hi6421v600.pos, CLR_BIT);
+	} else if (g_nfc_svdd_sw == NFC_SWP_SW_HI6421V500) {
+		hisi_pmu_reg_operate_by_bit(nfc_on_hi6421v500.addr, nfc_on_hi6421v500.pos, CLR_BIT);
+	} else if (g_nfc_svdd_sw == NFC_SWP_SW_HI6555V110) {
+		hisi_pmu_reg_operate_by_bit(nfc_on_hi6555v110.addr, nfc_on_hi6555v110.pos, CLR_BIT);
+	} else {
+        hwlog_info("%s: pmu gpio don't connect to switch\n", __func__);
+    }
+}
+
+static int get_pmu0_svdd_sel_status(void)
+{
+    int ret = -1;
+	hwlog_info("%s: in g_nfc_svdd_sw: %d\n", __func__, g_nfc_svdd_sw);
+	if (g_nfc_svdd_sw == NFC_SWP_SW_HI6421V600) {
+		ret = get_hisi_pmic_reg_status(nfc_on_hi6421v600.addr, nfc_on_hi6421v600.pos);
+	} else if (g_nfc_svdd_sw == NFC_SWP_SW_HI6421V500) {
+		ret = get_hisi_pmic_reg_status(nfc_on_hi6421v500.addr, nfc_on_hi6421v500.pos);
+	} else if (g_nfc_svdd_sw == NFC_SWP_SW_HI6555V110) {
+		ret = get_hisi_pmic_reg_status(nfc_on_hi6555v110.addr, nfc_on_hi6555v110.pos);
+	} else {
+        hwlog_info("%s: pmu gpio don't connect to switch\n", __func__);
+    }
+    return ret;
 }
 
 static int nfc_get_dts_config_string(const char *node_name,
@@ -215,10 +310,12 @@ static int nfc_get_dts_config_u32(const char *node_name, const char *prop_name, 
 	}
 	return ret;
 }
+/*lint -restore*/
 /*
  * g_nfc_ext_gpio bit 0: 1 -- dload use extented gpio, 0 -- dload use soc gpio
  * g_nfc_ext_gpio bit 1: 1 -- irq use extented gpio, 0 -- irq use soc gpio
  */
+ /*lint -save -e* */
 static void get_ext_gpio_type(void)
 {
 	int ret = -1;
@@ -243,7 +340,7 @@ static void nfc_gpio_set_value(unsigned int gpio, int val)
 		gpio_set_value(gpio, val);
 	}
 }
-
+/*lint -restore*/
 static int nfc_gpio_get_value(unsigned int gpio)
 {
 	int ret = -1;
@@ -257,7 +354,8 @@ static int nfc_gpio_get_value(unsigned int gpio)
 	}
 	return ret;
 }
-
+/*lint -save -e* */
+EXPORT_SYMBOL(nfc_gpio_get_value);
 static void get_wake_lock_timeout(void)
 {
 	char wake_lock_str[MAX_WAKE_LOCK_TIMEOUT_SIZE] = {0};
@@ -302,6 +400,10 @@ static void get_nfc_on_type(void)
 			g_nfc_on_type = NFC_ON_BY_GPIO;
 		} else if (!strncasecmp(nfc_on_str, "hisi_pmic", strlen("hisi_pmic"))) {
 			g_nfc_on_type = NFC_ON_BY_HISI_PMIC;
+		} else if (!strncasecmp(nfc_on_str, "hi6421v600_pmic", strlen("hi6421v600_pmic"))) {
+			g_nfc_on_type = NFC_ON_BY_HI6421V600_PMIC;
+		} else if (!strncasecmp(nfc_on_str, "hi6555v110_pmic", strlen("hi6555v110_pmic"))) {
+			g_nfc_on_type = NFC_ON_BY_HI6555V110_PMIC;
 		} else if (!strncasecmp(nfc_on_str, "regulator_bulk", strlen("regulator_bulk"))) {
 			g_nfc_on_type = NFC_ON_BY_REGULATOR_BULK;
 		} else {
@@ -350,19 +452,24 @@ static void get_nfc_svdd_sw(void)
 
 	if (ret != 0) {
 		memset(nfc_svdd_sw_str, 0, MAX_DETECT_SE_SIZE);
-		g_nfc_svdd_sw = false;
+		g_nfc_svdd_sw = NFC_SWP_WITHOUT_SW;
 		hwlog_err("%s: can't get_nfc_svdd_sw\n", __func__);
 	} else {
-		if (!strncasecmp(nfc_svdd_sw_str, "true", strlen("true"))) {
-			g_nfc_svdd_sw = true;
+		if (!strncasecmp(nfc_svdd_sw_str, "hi6421v600_pmic", strlen("hi6421v600_pmic"))) {
+			g_nfc_svdd_sw = NFC_SWP_SW_HI6421V600;
+		} else if (!strncasecmp(nfc_svdd_sw_str, "hi6421v500_pmic", strlen("hi6421v500_pmic"))) {
+			g_nfc_svdd_sw = NFC_SWP_SW_HI6421V500;
+		} else if (!strncasecmp(nfc_svdd_sw_str, "hi6555v110_pmic", strlen("hi6555v110_pmic"))) {
+			g_nfc_svdd_sw = NFC_SWP_SW_HI6555V110;
 		} else {
-			g_nfc_svdd_sw = false;
+			g_nfc_svdd_sw = NFC_SWP_WITHOUT_SW;
 		}
 	}
 	hwlog_info("%s: g_nfc_svdd_sw:%d\n", __func__, g_nfc_svdd_sw);
 	return;
 }
-
+/*lint -restore*/
+/*lint -save -e* */
 void set_nfc_nxp_config_name(void)
 {
 	int ret = -1;
@@ -475,6 +582,8 @@ static int pn547_bulk_enable(struct  pn547_dev *pdev)
 		break;
 
 	case NFC_ON_BY_HISI_PMIC:
+	case NFC_ON_BY_HI6421V600_PMIC:
+	case NFC_ON_BY_HI6555V110_PMIC:
 		hwlog_info("%s: Nfc on by HISI PMIC !\n", __func__);
 		hisi_pmic_on();
 		break;
@@ -512,6 +621,8 @@ static int pn547_bulk_disable(struct  pn547_dev *pdev)
 		break;
 
 	case NFC_ON_BY_HISI_PMIC:
+	case NFC_ON_BY_HI6421V600_PMIC:
+	case NFC_ON_BY_HI6555V110_PMIC:
 		hwlog_info("%s: Nfc off by HISI PMIC !\n", __func__);
 		hisi_pmic_off();
 		break;
@@ -528,8 +639,8 @@ static int pn547_enable_clk(struct	pn547_dev *pdev, int enableflg)
 {
 	int ret = 0;
 
-	if ((NFC_CLK_SRC_PMU == g_nfc_clk_src) || (NFC_CLK_SRC_PMU_HI6555 == g_nfc_clk_src)) {
-		hwlog_info("%s: pmu clk is controlled by clk_req gpio.\n", __func__);
+	if (g_nfc_clk_src != NFC_CLK_SRC_CPU) {
+		hwlog_info("%s: pmu clk is controlled by clk_req gpio or xtal .\n", __func__);
 		return 0;
 	}
 
@@ -586,7 +697,8 @@ static int pn547_enable_nfc(struct pn547_dev *pdev)
 
 	return ret;
 }
-
+/*lint -restore*/
+/*lint -save -e* */
 static void pn547_disable_irq(struct pn547_dev *pn547_dev)
 {
 	unsigned int flags;
@@ -598,7 +710,8 @@ static void pn547_disable_irq(struct pn547_dev *pn547_dev)
 	}
 	spin_unlock_irqrestore(&pn547_dev->irq_enabled_lock, flags);
 }
-
+/*lint -restore*/
+/*lint -save -e* */
 static void pn547_disable_irq_for_ext_gpio(struct pn547_dev *pn547_dev)
 {
 	mutex_lock(&pn547_dev->irq_mutex_lock);
@@ -724,6 +837,7 @@ fail:
 	mutex_unlock(&pn547_dev->read_mutex);
 	return (size_t)ret;
 }
+EXPORT_SYMBOL(pn547_dev_read);
 
 static ssize_t pn547_dev_write(struct file *filp, const char __user *buf,
 		size_t count, loff_t *offset)
@@ -783,6 +897,7 @@ static ssize_t pn547_dev_write(struct file *filp, const char __user *buf,
 
 	return (size_t)ret;
 }
+EXPORT_SYMBOL(pn547_dev_write);
 
 static int pn547_dev_open(struct inode *inode, struct file *filp)
 {
@@ -880,7 +995,8 @@ static long pn547_dev_ioctl(struct file *filp,
 
 	return 0;
 }
-
+/*lint -restore*/
+/*lint -save -e* */
 static const struct file_operations pn547_dev_fops = {
 	.owner = THIS_MODULE,
 	.llseek = no_llseek,
@@ -892,6 +1008,8 @@ static const struct file_operations pn547_dev_fops = {
 	.compat_ioctl = pn547_dev_ioctl,
 #endif
 };
+/*lint -restore*/
+/*lint -save -e* */
 static ssize_t pn547_i2c_write(struct  pn547_dev *pdev, const char *buf, int count)
 {
 	int ret;
@@ -995,13 +1113,15 @@ static ssize_t pn547_i2c_read(struct  pn547_dev *pdev, char *buf, int count)
 fail:
 	return (size_t)ret;
 }
+/*lint -restore*/
+/*lint -save -e* */
 static int check_sim_status(struct i2c_client *client, struct  pn547_dev *pdev)
 {
 	int ret;
 	int nfc_rece_length = 40;
 
 	unsigned char recvBuf[40] = {0};
-	const  char send_reset[] = {0x20, 0x00, 0x01, 0x01};
+	const  char send_reset[] = {0x20, 0x00, 0x01, 0x00};
 	const  char init_cmd[] = {0x20, 0x01, 0x00};
 
 	const  char read_config[] = {0x2F, 0x02, 0x00};
@@ -1152,6 +1272,38 @@ static ssize_t nfc_fwupdate_show(struct device *dev, struct device_attribute *at
 	return (ssize_t)(snprintf(buf, sizeof(firmware_update)+1, "%d", firmware_update));
 }
 
+static ssize_t nfc_switch_state_store(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t count)
+{
+	if(buf!=NULL)
+	{
+		nfc_switch_state=buf[0]-CHAR_0; /*file storage str*/
+	}
+	return (ssize_t)count;
+}
+
+static ssize_t nfc_switch_state_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return (ssize_t)(snprintf(buf, sizeof(nfc_switch_state)+1, "%d", nfc_switch_state));
+}
+
+static ssize_t nfc_at_result_store(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t count)
+{
+	if(buf!=NULL)
+	{
+		nfc_at_result=buf[0]-CHAR_0; /*file storage str*/
+	}
+	return (ssize_t)count;
+}
+
+static ssize_t nfc_at_result_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return (ssize_t)(snprintf(buf, sizeof(nfc_at_result)+1, "%d", nfc_at_result));
+}
+
+
+
 static ssize_t nxp_config_name_store(struct device *dev, struct device_attribute *attr,
 			const char *buf, size_t count)
 {
@@ -1172,6 +1324,7 @@ static ssize_t nfc_brcm_conf_name_show(struct device *dev, struct device_attribu
 {
 	return (ssize_t)(snprintf(buf, strlen(g_nfc_brcm_conf_name)+1, "%s", g_nfc_brcm_conf_name));
 }
+/*lint -restore*/
 /*
 	function: check which sim card support card Emulation.
 	return value:
@@ -1182,6 +1335,7 @@ static ssize_t nfc_brcm_conf_name_show(struct device *dev, struct device_attribu
 		1		  1			 3			(all support)
 		<0>	:error
 */
+/*lint -save -e* */
 static ssize_t nfc_sim_status_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	int status = -1;
@@ -1347,14 +1501,16 @@ static ssize_t nfc_svdd_sw_store(struct device *dev, struct device_attribute *at
 		hwlog_err("%s: val len error\n", __func__);
 		return (ssize_t)count;
 	}
-	g_nfc_svdd_sw = val;
 	hwlog_info("%s: nfc svdd switch to %d\n", __func__, val);
 	return (ssize_t)count;
 }
 
 static ssize_t nfc_svdd_sw_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	return (ssize_t)(snprintf(buf, MAX_ATTRIBUTE_BUFFER_SIZE-1, "%d", g_nfc_svdd_sw));
+	int sw_status = 0;
+
+	sw_status = get_pmu0_svdd_sel_status();
+	return (ssize_t)(snprintf(buf, MAX_ATTRIBUTE_BUFFER_SIZE-1, "%d", sw_status));
 }
 
 static ssize_t nfc_close_type_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -1433,13 +1589,13 @@ static ssize_t nfc_hal_dmd_info_store(struct device *dev, struct device_attribut
 int nfc_record_dmd_info(long dmd_no, const char *dmd_info)
 {
 /*lint -e529 -esym(529,*)*/
+#ifdef CONFIG_HUAWEI_DSM
 	if (dmd_no < NFC_DMD_NUMBER_MIN || dmd_no > NFC_DMD_NUMBER_MAX
 		|| dmd_info == NULL || NULL == nfc_dclient) {
 		hwlog_info("%s: para error: %d\n", __func__, dmd_no); /*lint !e960*/
 		return -1;
 	}
-
-#ifdef CONFIG_HUAWEI_DSM
+    
 	hwlog_info("%s: dmd no: %d - %s", __func__, dmd_no, dmd_info); /*lint !e960*/
 	if (!dsm_client_ocuppy(nfc_dclient)) {
 		dsm_client_record(nfc_dclient, "DMD info:%s", dmd_info);
@@ -1475,6 +1631,11 @@ static ssize_t nfc_calibration_show(struct device *dev, struct device_attribute 
 	return (ssize_t)(snprintf(buf, MAX_BUFFER_SIZE-1, "%s", cali_str));
 }
 
+static ssize_t nfc_clk_src_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return (ssize_t)(snprintf(buf, MAX_ATTRIBUTE_BUFFER_SIZE-1, "%d", g_nfc_clk_src));
+}
+
 static struct device_attribute pn547_attr[] = {
 
 	__ATTR(nfc_fwupdate, 0664, nfc_fwupdate_show, nfc_fwupdate_store),
@@ -1495,8 +1656,12 @@ static struct device_attribute pn547_attr[] = {
 	__ATTR(nfc_activated_se_info, 0664, nfc_activated_se_info_show, nfc_activated_se_info_store),
 	__ATTR(nfc_hal_dmd, 0664, nfc_hal_dmd_info_show, nfc_hal_dmd_info_store),
 	__ATTR(nfc_calibration, 0444, nfc_calibration_show, NULL),
+	__ATTR(nfc_clk_src, 0444, nfc_clk_src_show, NULL),
+	__ATTR(nfc_switch_state, 0664, nfc_switch_state_show, nfc_switch_state_store),
+	__ATTR(nfc_at_result, 0664, nfc_at_result_show, nfc_at_result_store),
 };
-
+/*lint -restore*/
+/*lint -save -e* */
 static int create_sysfs_interfaces(struct device *dev)
 {
 	int i;
@@ -1532,20 +1697,14 @@ static int nfc_ven_low_beforepwd(struct notifier_block *this, unsigned int code,
 
 	hwlog_info("[%s]: enter!\n", __func__);
 
-	if (g_nfc_svdd_sw == true) {
-		hwlog_info("[%s]: %s powerdown with current sim_switch value: %d !\n", __func__, g_nfc_chip_type, nfcdev->sim_switch);
-		if (nfcdev->sim_switch ==  SIM2_CARD) {
-			pmu0_svdd_sel_off();
-		}
-	}
-
 	return retval;
 }
 
 static struct notifier_block nfc_ven_low_notifier = {
 	.notifier_call = nfc_ven_low_beforepwd,
 };
-
+/*lint -restore*/
+/*lint -save -e* */
 static int check_pn547(struct i2c_client *client, struct  pn547_dev *pdev)
 {
 	int ret = -1;
@@ -1619,7 +1778,12 @@ static int check_pn547(struct i2c_client *client, struct  pn547_dev *pdev)
 }
 static int pn547_get_resource(struct  pn547_dev *pdev,	struct i2c_client *client)
 {
-	int ret;
+	int ret = 0;
+	char *nfc_clk_status = NULL;
+	t_pmu_reg_control nfc_clk_hd_reg[] = {{0x000, 0}, {0x0C5, 5}, {0x125, 4}, {0x119, 4}};
+	t_pmu_reg_control nfc_clk_en_reg[] = {{0x000, 0}, {0x10A, 2}, {0x110, 0}, {0x000, 0}};
+	t_pmu_reg_control nfc_clk_dig_reg[] = {{0x000, 0}, {0x10C, 0}, {0x116, 2}, {0x238, 0}};
+	t_pmu_reg_control clk_driver_strength[] = {{0x000, 0}, {0x109, 4}, {0x116, 0}, {0x10D, 0}};
 
 	pdev->irq_gpio = of_get_named_gpio(client->dev.of_node, "pn547,irq", 0);
 	hwlog_err("irq_gpio:%u\n", pdev->irq_gpio);
@@ -1632,6 +1796,27 @@ static int pn547_get_resource(struct  pn547_dev *pdev,	struct i2c_client *client
 	if (!gpio_is_valid(pdev->firm_gpio)) {
 		hwlog_err("failed to get firm!\n");
 		return -ENODEV;
+	}
+
+	ret = of_property_read_string(client->dev.of_node, "clk_status", (const char **)&nfc_clk_status);
+	if (ret) {
+		hwlog_err("[%s,%d]:read clk status fail\n", __func__, __LINE__);
+		return -ENODEV;
+	} else if (!strcmp(nfc_clk_status, "pmu")) {
+		hwlog_info("[%s,%d]:clock source is pmu\n", __func__, __LINE__);
+		g_nfc_clk_src = NFC_CLK_SRC_PMU;
+	} else if (!strcmp(nfc_clk_status, "pmu_hi6555")) {
+		hwlog_info("[%s,%d]:clock source is pmu_hi6555\n", __func__, __LINE__);
+		g_nfc_clk_src = NFC_CLK_SRC_PMU_HI6555;
+	} else if (!strcmp(nfc_clk_status, "pmu_hi6421v600")) {
+		hwlog_info("[%s,%d]:clock source is pmu_hi6421v600\n", __func__, __LINE__);
+		g_nfc_clk_src = NFC_CLK_SRC_PMU_HI6421V600;
+	} else if (!strcmp(nfc_clk_status, "xtal")) {
+		hwlog_info("[%s,%d]:clock source is XTAL\n", __func__, __LINE__);
+		g_nfc_clk_src = NFC_CLK_SRC_XTAL;
+	} else {
+		hwlog_info("[%s,%d]:clock source is cpu by default\n", __func__, __LINE__);
+		g_nfc_clk_src = NFC_CLK_SRC_CPU;
 	}
 
 	pdev->pctrl = devm_pinctrl_get(&client->dev);
@@ -1653,58 +1838,64 @@ static int pn547_get_resource(struct  pn547_dev *pdev,	struct i2c_client *client
 	if (NFC_CLK_SRC_PMU == g_nfc_clk_src) {
 		/*use pmu wifibt clk*/
 		hwlog_info("%s: config pmu clock in register!\n", __func__);
-
 		/*Register 0x0c5 bit5 = 0 -- not disable wifi_clk_en gpio to control wifi_clk output*/
-		ret = hisi_pmic_reg_read(0xc5);
-		ret &= (~0x20);
-		hisi_pmic_reg_write(0xc5, ret);
-
+		hisi_pmu_reg_operate_by_bit(nfc_clk_hd_reg[NFC_CLK_SRC_PMU].addr,
+									nfc_clk_hd_reg[NFC_CLK_SRC_PMU].pos, CLR_BIT);
 		/*Register 0x10A bit2 = 0 -- disable internal register to control wifi_clk output*/
-		ret = hisi_pmic_reg_read(0x10A);
-		ret &= (~0x4);
-		hisi_pmic_reg_write(0x10A, ret);
-
+		hisi_pmu_reg_operate_by_bit(nfc_clk_en_reg[NFC_CLK_SRC_PMU].addr,
+									nfc_clk_en_reg[NFC_CLK_SRC_PMU].pos, CLR_BIT);
 		/*Register 0x10C bit0 = 0 -- sine wave(default); 1 --	square wave*/
-		ret = hisi_pmic_reg_read(0x10C);
-		ret |= 0x01;
-		hisi_pmic_reg_write(0x10C, ret);
-
+		hisi_pmu_reg_operate_by_bit(nfc_clk_dig_reg[NFC_CLK_SRC_PMU].addr,
+									nfc_clk_dig_reg[NFC_CLK_SRC_PMU].pos, SET_BIT);
 		/*Register 0x109 bit5:bit4 = drive-strength
 							  00 --3pF//100K;
 							  01 --10pF//100K;
 							  10 --16pF//100K;
 							  11 --25pF//100K */
-		ret = hisi_pmic_reg_read(0x109);
-		ret |= 0x30;
-		hisi_pmic_reg_write(0x109, ret);
+		hisi_pmu_reg_operate_by_bit(clk_driver_strength[NFC_CLK_SRC_PMU].addr,
+									clk_driver_strength[NFC_CLK_SRC_PMU].pos, SET_BIT);
+		hisi_pmu_reg_operate_by_bit(clk_driver_strength[NFC_CLK_SRC_PMU].addr,
+									clk_driver_strength[NFC_CLK_SRC_PMU].pos + 1, SET_BIT);
 	} else if (NFC_CLK_SRC_PMU_HI6555 == g_nfc_clk_src) {
 		/*use pmu wifibt clk*/
 		hwlog_info("%s: config pmu_hi6555 clock in register!\n", __func__);
-
 		/*Register 0x125 bit4 = 0 -- not disable wifi_clk_en gpio to control wifi_clk output*/
-		ret = hisi_pmic_reg_read(0x125);
-		ret &= (~0x10);
-		hisi_pmic_reg_write(0x125, ret);
-
+		hisi_pmu_reg_operate_by_bit(nfc_clk_hd_reg[NFC_CLK_SRC_PMU_HI6555].addr,
+									nfc_clk_hd_reg[NFC_CLK_SRC_PMU_HI6555].pos, CLR_BIT);
 		/*Register 0x110 bit0 = 0 -- disable internal register to control wifi_clk output*/
-		ret = hisi_pmic_reg_read(0x110);
-		ret &= (~0x01);
-		hisi_pmic_reg_write(0x110, ret);
-
+		hisi_pmu_reg_operate_by_bit(nfc_clk_en_reg[NFC_CLK_SRC_PMU_HI6555].addr,
+									nfc_clk_en_reg[NFC_CLK_SRC_PMU_HI6555].pos, CLR_BIT);
 		/*Register 0x116 bit2 = sine wave(default):1 --  square wave:0*/
-		ret = hisi_pmic_reg_read(0x116);
-		ret &= (~0x04);
-		hisi_pmic_reg_write(0x116, ret);
-
+		hisi_pmu_reg_operate_by_bit(nfc_clk_dig_reg[NFC_CLK_SRC_PMU_HI6555].addr,
+									nfc_clk_dig_reg[NFC_CLK_SRC_PMU_HI6555].pos, CLR_BIT);
 		/*Register 0x116 bit1:bit0 = drive-strength
 									00 --3pF//100K;
 									01 --10pF//100K;
 									10 --16pF//100K;
 									11 --30pF//100K */
-		ret = hisi_pmic_reg_read(0x116);
-		ret |= 0x03;
-		hisi_pmic_reg_write(0x116, ret);
-	} else {
+		hisi_pmu_reg_operate_by_bit(clk_driver_strength[NFC_CLK_SRC_PMU_HI6555].addr,
+									clk_driver_strength[NFC_CLK_SRC_PMU_HI6555].pos, SET_BIT);
+		hisi_pmu_reg_operate_by_bit(clk_driver_strength[NFC_CLK_SRC_PMU_HI6555].addr,
+									clk_driver_strength[NFC_CLK_SRC_PMU_HI6555].pos + 1, SET_BIT);
+	} else if (NFC_CLK_SRC_PMU_HI6421V600 == g_nfc_clk_src) {
+		/*use pmu nfc clk*/
+		hwlog_info("%s: config pmu_hi6421v600 clock in register!\n", __func__);
+		/*Register 0x119 bit4 = 0 -- not disable nfc_clk_en gpio to control nfc_clk output*/
+		hisi_pmu_reg_operate_by_bit(nfc_clk_hd_reg[NFC_CLK_SRC_PMU_HI6421V600].addr,
+									nfc_clk_hd_reg[NFC_CLK_SRC_PMU_HI6421V600].pos, CLR_BIT);
+		/*Register 0x238 bit0 = sine wave(default):1 --  square wave:0*/
+		hisi_pmu_reg_operate_by_bit(nfc_clk_dig_reg[NFC_CLK_SRC_PMU_HI6421V600].addr,
+									nfc_clk_dig_reg[NFC_CLK_SRC_PMU_HI6421V600].pos, CLR_BIT);
+		/*Register 0x10D bit1:bit0 = drive-strength
+									00 --3pF//100K;
+									01 --10pF//100K;
+									10 --16pF//100K;
+									11 --30pF//100K */
+		hisi_pmu_reg_operate_by_bit(clk_driver_strength[NFC_CLK_SRC_PMU_HI6421V600].addr,
+									clk_driver_strength[NFC_CLK_SRC_PMU_HI6421V600].pos, SET_BIT);
+		hisi_pmu_reg_operate_by_bit(clk_driver_strength[NFC_CLK_SRC_PMU_HI6421V600].addr,
+									clk_driver_strength[NFC_CLK_SRC_PMU_HI6421V600].pos + 1, CLR_BIT);
+	} else if (NFC_CLK_SRC_CPU == g_nfc_clk_src) {
 		/*use default soc clk*/
 		pdev->nfc_clk = devm_clk_get(&client->dev, NFC_CLK_PIN);
 		if (IS_ERR(pdev->nfc_clk)) {
@@ -1722,7 +1913,7 @@ static int pn547_get_resource(struct  pn547_dev *pdev,	struct i2c_client *client
 	case NFC_ON_BY_GPIO:
 		pdev->ven_gpio = of_get_named_gpio(client->dev.of_node, "pn547,ven", 0);
 		hwlog_info("Nfc on by ven_gpio:%d\n", pdev->ven_gpio); /*lint !e515 !e516 !e717 !e960*/
-		if (!gpio_is_valid(pdev->ven_gpio)) {                  /*lint !e713*/
+		if (!gpio_is_valid(pdev->ven_gpio)) {				   /*lint !e713*/
 			hwlog_err("failed to get \"huawei,nfc_ven\"\n");
 			return -ENODEV;
 		}
@@ -1743,6 +1934,8 @@ static int pn547_get_resource(struct  pn547_dev *pdev,	struct i2c_client *client
 		break;
 
 	case NFC_ON_BY_HISI_PMIC:
+	case NFC_ON_BY_HI6421V600_PMIC:
+	case NFC_ON_BY_HI6555V110_PMIC:
 		hwlog_info("Nfc on by hisi pmic!\n");
 		break;
 
@@ -1758,14 +1951,13 @@ static struct of_device_id pn547_i2c_dt_ids[] = {
 	{.compatible = "hisilicon,pn547_nfc" },
 	{}
 };
-
-
+/*lint -restore*/
+/*lint -save -e* */
 static int pn547_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
 	int ret;
 	struct pn547_dev *pn547_dev;
-	char *nfc_clk_status = NULL;
 
 	hwlog_info("[%s,%d]: probe start !\n", __func__, __LINE__);
 	if (!of_match_device(pn547_i2c_dt_ids, &client->dev)) {
@@ -1786,23 +1978,6 @@ static int pn547_probe(struct i2c_client *client,
 	get_nfc_svdd_sw();
 	get_wake_lock_timeout();
 	get_nfc_wired_ese_type();
-	if (g_nfc_svdd_sw == true)
-		pmu0_svdd_sel_on();
-
-	ret = of_property_read_string(client->dev.of_node, "clk_status", (const char **)&nfc_clk_status);
-	if (ret) {
-		hwlog_err("[%s,%d]:read clk status fail\n", __func__, __LINE__);
-		return -ENODEV;
-	} else if (!strcmp(nfc_clk_status, "pmu")) {
-		hwlog_info("[%s,%d]:clock source is pmu\n", __func__, __LINE__);
-		g_nfc_clk_src = NFC_CLK_SRC_PMU;
-	} else if (!strcmp(nfc_clk_status, "pmu_hi6555")) {
-		hwlog_info("[%s,%d]:clock source is pmu_hi6555\n", __func__, __LINE__);
-		g_nfc_clk_src = NFC_CLK_SRC_PMU_HI6555;
-	} else {
-		hwlog_info("[%s,%d]:clock source is cpu by default\n", __func__, __LINE__);
-		g_nfc_clk_src = NFC_CLK_SRC_CPU;
-	}
 
 	ret = create_sysfs_interfaces(&client->dev);
 	if (ret < 0) {
@@ -2017,8 +2192,8 @@ static const struct i2c_device_id pn547_id[] = {
 	{ "pn547", 0 },
 	{ }
 };
-
-
+/*lint -restore*/
+/*lint -save -e* */
 MODULE_DEVICE_TABLE(of, pn547_i2c_dt_ids);
 static struct i2c_driver pn547_driver = {
 	.id_table = pn547_id,
@@ -2030,10 +2205,13 @@ static struct i2c_driver pn547_driver = {
 		.of_match_table = of_match_ptr(pn547_i2c_dt_ids),
 	},
 };
+/*lint -restore*/
 /*
  * module load/unload record keeping
  */
+ /*lint -save -e* */
 module_i2c_driver(pn547_driver);
 MODULE_AUTHOR("Sylvain Fonteneau");
 MODULE_DESCRIPTION("NFC pn547 driver");
 MODULE_LICENSE("GPL");
+/*lint -restore*/
