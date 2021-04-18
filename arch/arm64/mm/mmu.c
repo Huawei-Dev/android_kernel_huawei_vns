@@ -65,18 +65,15 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 }
 EXPORT_SYMBOL(phys_mem_access_prot);
 
-static void __init *early_alloc(void)
+static void __init *early_alloc(unsigned long sz)
 {
 	phys_addr_t phys;
 	void *ptr;
 
-	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+	phys = memblock_alloc(sz, sz);
 	BUG_ON(!phys);
 	ptr = __va(phys);
-	memset(ptr, 0, PAGE_SIZE);
-
-	/* Ensure the zeroed page is visible to the page table walker */
-	dsb(ishst);
+	memset(ptr, 0, sz);
 	return ptr;
 }
 
@@ -101,12 +98,12 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
 static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
 				  unsigned long end, unsigned long pfn,
 				  pgprot_t prot,
-				  void *(*pgtable_alloc)(void))
+				  void *(*alloc)(unsigned long size))
 {
 	pte_t *pte;
 
 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
-		pte = pgtable_alloc();
+		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
 		if (pmd_sect(*pmd))
 			split_pmd(pmd, pte);
 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
@@ -145,7 +142,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
 	 * Check for initial section mappings in the pgd/pud and remove them.
 	 */
 	if (pud_none(*pud) || pud_sect(*pud)) {
-		pmd = alloc();
+		pmd = alloc(PTRS_PER_PMD * sizeof(pmd_t));
 		if (pud_sect(*pud)) {
 			/*
 			 * need to have the 1G of mappings continue to be
@@ -207,7 +204,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
 	unsigned long next;
 
 	if (pgd_none(*pgd)) {
-		pud = alloc();
+		pud = alloc(PTRS_PER_PUD * sizeof(pud_t));
 		pgd_populate(mm, pgd, pud);
 	}
 	BUG_ON(pgd_bad(*pgd));
@@ -269,13 +266,14 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
 	} while (pgd++, addr = next, addr != end);
 }
 
-static void *late_alloc(void)
+static void *late_alloc(unsigned long size)
 {
-	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
+	void *ptr;
+	
+	BUG_ON(size > PAGE_SIZE);
+	ptr = (void *)__get_free_page(PGALLOC_GFP);
 	BUG_ON(!ptr);
 
-	/* Ensure the zeroed page is visible to the page table walker */
-	dsb(ishst);
 	return ptr;
 }
 
