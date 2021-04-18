@@ -134,7 +134,7 @@ int dt_target_cpu(unsigned long *freq)
 	g_support_efuse = false;
 	ret = of_property_read_string(np, "support_efuse", (const char **)(&support_efuse));
 	if (!ret) {
-		if (strcmp(support_efuse, "true") == 0)
+		if (strncmp(support_efuse, "true", 4) == 0)
 			g_support_efuse = true;
 	}
 

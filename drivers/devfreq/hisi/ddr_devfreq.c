@@ -25,6 +25,7 @@
 #endif
 #include <linux/clk.h>
 
+/*lint -save -e715 -e785 -e747*/
 
 /*===tele_mntn===*/
 #if defined (CONFIG_HISILICON_PLATFORM_TELE_MNTN)
@@ -36,10 +37,13 @@ extern unsigned int get_slice_time(void);
 
 #define MODULE_NAME "DDR_DEVFREQ"
 
+typedef unsigned long (*calc_vote_value_func)(struct devfreq *devfreq, unsigned long freq);
+
 struct ddr_devfreq_device {
 	struct devfreq *devfreq;
 	struct clk *set;
 	struct clk *get;
+	calc_vote_value_func calc_vote_value;
 	unsigned long freq;
 };
 
@@ -220,11 +224,52 @@ static struct devfreq_pm_qos_data ddr_devfreq_up_th_pm_qos_data = {
 	.freq = 0,
 };
 
+
+#define VOTE_MAX_VALUE	(0xFF)
+#define VOTE_QUOTIENT(vote)	((vote) >> 4)
+#define VOTE_REMAINDER(vote)	((vote) & 0xF)
+#define FREQ_HZ	(1000000)
+
+static unsigned long calc_vote_value_hw(struct devfreq *devfreq, unsigned long freq)
+{
+	unsigned long freq_hz = freq / FREQ_HZ;
+	unsigned long quotient = VOTE_QUOTIENT(freq_hz);
+	unsigned long remainder = VOTE_REMAINDER(freq_hz);
+	unsigned long x_quotient, x_remainder;
+	unsigned int lev;
+
+	for (lev = 0; lev < devfreq->profile->max_state; lev++)
+	{
+		x_quotient = VOTE_QUOTIENT(devfreq->profile->freq_table[lev] / FREQ_HZ);
+		if (quotient == x_quotient)
+		{
+			x_remainder = VOTE_REMAINDER(devfreq->profile->freq_table[lev] / FREQ_HZ);
+			if (remainder > x_remainder)
+			{
+				quotient ++;
+			}
+			break;
+		}else if (quotient < x_quotient)
+			break;
+	}
+
+	if (quotient > VOTE_MAX_VALUE) {
+		quotient = VOTE_MAX_VALUE;
+	}
+
+	return (quotient * FREQ_HZ);
+}
+
+static unsigned long calc_vote_value_ipc(struct devfreq *devfreq, unsigned long freq)
+{
+	return freq;
+}
+
 /*static unsigned long min_freq_table[2];*/
 static int ddr_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 {
 	struct platform_device *pdev = container_of(dev,
-					struct platform_device, dev);
+					struct platform_device, dev);  //lint !e826
 	struct ddr_devfreq_device *ddev = platform_get_drvdata(pdev);
 	struct devfreq_pm_qos_data *data;
 	struct devfreq *devfreq;
@@ -259,7 +304,7 @@ static int ddr_devfreq_target(struct device *dev, unsigned long *freq, u32 flags
 
 		if (cur_freq != *freq)
 		{
-			(void)clk_set_rate(ddev->set, *freq);
+			(void)clk_set_rate(ddev->set, ddev->calc_vote_value(devfreq, *freq));
 			ddev->freq = *freq;
 		}
 	}
@@ -268,7 +313,7 @@ static int ddr_devfreq_target(struct device *dev, unsigned long *freq, u32 flags
 		data->freq = *freq;
 		if (ddev->freq != *freq) {
 			/* undate ddr freqency down threshold */
-			(void)clk_set_rate(ddev->set, *freq);
+			(void)clk_set_rate(ddev->set, ddev->calc_vote_value(devfreq, *freq));
 			ddev->freq = *freq;
 		}
 	}
@@ -278,7 +323,7 @@ static int ddr_devfreq_target(struct device *dev, unsigned long *freq, u32 flags
 	*freq = clk_get_rate(ddev->get);
 
 	/* check */
-	for (lev = 0; lev < devfreq->profile->max_state; lev++)
+	for (lev = 0; lev < devfreq->profile->max_state; lev++)	//lint !e574 !e737
 		if (*freq == devfreq->profile->freq_table[lev])
 			goto out;
 
@@ -287,7 +332,7 @@ static int ddr_devfreq_target(struct device *dev, unsigned long *freq, u32 flags
 	dev_err(dev,
 		"odd freq status.\n<Target: %09lu hz>\n<Status: %09lu hz>\n%s",
 		_freq, *freq, "--- freq table ---\n");
-	for (lev = 0; lev < devfreq->profile->max_state; lev++) {
+	for (lev = 0; lev < devfreq->profile->max_state; lev++) {	//lint !e574 !e737
 		pr_err("<%d> %09u hz\n",
 			lev, devfreq->profile->freq_table[lev]);
 	}
@@ -317,7 +362,7 @@ ddr_devfreq_get_dev_status(struct device *dev, struct devfreq_dev_status *stat)
 static int ddr_devfreq_get_cur_status(struct device *dev, unsigned long *freq)
 {
 	struct platform_device *pdev = container_of(dev,
-					struct platform_device, dev);
+					struct platform_device, dev);	/*lint !e826 */
 	struct ddr_devfreq_device *ddev = platform_get_drvdata(pdev);
 
 	if(NULL == ddev)
@@ -335,12 +380,14 @@ static struct devfreq_dev_profile ddr_devfreq_dev_profile = {
 	.get_cur_freq		= ddr_devfreq_get_cur_status,
 };
 
+/*lint -e429*/
 static int ddr_devfreq_probe(struct platform_device *pdev)
 {
     struct ddr_devfreq_device *ddev = NULL;
     struct device_node *np = pdev->dev.of_node;
     struct devfreq_pm_qos_data *ddata = NULL;
     const char *type = NULL;
+    const char *vote_method = NULL;
     int ret = 0;
 
 #ifdef CONFIG_INPUT_PULSE_SUPPORT
@@ -401,7 +448,7 @@ static int ddr_devfreq_probe(struct platform_device *pdev)
 		goto no_type;
 	}
 
-	if (!strcmp("memory_latency", type)) {
+	if (!strncmp("memory_latency", type, strlen(type) + 1)) {
 		ret=of_property_read_u32_array(np, "pm_qos_data_reg", (u32 *)&ddr_devfreq_latency_pm_qos_data, 0x2);
 		if (ret) {
 			pr_err("%s: %s %d, no type\n",
@@ -412,7 +459,7 @@ static int ddr_devfreq_probe(struct platform_device *pdev)
 		ddata = &ddr_devfreq_latency_pm_qos_data;
 		dev_set_name(&pdev->dev, "ddrfreq_latency");
 	}
-	else if (!strcmp("memory_tput", type)) {
+	else if (!strncmp("memory_tput", type, strlen(type) + 1)) {
 		ret=of_property_read_u32_array(np, "pm_qos_data_reg", (u32 *)&ddr_devfreq_pm_qos_data, 0x2);
 		if (ret) {
 			pr_err("%s: %s %d, no type\n",
@@ -422,7 +469,7 @@ static int ddr_devfreq_probe(struct platform_device *pdev)
 			MODULE_NAME, __func__, __LINE__,ddr_devfreq_pm_qos_data.bytes_per_sec_per_hz,ddr_devfreq_pm_qos_data.bd_utilization);
 		ddata = &ddr_devfreq_pm_qos_data;
 		dev_set_name(&pdev->dev, "ddrfreq");
-	} else if (!strcmp("memory_tput_up_threshold", type)) {
+	} else if (!strncmp("memory_tput_up_threshold", type, strlen(type) + 1)) {
 		ret = of_property_read_u32_array(np, "pm_qos_data_reg", (u32 *) &ddr_devfreq_up_th_pm_qos_data, 0x2);
 		if (ret) {
 			pr_err("%s: %s %d, no type\n",
@@ -439,7 +486,7 @@ static int ddr_devfreq_probe(struct platform_device *pdev)
 		goto err_type;
 	}
 
-	ddev = kmalloc(sizeof(struct ddr_devfreq_device), GFP_KERNEL);
+	ddev = kzalloc(sizeof(struct ddr_devfreq_device), GFP_KERNEL);
 	if (!ddev) {
 		pr_err("%s: %s %d, no mem\n",
 			MODULE_NAME, __func__, __LINE__);
@@ -463,6 +510,14 @@ static int ddr_devfreq_probe(struct platform_device *pdev)
 		goto no_clk2;
 	}
 
+	if (of_property_read_string(np, "vote_method", &vote_method)) {
+		ddev->calc_vote_value = calc_vote_value_ipc;
+	} else if (!strncmp("hardware", vote_method, strlen(vote_method) + 1)) {
+		ddev->calc_vote_value = calc_vote_value_hw;
+	} else {
+		ddev->calc_vote_value = calc_vote_value_ipc;
+	}
+
 	if (dev_pm_opp_of_add_table(&pdev->dev) ||
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 		hisi_devfreq_init_freq_table(&pdev->dev,
@@ -478,7 +533,7 @@ static int ddr_devfreq_probe(struct platform_device *pdev)
 		ddr_devfreq_dev_profile.initial_freq = clk_get_rate(ddev->get);
 		rcu_read_lock();
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
-		ddr_devfreq_dev_profile.max_state = dev_pm_opp_get_opp_count(&pdev->dev);
+		ddr_devfreq_dev_profile.max_state = dev_pm_opp_get_opp_count(&pdev->dev); /*lint !e732 */
 #else
 		ddr_devfreq_dev_profile.max_state = opp_get_opp_count(&pdev->dev);
 #endif
@@ -537,6 +592,7 @@ no_type:
 out:
 	return ret;
 }
+/*lint +e429*/
 
 static int ddr_devfreq_remove(struct platform_device *pdev)
 {
@@ -576,7 +632,9 @@ static const struct of_device_id ddr_devfreq_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, ddr_devfreq_of_match);
 #endif
+/*lint -restore */
 
+/*lint -e64 -e785 */
 static struct platform_driver ddr_devfreq_driver = {
 	.probe = ddr_devfreq_probe,
 	.remove = ddr_devfreq_remove,
@@ -586,4 +644,9 @@ static struct platform_driver ddr_devfreq_driver = {
 		.of_match_table = of_match_ptr(ddr_devfreq_of_match),
 	},
 };
+/*lint +e64 +e785 */
+
+/*lint -e528 -esym(528,*) -e64 -esym(64,*) */
 module_platform_driver(ddr_devfreq_driver);
+/*lint -e528 +esym(528,*) +e64 +esym(64,*) */
+

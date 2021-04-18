@@ -34,6 +34,10 @@
 
 #define CPU_VOLT_FN_GET_VAL				(0xc800aa01)
 #define AVS_VOLT_MAX_BYTE				(192)
+#ifdef CONFIG_HISI_ENABLE_HPM_DATA_COLLECT
+#define HPM_VOLT_MAX_BYTE				(102)
+#define DIEID_MAX_BYTE					(20)
+#endif
 
 struct tag_cpu_volt_data {
 	phys_addr_t phy_addr;
@@ -69,11 +73,13 @@ static int get_volt_show(struct seq_file *m, void *v)
 	ret = atfd_hisi_service_get_val_smc((u64)CPU_VOLT_FN_GET_VAL,
 					    g_cpu_volt_data.phy_addr,
 					    (u64)AVS_VOLT_MAX_BYTE, 0ULL);
+
 	if (ret != 0) {
 		(void)seq_printf(m, "get val failed.\n");
 		mutex_unlock(&g_cpu_volt_data.cpu_mutex);
 		return -EAGAIN;
 	}
+
 	for (i = 0; i < AVS_VOLT_MAX_BYTE; i++) {
 		seq_printf(m, "0x%-2x ", g_cpu_volt_data.virt_addr[i]);
 		if ((i != 0) && (i % 16 == 15))
