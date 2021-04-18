@@ -356,7 +356,6 @@ static void __init dma_contiguous_remap(void)
 	for (i = 0; i < dma_mmu_remap_num; i++)
 		remap_as_pages(dma_mmu_remap[i].base,
 			       dma_mmu_remap[i].size);
->>>>>>> 6720ca618a... arm64: Support early fixup for CMA
 }
 
 void create_mapping_late(phys_addr_t phys, unsigned long virt,
