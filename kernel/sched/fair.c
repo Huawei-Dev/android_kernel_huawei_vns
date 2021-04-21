@@ -36,7 +36,6 @@
 
 #include "sched.h"
 #include "tune.h"
-#include "walt.h"
 
 /*
  * Targeted preemption latency for CPU-bound tasks:
@@ -58,12 +57,6 @@ unsigned int sysctl_sched_sync_hint_enable = 0;
 unsigned int sysctl_sched_initial_task_util = 0;
 unsigned int sysctl_sched_cstate_aware = 0;
 
-#ifdef CONFIG_SCHED_WALT
-unsigned int sysctl_sched_use_walt_cpu_util = 1;
-unsigned int sysctl_sched_use_walt_task_util = 1;
-__read_mostly unsigned int sysctl_sched_walt_cpu_high_irqload =
-    (10 * NSEC_PER_MSEC);
-#endif
 /*
  * The initial- and re-scaling of tunables is configurable
  * (default SCHED_TUNABLESCALING_LOG = *(1+ilog(ncpus))
@@ -4355,15 +4348,12 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		if (cfs_rq_throttled(cfs_rq))
 			break;
 		cfs_rq->h_nr_running++;
-		walt_inc_cfs_cumulative_runnable_avg(cfs_rq, p);
-
 		flags = ENQUEUE_WAKEUP;
 	}
 
 	for_each_sched_entity(se) {
 		cfs_rq = cfs_rq_of(se);
 		cfs_rq->h_nr_running++;
-		walt_inc_cfs_cumulative_runnable_avg(cfs_rq, p);
 
 		if (cfs_rq_throttled(cfs_rq))
 			break;
@@ -4378,7 +4368,6 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 #ifdef CONFIG_SMP
 
 	if (!se) {
-		walt_inc_cumulative_runnable_avg(rq, p);
 		if (!task_new && !rq->rd->overutilized &&
 		    cpu_overutilized(rq->cpu)) {
 			rq->rd->overutilized = true;
@@ -4429,7 +4418,6 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		if (cfs_rq_throttled(cfs_rq))
 			break;
 		cfs_rq->h_nr_running--;
-		walt_dec_cfs_cumulative_runnable_avg(cfs_rq, p);
 
 		/* Don't dequeue parent if it has other entities besides us */
 		if (cfs_rq->load.weight) {
@@ -4450,7 +4438,6 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	for_each_sched_entity(se) {
 		cfs_rq = cfs_rq_of(se);
 		cfs_rq->h_nr_running--;
-		walt_dec_cfs_cumulative_runnable_avg(cfs_rq, p);
 
 		if (cfs_rq_throttled(cfs_rq))
 			break;
@@ -4465,8 +4452,6 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 #ifdef CONFIG_SMP
 
 	if (!se) {
-		walt_dec_cumulative_runnable_avg(rq, p);
-
 		/*
 		 * We want to potentially trigger a freq switch
 		 * request only for tasks that are going to sleep;
@@ -5403,12 +5388,6 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
 
 static inline unsigned long task_util(struct task_struct *p)
 {
-#ifdef CONFIG_SCHED_WALT
-	if (!walt_disabled && sysctl_sched_use_walt_task_util) {
-		unsigned long demand = p->ravg.demand;
-		return (demand << 10) / walt_ravg_window;
-	}
-#endif
 	return p->se.avg.util_avg;
 }
 
@@ -5530,19 +5509,8 @@ static bool need_filter_task(struct task_struct *p)
 		if (capacity_orig_of(first_cpu) >= target_max_cap)
 			continue;
 
-#ifdef CONFIG_SCHED_WALT
-		if (sysctl_sched_use_walt_task_util) {
-			if (task_fits_max(p, first_cpu) ||
-			    p->se.avg.util_avg * MAX_TASK_NR_PER_CPU < capacity_orig_of(first_cpu))
-				target_max_cap = capacity_orig_of(first_cpu);
-		} else {
-			if (task_util(p) * MAX_TASK_NR_PER_CPU < capacity_orig_of(first_cpu))
-				target_max_cap = capacity_orig_of(first_cpu);
-		}
-#else
 		if (task_util(p) * MAX_TASK_NR_PER_CPU < capacity_orig_of(first_cpu))
 			target_max_cap = capacity_orig_of(first_cpu);
-#endif
 
 	} while (sg = sg->next, sg != sd->groups);
 
@@ -5919,10 +5887,6 @@ static inline int find_best_target(struct task_struct *p, bool boosted, bool pre
 		if (new_util > capacity_orig_of(i))
 			continue;
 
-#ifdef CONFIG_SCHED_WALT
-		if (walt_cpu_high_irqload(i))
-			continue;
-#endif
 		/*
 		 * Unconditionally favoring tasks that prefer idle cpus to
 		 * improve latency.
@@ -6896,27 +6860,9 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 	if (energy_aware() &&
 	    (capacity_orig_of(env->dst_cpu) > capacity_orig_of(env->src_cpu))) {
 
-#ifdef CONFIG_SCHED_WALT
-		if (sysctl_sched_use_walt_task_util) {
-			/*
-			 * go back to use PELT util_avg, so can really filter
-			 * out the task with big util value. Otherwise, it maybe
-			 * a 'fake' big load task due WALT also will account for
-			 * runnable time.
-			 */
-			if (task_fits_max(p, env->src_cpu) ||
-			    p->se.avg.util_avg * MAX_TASK_NR_PER_CPU < capacity_orig_of(env->src_cpu))
-				return 0;
-		} else {
-			/* task has small work load */
-			if (task_util(p) * MAX_TASK_NR_PER_CPU  < capacity_orig_of(env->src_cpu))
-				return 0;
-		}
-#else
 		/* task has small work load */
 		if (task_util(p) * MAX_TASK_NR_PER_CPU < capacity_orig_of(env->src_cpu))
 			return 0;
-#endif
 
 		/* the target CPU is overutilized and it's not idle */
 		if (cpu_overutilized(env->dst_cpu) && !idle_cpu(env->dst_cpu))
