@@ -1248,12 +1248,6 @@ config HISI_CPU_TOPO
 	help
 	  Hisilicon CPU topology helper function.
 
-config HISI_FORKBOOST
-	bool "hisilicon fork thread boost"
-	default n
-	help
-	  Boost the new fork thread if not kernel thread.
-
 config HISI_RT_OPT
 	bool "hisilicon rt-threads optimization"
 	default n

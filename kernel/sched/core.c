@@ -2428,11 +2428,6 @@ static int dl_overflow(struct task_struct *p, int policy,
 
 extern void init_dl_bw(struct dl_bw *dl_b);
 
-#ifdef CONFIG_HISI_FORKBOOST
- #define task_should_forkboost(task)  \
-	((task && task->parent && task->parent->pid > 2))
-#endif
-
 /*
  * wake_up_new_task - wake up a newly created task for the first time.
  *
@@ -2449,17 +2444,7 @@ void wake_up_new_task(struct task_struct *p)
 
 	/* Initialize new task's runnable average */
 
-#ifdef CONFIG_HISI_FORKBOOST
-	if (task_should_forkboost(p)) {
-		init_entity_runnable_average(&p->se);
-	} else {
-		struct sched_entity *se= &p->se;
-		struct sched_avg *sa= &se->avg;
-		memset(sa, 0, sizeof(*sa));
-	}
-#else
 	init_entity_runnable_average(&p->se);
-#endif
 
 #ifdef CONFIG_SMP
 	/*
