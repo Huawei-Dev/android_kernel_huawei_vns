@@ -1242,12 +1242,6 @@ config NET_NS
 
 endif # NAMESPACES
 
-config HISI_CPU_TOPO
-	bool "hisilicon cpu topology helper function"
-	default n
-	help
-	  Hisilicon CPU topology helper function.
-
 config HISI_RT_OPT
 	bool "hisilicon rt-threads optimization"
 	default n

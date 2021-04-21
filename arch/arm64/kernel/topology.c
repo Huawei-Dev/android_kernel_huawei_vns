@@ -227,12 +227,6 @@ out:
 struct cpu_topology cpu_topology[NR_CPUS];
 EXPORT_SYMBOL_GPL(cpu_topology);
 
-#ifdef CONFIG_HISI_CPU_TOPO
-static const char * const little_cores[] = {
-	"arm,cortex-a53",
-	NULL,
-};
-
 static bool is_little_cpu(struct device_node *cn)
 {
 	const char * const *lc;
@@ -473,8 +467,4 @@ void __init init_cpu_topology(void)
 		set_sched_topology(arm64_topology);
 
 	init_sched_energy_costs();
-
-#ifdef CONFIG_HISI_CPU_TOPO
-	arch_get_fast_and_slow_cpus(&fast_cpu_mask, &slow_cpu_mask);
-#endif
 }
