@@ -333,7 +333,7 @@ static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
 		return;
 	}
 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
-			     NULL);
+			     early_pgtable_alloc);
 }
 
 void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
@@ -385,22 +385,22 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
 	unsigned long kernel_x_end = round_up(__pa(__init_end), SWAPPER_BLOCK_SIZE);
 
 	if (end < kernel_x_start) {
-		create_mapping(start, __phys_to_virt(start),
+		create_mapping_noalloc(start, __phys_to_virt(start),
 			end - start, PAGE_KERNEL);
 	} else if (start >= kernel_x_end) {
-		create_mapping(start, __phys_to_virt(start),
+		create_mapping_noalloc(start, __phys_to_virt(start),
 			end - start, PAGE_KERNEL);
 	} else {
 		if (start < kernel_x_start)
-			create_mapping(start, __phys_to_virt(start),
+			create_mapping_noalloc(start, __phys_to_virt(start),
 				kernel_x_start - start,
 				PAGE_KERNEL);
-		create_mapping(kernel_x_start,
+		create_mapping_noalloc(kernel_x_start,
 				__phys_to_virt(kernel_x_start),
 				kernel_x_end - kernel_x_start,
 				PAGE_KERNEL_EXEC);
 		if (kernel_x_end < end)
-			create_mapping(kernel_x_end,
+			create_mapping_noalloc(kernel_x_end,
 				__phys_to_virt(kernel_x_end),
 				end - kernel_x_end,
 				PAGE_KERNEL);
@@ -409,7 +409,7 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
 #else
 static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
 {
-	create_mapping(start, __phys_to_virt(start), end - start,
+	create_mapping_noalloc(start, __phys_to_virt(start), end - start,
 			PAGE_KERNEL_EXEC);
 }
 #endif
@@ -438,7 +438,7 @@ static void __init fixup_executable(void)
 		unsigned long aligned_start = round_down(__pa(_stext),
 							 SWAPPER_BLOCK_SIZE);
 
-		create_mapping(aligned_start, __phys_to_virt(aligned_start),
+		create_mapping_noalloc(aligned_start, __phys_to_virt(aligned_start),
 				__pa(_stext) - aligned_start,
 				PAGE_KERNEL);
 	}
@@ -446,7 +446,7 @@ static void __init fixup_executable(void)
 	if (!IS_ALIGNED((unsigned long)__init_end, SWAPPER_BLOCK_SIZE)) {
 		unsigned long aligned_end = round_up(__pa(__init_end),
 							  SWAPPER_BLOCK_SIZE);
-		create_mapping(__pa(__init_end), (unsigned long)__init_end,
+		create_mapping_noalloc(__pa(__init_end), (unsigned long)__init_end,
 				aligned_end - __pa(__init_end),
 				PAGE_KERNEL);
 	}
