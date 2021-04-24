@@ -713,7 +713,6 @@ void do_exit(long code)
 	}
 
 	sched_exit(tsk);
-	schedtune_exit_task(tsk);
 
 	/*
 	 * tsk->flags are checked in the futex code to protect against
