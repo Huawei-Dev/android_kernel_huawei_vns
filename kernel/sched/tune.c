@@ -152,6 +152,10 @@ struct schedtune {
 
 	/* Performance Constraint (C) region threshold params */
 	int perf_constrain_idx;
+	
+	/* Hint to bias scheduling of tasks on that SchedTune CGroup
+	 * towards idle CPUs */
+	int prefer_idle;
 };
 
 static inline struct schedtune *css_st(struct cgroup_subsys_state *css)
