@@ -2590,7 +2590,6 @@ struct cfg80211_ops {
 
 	int	(*scan)(struct wiphy *wiphy,
 			struct cfg80211_scan_request *request);
-	void	(*abort_scan)(struct wiphy *wiphy, struct wireless_dev *wdev);
 
 	void	(*abort_scan)(struct wiphy *wiphy, struct wireless_dev *wdev);
 
