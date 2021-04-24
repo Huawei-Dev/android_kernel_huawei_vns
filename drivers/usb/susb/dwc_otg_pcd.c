@@ -141,10 +141,6 @@ static int32_t dwc_otg_pcd_start_cb(void *p)
 	 */
 	if (dwc_otg_is_device_mode(core_if)) {
 		dwc_otg_core_dev_init(core_if);
-#if 0
-		/* Set core_if's lock pointer to the pcd->lock */
-		core_if->lock = pcd->lock;
-#endif
 	}
 	return 1;
 }
@@ -1124,18 +1120,7 @@ dwc_otg_pcd_t *dwc_otg_pcd_init(dwc_otg_core_if_t *core_if)
 	if (pcd == NULL) {
 		return NULL;
 	}
-#if 0
-	pcd->lock = DWC_SPINLOCK_ALLOC();
-	if (!pcd->lock) {
-		DWC_ERROR("Could not allocate lock for pcd");
-		DWC_FREE(pcd);
-		return NULL;
-	}
-	/* Set core_if's lock pointer to hcd->lock */
-	core_if->lock = pcd->lock;
-#else
 	pcd->lock = core_if->lock;
-#endif
 	pcd->core_if = core_if;
 
 	dev_if = core_if->dev_if;
@@ -1334,11 +1319,6 @@ void dwc_otg_pcd_remove(dwc_otg_pcd_t *pcd)
 		DWC_FREE(pcd->setup_pkt);
 		DWC_FREE(pcd->status_buf);
 	}
-#if 0
-	DWC_SPINLOCK_FREE(pcd->lock);
-	/* Set core_if's lock pointer to NULL */
-	pcd->core_if->lock = NULL;
-#endif
 
 	DWC_TASK_FREE(pcd->start_xfer_tasklet);
 	DWC_TASK_FREE(pcd->test_mode_tasklet);
@@ -1731,11 +1711,6 @@ int dwc_otg_pcd_xiso_start_next_request(dwc_otg_pcd_t *pcd,
 	dwcep = &ep->dwc_ep;
 
 	if (dwcep->xiso_active_xfers > 0) {
-#if 0	/* Disable this to decrease s/w overhead that is crucial for Isoc transfers */
-		DWC_WARN("There are currently active transfers for EP%d \
-			 (active=%d; queued=%d)", dwcep->num, dwcep->xiso_active_xfers,
-			 dwcep->xiso_queued_xfers);
-#endif
 		return 0;
 	}
 

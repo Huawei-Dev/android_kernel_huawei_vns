@@ -269,37 +269,6 @@ void __DWC_DEBUG(char *format, ...)
 
 /* dwc_mem.h */
 
-#if 0
-dwc_pool_t *DWC_DMA_POOL_CREATE(uint32_t size, uint32_t align, uint32_t alloc)
-{
-	struct dma_pool *pool = dma_pool_create("Pool", NULL,
-						size, align, alloc);
-	return (dwc_pool_t *)pool;
-}
-
-void DWC_DMA_POOL_DESTROY(dwc_pool_t *pool)
-{
-	dma_pool_destroy((struct dma_pool *)pool);
-}
-
-void *DWC_DMA_POOL_ALLOC(dwc_pool_t *pool, uint64_t *dma_addr)
-{
-/*	return dma_pool_alloc((struct dma_pool *)pool, GFP_KERNEL, dma_addr); */
-	return dma_pool_alloc((struct dma_pool *)pool, M_WAITOK, dma_addr);
-}
-
-void *DWC_DMA_POOL_ZALLOC(dwc_pool_t *pool, uint64_t *dma_addr)
-{
-	void *vaddr = DWC_DMA_POOL_ALLOC(pool, dma_addr);
-	memset(..);
-}
-
-void DWC_DMA_POOL_FREE(dwc_pool_t *pool, void *vaddr, void *daddr)
-{
-	dma_pool_free(pool, vaddr, daddr);
-}
-#endif
-
 void *__DWC_DMA_ALLOC(void *dma_ctx, uint32_t size, dwc_dma_t *dma_addr)
 {
 	dwc_dmactx_t *dma = (dwc_dmactx_t *)dma_ctx;
@@ -572,16 +541,6 @@ uint32_t DWC_READ_REG32(void *io_ctx, uint32_t volatile * reg)
 	return bus_space_read_4(io->iot, io->ioh, ior);
 }
 
-#if 0
-uint64_t DWC_READ_REG64(void *io_ctx, uint64_t volatile * reg)
-{
-	dwc_ioctx_t *io = (dwc_ioctx_t *)io_ctx;
-	bus_size_t ior = (bus_size_t)reg;
-
-	return bus_space_read_8(io->iot, io->ioh, ior);
-}
-#endif
-
 void DWC_WRITE_REG32(void *io_ctx, uint32_t volatile * reg, uint32_t value)
 {
 	dwc_ioctx_t *io = (dwc_ioctx_t *)io_ctx;
@@ -589,16 +548,6 @@ void DWC_WRITE_REG32(void *io_ctx, uint32_t volatile * reg, uint32_t value)
 
 	bus_space_write_4(io->iot, io->ioh, ior, value);
 }
-
-#if 0
-void DWC_WRITE_REG64(void *io_ctx, uint64_t volatile * reg, uint64_t value)
-{
-	dwc_ioctx_t *io = (dwc_ioctx_t *)io_ctx;
-	bus_size_t ior = (bus_size_t)reg;
-
-	bus_space_write_8(io->iot, io->ioh, ior, value);
-}
-#endif
 
 void DWC_MODIFY_REG32(void *io_ctx, uint32_t volatile * reg, uint32_t clear_mask,
 			uint32_t set_mask)
@@ -610,22 +559,6 @@ void DWC_MODIFY_REG32(void *io_ctx, uint32_t volatile * reg, uint32_t clear_mask
 			(bus_space_read_4(io->iot, io->ioh, ior) &
 			~clear_mask) | set_mask);
 }
-
-#if 0
-void DWC_MODIFY_REG64(void *io_ctx, uint64_t volatile * reg, uint64_t clear_mask,
-			uint64_t set_mask)
-{
-	dwc_ioctx_t *io = (dwc_ioctx_t *)io_ctx;
-	bus_size_t ior = (bus_size_t)reg;
-
-	bus_space_write_8(io->iot, io->ioh, ior,
-			  (bus_space_read_8(io->iot, io->ioh, ior) &
-			   ~clear_mask) | set_mask);
-}
-#endif
-
-
-/* Locking */
 
 dwc_spinlock_t *DWC_SPINLOCK_ALLOC(void)
 {

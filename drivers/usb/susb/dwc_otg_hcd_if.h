@@ -46,6 +46,11 @@ typedef struct dwc_otg_hcd dwc_otg_hcd_t;
 struct dwc_otg_hcd_urb;
 typedef struct dwc_otg_hcd_urb dwc_otg_hcd_urb_t;
 
+struct dwc_otg_qtd;
+typedef struct dwc_otg_qtd dwc_otg_qtd_t;
+
+struct dwc_otg_qh;
+typedef struct dwc_otg_qh dwc_otg_qh_t;
 /** @name HCD Function Driver Callbacks */
 /** @{ */
 
@@ -331,17 +336,17 @@ extern uint32_t dwc_otg_hcd_urb_get_iso_desc_actual_length(dwc_otg_hcd_urb_t *
 /** Queue URB. After transfer is completes, the complete callback will be called with the URB status
  *
  * @param dwc_otg_hcd The HCD
- * @param dwc_otg_urb DWC_OTG URB
- * @param ep_handle Out parameter for returning endpoint handle
+ * @param qh input parameter
+ * @param qtd input parameter
  * @param atomic_alloc Flag to do atomic allocation if needed
  *
  * Returns -DWC_E_NO_DEVICE if no device is connected.
  * Returns -DWC_E_NO_MEMORY if there is no enough memory.
  * Returns 0 on success.
  */
-extern int dwc_otg_hcd_urb_enqueue(dwc_otg_hcd_t *dwc_otg_hcd,
-				   dwc_otg_hcd_urb_t *dwc_otg_urb,
-				   void **ep_handle, int atomic_alloc);
+int dwc_otg_hcd_urb_enqueue(dwc_otg_hcd_t *hcd,
+			dwc_otg_qh_t *qh,
+			dwc_otg_qtd_t *qtd, int atomic_alloc);
 
 /** De-queue the specified URB
  *

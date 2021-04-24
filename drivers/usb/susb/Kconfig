@@ -19,3 +19,6 @@ config HI6250_USB
 	depends on USB_SUSB_HDRC
 	bool 'USB for hi6250'
 	default n
+
+config USB_DEBUG_NODE
+	bool 'SUSB DEBUG NODE for hi6250'

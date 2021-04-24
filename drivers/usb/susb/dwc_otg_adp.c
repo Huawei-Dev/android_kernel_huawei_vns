@@ -200,97 +200,6 @@ void dwc_otg_adp_vbuson_timer_start(dwc_otg_core_if_t *core_if)
 	}
 }
 
-#if 0
-/**
- * Masks all DWC OTG core interrupts
- *
- */
-static void mask_all_interrupts(dwc_otg_core_if_t *core_if)
-{
-	int i;
-	gahbcfg_data_t ahbcfg = {.d32 = 0 };
-
-	/* Mask Host Interrupts */
-
-	/* Clear and disable HCINTs */
-	for (i = 0; i < core_if->core_params->host_channels; i++) {
-		DWC_WRITE_REG32(&core_if->host_if->hc_regs[i]->hcintmsk, 0);
-		DWC_WRITE_REG32(&core_if->host_if->hc_regs[i]->hcint, 0xFFFFFFFF);
-
-	}
-
-	/* Clear and disable HAINT */
-	DWC_WRITE_REG32(&core_if->host_if->host_global_regs->haintmsk, 0x0000);
-	DWC_WRITE_REG32(&core_if->host_if->host_global_regs->haint, 0xFFFFFFFF);
-
-	/* Mask Device Interrupts */
-	if (!core_if->multiproc_int_enable) {
-		/* Clear and disable IN Endpoint interrupts */
-		DWC_WRITE_REG32(&core_if->dev_if->dev_global_regs->diepmsk, 0);
-		for (i = 0; i <= core_if->dev_if->num_in_eps; i++) {
-			DWC_WRITE_REG32(&core_if->dev_if->in_ep_regs[i]->
-					diepint, 0xFFFFFFFF);
-		}
-
-		/* Clear and disable OUT Endpoint interrupts */
-		DWC_WRITE_REG32(&core_if->dev_if->dev_global_regs->doepmsk, 0);
-		for (i = 0; i <= core_if->dev_if->num_out_eps; i++) {
-			DWC_WRITE_REG32(&core_if->dev_if->out_ep_regs[i]->
-					doepint, 0xFFFFFFFF);
-		}
-
-		/* Clear and disable DAINT */
-		DWC_WRITE_REG32(&core_if->dev_if->dev_global_regs->daint,
-				0xFFFFFFFF);
-		DWC_WRITE_REG32(&core_if->dev_if->dev_global_regs->daintmsk, 0);
-	} else {
-		for (i = 0; i < core_if->dev_if->num_in_eps; ++i) {
-			DWC_WRITE_REG32(&core_if->dev_if->dev_global_regs->
-					diepeachintmsk[i], 0);
-			DWC_WRITE_REG32(&core_if->dev_if->in_ep_regs[i]->
-					diepint, 0xFFFFFFFF);
-		}
-
-		for (i = 0; i < core_if->dev_if->num_out_eps; ++i) {
-			DWC_WRITE_REG32(&core_if->dev_if->dev_global_regs->
-					doepeachintmsk[i], 0);
-			DWC_WRITE_REG32(&core_if->dev_if->out_ep_regs[i]->
-					doepint, 0xFFFFFFFF);
-		}
-
-		DWC_WRITE_REG32(&core_if->dev_if->dev_global_regs->deachintmsk,
-				0);
-		DWC_WRITE_REG32(&core_if->dev_if->dev_global_regs->deachint,
-				0xFFFFFFFF);
-
-	}
-
-	/* Disable interrupts */
-	ahbcfg.b.glblintrmsk = 1;
-	DWC_MODIFY_REG32(&core_if->core_global_regs->gahbcfg, ahbcfg.d32, 0);
-
-	/* Disable all interrupts. */
-	DWC_WRITE_REG32(&core_if->core_global_regs->gintmsk, 0);
-
-	/* Clear any pending interrupts */
-	DWC_WRITE_REG32(&core_if->core_global_regs->gintsts, 0xFFFFFFFF);
-
-	/* Clear any pending OTG Interrupts */
-	DWC_WRITE_REG32(&core_if->core_global_regs->gotgint, 0xFFFFFFFF);
-}
-
-/**
- * Unmask Port Connection Detected interrupt
- *
- */
-static void unmask_conn_det_intr(dwc_otg_core_if_t *core_if)
-{
-	gintmsk_data_t gintmsk = {.d32 = 0, .b.portintr = 1 };
-
-	DWC_WRITE_REG32(&core_if->core_global_regs->gintmsk, gintmsk.d32);
-}
-#endif
-
 /**
  * Starts the ADP Probing
  *
@@ -301,10 +210,6 @@ uint32_t dwc_otg_adp_probe_start(dwc_otg_core_if_t *core_if)
 
 	adpctl_data_t adpctl = {.d32 = 0};
 	gpwrdn_data_t gpwrdn;
-#if 0
-	adpctl_data_t adpctl_int = {.d32 = 0, .b.adp_prb_int = 1,
-					.b.adp_sns_int = 1, b.adp_tmout_int};
-#endif
 	dwc_otg_disable_global_interrupts(core_if);
 	DWC_PRINTF("ADP Probe Start\n");
 	core_if->adp.probe_enabled = 1;

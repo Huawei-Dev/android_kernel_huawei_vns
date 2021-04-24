@@ -14,6 +14,7 @@
 #include <linux/of_gpio.h>
 
 #include <linux/hisi/usb/hisi_usb.h>
+#include <linux/pm_runtime.h>
 
 #include "lm.h"
 #include "dwc_otg_pcd.h"
@@ -28,15 +29,10 @@
 #include <linux/mfd/hisi_pmic.h>
 #include <pmic_interface.h>
 
-#define DEFAULT_DCD_TIMEOUT 900
-
 atomic_t is_event_work_ready = ATOMIC_INIT(0);
 atomic_t is_power_on = ATOMIC_INIT(0);
 
 struct otg_dev *otg_dev_p;
-static u32 dcd_timeout = DEFAULT_DCD_TIMEOUT;
-
-#define BC_AGAIN_DELAY_TIME 8000 /* ms */
 
 #define ENABLE_USB_OTG_TEST 1
 #if ENABLE_USB_OTG_TEST
@@ -147,7 +143,6 @@ ssize_t hiusb_do_charger_show(void *dev_data, char *buf, size_t len)
 			, charger_type, charger_type_array[charger_type]);
 }
 
-static void notify_charger_type(struct otg_dev *dev_p);
 ssize_t hiusb_do_charger_store(void *dev_data, const char *buf, size_t size)
 {
 	struct otg_dev *dev_p = (struct otg_dev *)dev_data;
@@ -195,67 +190,36 @@ static ssize_t fakecharger_store(void *dev_data, const char *buf, size_t size)
 	return size;
 }
 
-ssize_t hiusb_do_eventmask_show(void *dev_data, char *buf, size_t len)
+int hiusb_do_eventmask_show(void *dev_data)
 {
 	struct otg_dev *dev_p = (struct otg_dev *)dev_data;
-	if (!dev_p) {
-		printk(KERN_ERR "dev_get_drvdata return null\n");
-		return scnprintf(buf, PAGE_SIZE, "dev_get_drvdata return null\n");
-	}
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", dev_p->eventmask);
+	return dev_p->eventmask;
 }
 
-ssize_t hiusb_do_eventmask_store(void *dev_data, const char *buf, size_t size)
+void hiusb_do_eventmask_store(void *dev_data, int eventmask)
 {
-	int eventmask;
 	struct otg_dev *dev_p = (struct otg_dev *)dev_data;
-
-	if (!dev_p) {
-		printk(KERN_ERR "dev_get_drvdata return null\n");
-		return size;
-	}
-
-	if (sscanf(buf, "%32d", &eventmask) != 1) {
-		return size;
-	}
 
 	dev_p->eventmask = eventmask;
-
-	return size;
 }
 
-int hiusb_set_eyepattern_param(void *dev_data, const char *buf, size_t len)
+void hiusb_set_eyepattern_param(void *dev_data, unsigned int eye_diagram_param)
 {
 	struct otg_dev *dev_p = (struct otg_dev *)dev_data;
-	int eyepattern_param;
 
-	if (!dev_p) {
-		printk(KERN_ERR "dev_get_drvdata return null\n");
-		return len;
-	}
-
-	if (sscanf(buf, "%32x", &eyepattern_param) != 1) {
-		return len;
-	}
-
-	dev_p->eyePattern = eyepattern_param;
-	dev_p->host_eyePattern = eyepattern_param;
-
-	return len;
+	dev_p->eyePattern = eye_diagram_param;
+	dev_p->host_eyePattern = eye_diagram_param;
 }
 
-int hiusb_get_eyepattern_param(void *dev_data, char *buf, size_t len)
+void hiusb_get_eyepattern_param(void *dev_data, unsigned int *eye_diagram_param,
+		unsigned int *eye_diagram_host_param)
 {
 	struct otg_dev *dev_p = (struct otg_dev *)dev_data;
-	if (dev_p) {
-		return scnprintf(buf, len, "device:0x%x\nhost:0x%x\n", dev_p->eyePattern, dev_p->host_eyePattern);
-	} else {
-		usb_err("otg_dev_p NULL\n");
-		return scnprintf(buf, len, "otg_dev_p NULL\n");
-	}
-}
 
+	*eye_diagram_param = dev_p->eyePattern;
+	*eye_diagram_host_param = dev_p->host_eyePattern;
+}
 
 static struct device_attribute *hisi_usb_attributes[] = {
 	&dev_attr_plugusb
@@ -299,6 +263,16 @@ int create_attr_file(struct device *dev)
 		usb_dbg("create attr file error!\n");
 	}
 
+#ifdef CONFIG_USB_F_BALONG_ACM
+#ifdef CONFIG_HISI_DEBUG_FS
+	hiusb_debug_quick_register("fakecharger",
+		platform_get_drvdata(to_platform_device(dev)),
+		(hiusb_debug_show_ops)fakecharger_show,
+		(hiusb_debug_store_ops)fakecharger_store);
+	hiusb_debug_init(dev_get_drvdata(dev));
+#endif
+#endif
+
 	return ret;
 }
 #else
@@ -308,28 +282,9 @@ static inline int create_attr_file(struct device *dev) {return 0; }
 
 int get_resource(struct otg_dev *dev)
 {
-	int ret = 0;
+	int ret;
 	struct device_node *np = NULL;
 	struct device *base_dev = &(dev->pdev->dev);
-
-	/*
-	 * get dcd_timeout time
-	 */
-	np = of_find_compatible_node(NULL, NULL, "hisilicon,hi6250-usb-otg");
-	if (np) {
-		usb_dbg("find node hisi,coul_core successful\n");
-		ret = of_property_read_u32(np, "dcd_timeout", &dcd_timeout);
-		if (ret) {
-			usb_dbg("get dcd_timeout failed !!\n");
-			dcd_timeout = DEFAULT_DCD_TIMEOUT;
-		}
-		else{
-			usb_dbg("get dcd_timeout successful, dcd_timeout is %d\n",dcd_timeout);
-		}
-	}
-	else{
-		usb_dbg("find node hisi,coul_core failed !!\n");
-	}
 
 	/*
 	 * get registers base address
@@ -359,7 +314,6 @@ int get_resource(struct otg_dev *dev)
 	if (ret) {
 		usb_err("get host eye_diagram_param failed !!! \n");
 		dev->host_eyePattern = 0x059066DB;
-		ret = 0;
 	}
 
 	/*
@@ -370,6 +324,14 @@ int get_resource(struct otg_dev *dev)
 		usb_err("get eye_diagram_param failed !!! \n");
 		dev->eyePattern = 0x059066DB;
 		ret = 0;
+	}
+
+	/*
+	 * get device usb support voltage check
+	 */
+	if(of_property_read_u32(base_dev->of_node, "usb_support_check_voltage", &(dev->check_voltage))){
+		usb_dbg("usb driver not usb_support_check_voltage!!!\n");
+		dev->check_voltage = 0;
 	}
 
 	if (!dev->usb_ahbif_base || !dev->pericrg_base || !dev->pctrl_reg_base) {
@@ -415,11 +377,6 @@ int get_resource(struct otg_dev *dev)
 		} else {
 			usb_err("[fpga mode]:get gpio_number failure errno:%d!\n", dev->fpga_usb_mode_gpio);
 		}
-	}
-
-	if (of_property_read_u32(base_dev->of_node, "bc_again_flag",
-		&(dev->bc_again_flag))) {
-		dev->bc_again_flag = 0;
 	}
 
 	usb_dbg("get resource %s!\n", ret ? "error" : "done");
@@ -634,6 +591,24 @@ static char *charger_type_string(enum hisi_charger_type type)
 	return s;
 }
 
+static char *event_type_string(enum otg_dev_event_type event)
+{
+	char *s = NULL;
+	if (event == CHARGER_CONNECT_EVENT)
+		s = "CHARGER_CONNECT";
+	else if (event == CHARGER_DISCONNECT_EVENT)
+		s = "CHARGER_DISCONNECT";
+	else if (event == ID_FALL_EVENT)
+		s = "OTG_CONNECT";
+	else if (event == ID_RISE_EVENT)
+		s = "OTG_DISCONNECT";
+	else if (event == NONE_EVENT)
+		s = "NONE";
+	else
+		s = "ilegal event";
+	return s;
+}
+
 void dump_bc_reg(struct otg_dev *dev_p)
 {
 	/* for debug */
@@ -666,6 +641,11 @@ static void disable_vdp_src(struct otg_dev *dev_p)
 	union bc_ctrl4 bc_ctrl4;
 	union bc_ctrl5 bc_ctrl5;
 
+	usb_dbg("+\n");
+	if (dev_p->vdp_src_enable == 0)
+		return;
+	dev_p->vdp_src_enable = 0;
+
 	bc_ctrl5.reg = readl(&ahbif->bc_ctrl5);
 	bc_ctrl5.bits.bc_chrg_sel = 0;
 	bc_ctrl5.bits.bc_vdat_src_en = 0;
@@ -679,6 +659,7 @@ static void disable_vdp_src(struct otg_dev *dev_p)
 
 	/* disable BC */
 	writel(0, &ahbif->bc_ctrl3);
+	usb_dbg("-\n");
 }
 
 static void enable_vdp_src(struct otg_dev *dev_p)
@@ -687,11 +668,17 @@ static void enable_vdp_src(struct otg_dev *dev_p)
 		= (struct usb_ahbif_registers *)otg_dev_p->usb_ahbif_base;
 	union bc_ctrl5 bc_ctrl5;
 
+	usb_dbg("+\n");
+	if (dev_p->vdp_src_enable == 1)
+		return;
+	dev_p->vdp_src_enable = 1;
+
 	bc_ctrl5.reg = readl(&ahbif->bc_ctrl5);
 	bc_ctrl5.bits.bc_chrg_sel = 0;
 	bc_ctrl5.bits.bc_vdat_src_en = 1;
 	bc_ctrl5.bits.bc_vdat_det_en = 1;
 	writel(bc_ctrl5.reg, &ahbif->bc_ctrl5);
+	usb_dbg("-\n");
 }
 
 static void detect_charger_type(struct otg_dev *dev_p)
@@ -704,6 +691,8 @@ static void detect_charger_type(struct otg_dev *dev_p)
 	union bc_sts2 bc_sts2;
 	unsigned long jiffies_expire;
 	int i = 0;
+
+	usb_dbg("+\n");
 
 	if (dev_p->fake_charger_type != CHARGER_TYPE_NONE) {
 		usb_dbg("fake type: %d\n", dev_p->fake_charger_type);
@@ -725,11 +714,10 @@ static void detect_charger_type(struct otg_dev *dev_p)
 	bc_ctrl5.bits.bc_dcd_en = 1;
 	writel(bc_ctrl5.reg, &ahbif->bc_ctrl5);
 
-	jiffies_expire = jiffies + msecs_to_jiffies(dcd_timeout);
+	jiffies_expire = jiffies + msecs_to_jiffies(900);
 	msleep(50);
 	while (i < 10) {
 		union bc_sts2 bc_sts2;
-
 		bc_sts2.reg = readl(&ahbif->bc_sts2);
 		if (bc_sts2.bits.bc_fs_vplus == 0) {
 			i++;
@@ -741,6 +729,7 @@ static void detect_charger_type(struct otg_dev *dev_p)
 		msleep(1);
 
 		if (time_after(jiffies, jiffies_expire)) {
+			usb_dbg("DCD timeout!\n");
 			type = CHARGER_TYPE_UNKNOWN;
 			break;
 		}
@@ -761,7 +750,7 @@ static void detect_charger_type(struct otg_dev *dev_p)
 		bc_ctrl5.bits.bc_vdat_det_en = 1;
 		writel(bc_ctrl5.reg, &ahbif->bc_ctrl5);
 
-		msleep(10);
+		msleep(40);
 
 		/* we can detect sdp or cdp dcp */
 		bc_sts2.reg = readl(&ahbif->bc_sts2);
@@ -786,7 +775,7 @@ static void detect_charger_type(struct otg_dev *dev_p)
 		bc_ctrl5.bits.bc_vdat_det_en = 1;
 		writel(bc_ctrl5.reg, &ahbif->bc_ctrl5);
 
-		msleep(10);
+		msleep(40);
 
 		/* we can detect sdp or cdp dcp */
 		bc_sts2.reg = readl(&ahbif->bc_sts2);
@@ -826,6 +815,7 @@ static void detect_charger_type(struct otg_dev *dev_p)
 
 	otg_dev_p->charger_type = type;
 	usb_dbg("charger type: %s\n", charger_type_string(type));
+	usb_dbg("-\n");
 	return;
 }
 
@@ -889,22 +879,12 @@ enum hisi_charger_type hisi_get_charger_type(void)
 	return type;
 }
 
-static void notify_charger_type(struct otg_dev *dev_p)
+void notify_charger_type(struct otg_dev *dev_p)
 {
 	usb_dbg("+\n");
 	blocking_notifier_call_chain(&dev_p->charger_type_notifier,
 				   dev_p->charger_type, dev_p);
 	usb_dbg("-\n");
-}
-
-void clear_charger_interrupt(void)
-{
-	struct otg_dev *dev = otg_dev_p;
-
-	if (!dev->fpga_flag) {
-		hisi_pmic_reg_write(PMIC_IRQ_MASK_1_ADDR(0), (VBUS_COMP_VBAT_F | VBUS_COMP_VBAT_R));
-	}
-	return;
 }
 
 static int is_usb_cable_connected(void)
@@ -920,14 +900,26 @@ static int is_usb_cable_connected(void)
 
 static inline bool enumerate_allowed(struct otg_dev *dev)
 {
+	if (dev->bc_again_delay_time == BC_AGAIN_DELAY_TIME_1)
+		return false;
+
+	/* do not start peripheral if real charger connected */
 	return ((dev->charger_type == CHARGER_TYPE_SDP)
-			||(dev->charger_type == CHARGER_TYPE_CDP));
+			|| (dev->charger_type == CHARGER_TYPE_UNKNOWN)
+			|| (dev->charger_type == CHARGER_TYPE_CDP));
 }
 
 static inline bool sleep_allowed(struct otg_dev *dev)
 {
 	return ((dev->charger_type == CHARGER_TYPE_DCP)
 			|| (dev->charger_type == CHARGER_TYPE_UNKNOWN));
+}
+
+static inline bool bc_again_allowed(struct otg_dev *dev)
+{
+	return ((dev->charger_type == CHARGER_TYPE_SDP)
+			|| (dev->charger_type == CHARGER_TYPE_UNKNOWN)
+			|| (dev->charger_type == CHARGER_TYPE_CDP));
 }
 
 int dwc_otg_hicommon_is_power_on(void)
@@ -1043,6 +1035,8 @@ static void stop_host(struct dwc_otg_device *dwc_otg_dev)
 	extern atomic_t dwc_otg_hcd_bus_state;
 
 	usb_dbg("+\n");
+	dwc_otg_hicommon_set_prtpower(0);
+
 	while (0 != atomic_read(&dwc_otg_hcd_bus_state)) {
 		msleep(200);
 	}
@@ -1051,8 +1045,6 @@ static void stop_host(struct dwc_otg_device *dwc_otg_dev)
 	dwc_otg_disable_global_interrupts(dwc_otg_dev->core_if);
 	dwc_otg_mask_all_interrupts(dwc_otg_dev->core_if);
 	dwc_otg_clear_all_interrupts(dwc_otg_dev->core_if);
-
-	dwc_otg_hicommon_set_prtpower(0);
 }
 
 static int off_to_device(struct otg_dev *p)
@@ -1068,6 +1060,10 @@ static int off_to_device(struct otg_dev *p)
 
 	/* disable usb core interrupt */
 	dwc_otg_disable_global_interrupts(dwc_otg_dev->core_if);
+
+	/*if the platform support,it need check voltage*/
+	if(p->usb_phy_ops->check_voltage)
+		p->usb_phy_ops->check_voltage(p);
 
 	/* Get charger type. */
 	detect_charger_type(p);
@@ -1129,8 +1125,11 @@ static void host_to_off(struct otg_dev *p)
 static void bc_again(struct otg_dev *p)
 {
 	int ret;
+	bool schdule = false;
+	unsigned int bc_again_delay_time = 0;
 	struct dwc_otg_device *dwc_otg_dev = lm_get_drvdata(p->lm_dev);
 
+	usb_dbg("+\n");
 	/*
 	 * STEP 1
 	 */
@@ -1142,6 +1141,16 @@ static void bc_again(struct otg_dev *p)
 	 */
 	detect_charger_type(p);
 	notify_charger_type(p);
+	if (p->charger_type == CHARGER_TYPE_UNKNOWN) {
+
+		if (p->bc_again_delay_time == BC_AGAIN_DELAY_TIME_1) {
+			p->bc_again_delay_time = BC_AGAIN_DELAY_TIME_2;
+			schdule = true;
+		}
+		bc_again_delay_time = p->bc_again_delay_time;
+	} else {
+		p->bc_again_delay_time = 0;
+	}
 
 	/*
 	 * STEP 3
@@ -1160,6 +1169,16 @@ static void bc_again(struct otg_dev *p)
 	} else {
 		usb_dbg("it is not SDP connected,so do nothing\n");
 	}
+
+	if (schdule) {
+		ret = queue_delayed_work(system_power_efficient_wq,
+				&p->bc_again_work,
+				msecs_to_jiffies(bc_again_delay_time));
+		usb_dbg("schedule ret:%d, run bc_again_work %dms later\n",
+			ret, bc_again_delay_time);
+	}
+
+	usb_dbg("-\n");
 }
 
 void hisi_usb_otg_bc_again(void)
@@ -1169,19 +1188,21 @@ void hisi_usb_otg_bc_again(void)
 	usb_dbg("+\n");
 
 	if (!p) {
-		usb_err("No usb module, can't call bc again api\n");
+		usb_err("No usb module, can't call bc again api!\n");
 		return;
 	}
 
-	mutex_lock(&p->lock);
+	if ((1 == p->bc_again_flag) && (0 == p->bc_unknown_again_flag)) {
+		mutex_lock(&p->lock);
+		/* user triggered bc_again allowed only when charger type is unknown */
+		if (p->charger_type == CHARGER_TYPE_UNKNOWN) {
+			usb_dbg("charger_type is UNKNOWN, start bc_again_work!\n");
+			bc_again(p);
+		}
+		mutex_unlock(&p->lock);
+	} else
+		usb_dbg("hisi_usb_otg_bc_again do nothing!\n");
 
-	/* user triggered bc_again allowed only when charger type is unknown */
-	if (p->charger_type == CHARGER_TYPE_UNKNOWN) {
-		usb_dbg("charger_type is UNKNOWN, start bc_again_work\n");
-		bc_again(p);
-	}
-
-	mutex_unlock(&p->lock);
 	usb_dbg("-\n");
 }
 EXPORT_SYMBOL_GPL(hisi_usb_otg_bc_again);
@@ -1189,15 +1210,13 @@ EXPORT_SYMBOL_GPL(hisi_usb_otg_bc_again);
 static void bc_again_work(struct work_struct *work)
 {
 	struct otg_dev *p = container_of(work, struct otg_dev,
-		bc_again_work.work);
+			bc_again_work.work);
 
 	usb_dbg("+\n");
 	mutex_lock(&p->lock);
 
 	/* we are here because it's detected as SDP before */
-	if ((p->charger_type == CHARGER_TYPE_SDP)
-		|| (p->charger_type == CHARGER_TYPE_UNKNOWN)
-		|| (p->charger_type == CHARGER_TYPE_CDP)) {
+	if (bc_again_allowed(p)) {
 		usb_err("charger_type is not DCP, start bc_again_work\n");
 		bc_again(p);
 	}
@@ -1206,16 +1225,108 @@ static void bc_again_work(struct work_struct *work)
 	usb_dbg("-\n");
 }
 
+/**
+ * In some cases, DCP is detected as SDP wrongly. To avoid this,
+ * start bc_again delay work to detect charger type once more.
+ * If later the enum process is executed, then it's a real SDP, so
+ * the work will be canceled.
+ */
+void schdule_bc_again(struct otg_dev *p)
+{
+	int ret;
+	unsigned int bc_again_delay_time;
+
+	usb_dbg("+\n");
+
+	if (!p->bc_again_flag)
+		return;
+
+	if ((p->charger_type == CHARGER_TYPE_UNKNOWN)
+		&& p->bc_unknown_again_flag)
+		p->bc_again_delay_time = BC_AGAIN_DELAY_TIME_1;
+	else
+		p->bc_again_delay_time = BC_AGAIN_DELAY_TIME_2;
+
+	bc_again_delay_time = p->bc_again_delay_time;
+
+	ret = queue_delayed_work(system_power_efficient_wq,
+			&p->bc_again_work,
+			msecs_to_jiffies(bc_again_delay_time));
+	usb_dbg("schedule ret:%d, run bc_again_work %dms later\n",
+		ret, bc_again_delay_time);
+
+	usb_dbg("-\n");
+}
+
+void cancel_bc_again(struct otg_dev *p, int sync)
+{
+	usb_dbg("+\n");
+	if (p->bc_again_flag) {
+		int ret;
+		if (sync)
+			ret = cancel_delayed_work_sync(&p->bc_again_work);
+		else
+			ret = cancel_delayed_work(&p->bc_again_work);
+
+		usb_dbg("cancel_delayed_work(result:%d)\n", ret);
+		p->bc_again_delay_time = 0;
+	}
+	usb_dbg("-\n");
+}
+
 static int conndone_notifier_fn(struct notifier_block *nb,
 			unsigned long action, void *data)
 {
-	int ret;
 	struct otg_dev *dev_p = container_of(nb,
 			 struct otg_dev, conndone_nb);
 
-	ret = cancel_delayed_work(&dev_p->bc_again_work);
-	usb_dbg("cancel bc_again_work:%d\n", ret);
+	usb_dbg("+\n");
+	cancel_bc_again(dev_p, 0);
+	if (dev_p->charger_type == CHARGER_TYPE_UNKNOWN) {
+		dev_p->charger_type = CHARGER_TYPE_SDP;
+	}
+	usb_dbg("-\n");
 	return 0;
+}
+
+int hisi_usb_bc_init(struct otg_dev *p)
+{
+	int ret;
+	struct device *dev = &p->pdev->dev;
+
+	usb_dbg("+\n");
+
+	if (of_property_read_u32(dev->of_node, "bc_again_flag",
+			    &(p->bc_again_flag))) {
+		p->bc_again_flag = 0;
+	}
+
+	if (p->bc_again_flag) {
+		INIT_DELAYED_WORK(&p->bc_again_work, bc_again_work);
+		if (of_property_read_u32(dev->of_node, "bc_unknown_again_flag",
+			    &(p->bc_unknown_again_flag))) {
+			p->bc_unknown_again_flag = 0;
+		}
+	} else
+		p->bc_unknown_again_flag = 0;
+
+	p->conndone_nb.notifier_call = conndone_notifier_fn;
+	ret = dwc_conndone_notifier_register(&p->conndone_nb);
+	if (ret) {
+		usb_err("dwc_conndone_notifier_register failed\n");
+		return ret;
+	}
+
+	usb_dbg("-\n");
+	return 0;
+}
+
+void hisi_usb_bc_exit(struct otg_dev *p)
+{
+	usb_dbg("+\n");
+	dwc_conndone_notifier_unregister(&p->conndone_nb);
+	p->conndone_nb.notifier_call = NULL;
+	usb_dbg("-\n");
 }
 
 /*
@@ -1363,7 +1474,7 @@ static void handle_event(struct otg_dev *p, enum otg_dev_event_type event)
 {
 	int ret = 0;
 
-	usb_err("[handle_event_type]: %d\n", event);
+	usb_err("[handle_event_type]: %s\n", event_type_string(event));
 	switch (event) {
 	case CHARGER_CONNECT_EVENT:
 		if (OTG_DEV_DEVICE == p->status) {
@@ -1383,17 +1494,8 @@ static void handle_event(struct otg_dev *p, enum otg_dev_event_type event)
 			 * If later the enum process is executed, then it's a real SDP, so
 			 * the work will be canceled.
 			 */
-			if (p->bc_again_flag &&
-				((p->charger_type == CHARGER_TYPE_SDP)
-				|| (p->charger_type == CHARGER_TYPE_UNKNOWN)
-				|| (p->charger_type == CHARGER_TYPE_CDP))) {
-				ret = queue_delayed_work(
-					system_power_efficient_wq,
-					&p->bc_again_work,
-					msecs_to_jiffies(BC_AGAIN_DELAY_TIME));
-				usb_dbg("schedule ret:%d, run bc_again_work %dms later\n",
-					ret, BC_AGAIN_DELAY_TIME);
-			}
+			if (bc_again_allowed(p))
+				schdule_bc_again(p);
 
 			p->status = OTG_DEV_DEVICE;
 
@@ -1418,12 +1520,11 @@ static void handle_event(struct otg_dev *p, enum otg_dev_event_type event)
 		if (OTG_DEV_OFF == p->status) {
 			usb_dbg("Charger disconnect interrupt, but Already in OFF mode.\n");
 		} else if (OTG_DEV_DEVICE == p->status) {
-			if (p->bc_again_flag) {
-				ret = cancel_delayed_work(&p->bc_again_work);
-				usb_dbg("cancel bc_again_work :%d\n", ret);
-			}
+			disable_vdp_src(p);
 
 			device_to_off(p);
+
+			cancel_bc_again(p, 0);
 
 			p->charger_type = CHARGER_TYPE_NONE;
 			notify_charger_type(p);
@@ -1443,10 +1544,13 @@ static void handle_event(struct otg_dev *p, enum otg_dev_event_type event)
 		break;
 
 	case ID_FALL_EVENT:
+		dwc_otg_hicommon_wake_lock();
 		if (OTG_DEV_OFF == p->status) {
 			ret = off_to_host(p);
-			if (ret)
+			if (ret) {
+				dwc_otg_hicommon_wake_unlock();
 				return ;
+			}
 
 			p->status = OTG_DEV_HOST;
 
@@ -1471,6 +1575,7 @@ static void handle_event(struct otg_dev *p, enum otg_dev_event_type event)
 		} else if (OTG_DEV_OFF == p->status) {
 			usb_dbg("ID rise event, Already in OFF mode\n");
 		}
+		dwc_otg_hicommon_wake_unlock();
 		break;
 
 	default:
@@ -1660,6 +1765,7 @@ int dwc_otg_hicommon_probe_stage2(void)
 			usb_err("start_host failed\n");
 
 		otg_device->status = OTG_DEV_HOST;
+		otg_device->event = ID_FALL_EVENT;
 	} else if (0 == is_usb_cable_connected()) {
 		usb_dbg("off mode\n");
 
@@ -1667,6 +1773,7 @@ int dwc_otg_hicommon_probe_stage2(void)
 		hw_shutdown(otg_device);
 
 		otg_device->status = OTG_DEV_OFF;
+		otg_device->event = CHARGER_DISCONNECT_EVENT;
 	} else {
 		usb_dbg("device mode\n");
 
@@ -1686,6 +1793,7 @@ int dwc_otg_hicommon_probe_stage2(void)
 			usb_dbg("connected to charger, no start_peripheral\n");
 
 		otg_device->status = OTG_DEV_DEVICE;
+		otg_device->event = CHARGER_CONNECT_EVENT;
 
 		/* allow sleep when USB charger connected */
 		if (sleep_allowed(otg_device))
@@ -1746,7 +1854,7 @@ int dwc_otg_hicommon_probe(struct otg_dev *dev_p)
 
 	/* fpga only */
 	if (dev_p->fpga_usb_mode_gpio > 0) {
-		ret = gpio_request(dev_p->fpga_usb_mode_gpio, NULL);
+		ret = gpio_request((unsigned)dev_p->fpga_usb_mode_gpio, NULL);
 		if (ret) {
 			/* request gpio failure! */
 			usb_err("request gpio fail.[%d], gpio num:%d!\n",
@@ -1754,13 +1862,9 @@ int dwc_otg_hicommon_probe(struct otg_dev *dev_p)
 		}
 	}
 
-	if (dev_p->bc_again_flag) {
-		INIT_DELAYED_WORK(&dev_p->bc_again_work, bc_again_work);
-		dev_p->conndone_nb.notifier_call = conndone_notifier_fn;
-		ret = dwc_conndone_notifier_register(&dev_p->conndone_nb);
-		if (ret)
-			usb_err("dwc3_conndone_notifier_register failed\n");
-	}
+	ret = hisi_usb_bc_init(dev_p);
+	if (ret)
+		usb_err("dwc_conndone_notifier_register failed\n");
 
 	ret = hw_setup(dev_p, 0);
 	if (ret) {
@@ -1821,7 +1925,13 @@ int dwc_otg_hicommon_probe(struct otg_dev *dev_p)
 	}
 	usb_dbg("register dwc otg device done\n");
 
+	pm_runtime_enable(&lm_dev->dev);
+	pm_runtime_get_sync(&lm_dev->dev);
+	pm_runtime_forbid(&lm_dev->dev);
+
 	dwc_otg_hicommon_probe_stage2();
+
+	pm_runtime_allow(&lm_dev->dev);
 
 	usb_dbg("[%s]-\n", __func__);
 
@@ -1829,6 +1939,7 @@ int dwc_otg_hicommon_probe(struct otg_dev *dev_p)
 error:
 	hw_shutdown(dev_p);
 	put_resource(dev_p);
+	hisi_usb_bc_exit(dev_p);
 	return ret;
 
 }
@@ -1836,8 +1947,7 @@ error:
 int dwc_otg_hicommon_remove(struct otg_dev *dev_p)
 {
 	if (dev_p->bc_again_flag) {
-		dwc_conndone_notifier_unregister(&dev_p->conndone_nb);
-		dev_p->conndone_nb.notifier_call = NULL;
+		hisi_usb_bc_exit(dev_p);
 	}
 
 	if ((dev_p->status == OTG_DEV_DEVICE) || (dev_p->status == OTG_DEV_HOST)) {
@@ -1847,6 +1957,10 @@ int dwc_otg_hicommon_remove(struct otg_dev *dev_p)
 	event_queue_destroy(&dev_p->event_queue);
 
 	put_resource(dev_p);
+
+	pm_runtime_put_sync(&dev_p->lm_dev->dev);
+	pm_runtime_disable(&dev_p->lm_dev->dev);
+
 	return 0;
 }
 

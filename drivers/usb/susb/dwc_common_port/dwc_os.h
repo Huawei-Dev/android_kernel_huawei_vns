@@ -607,41 +607,6 @@ typedef struct dwc_dmactx {
 #endif
 
 /* @todo these functions will be added in the future */
-#if 0
-/**
- * Creates a DMA pool from which you can allocate DMA buffers.  Buffers
- * allocated from this pool will be guaranteed to meet the size, alignment, and
- * boundary requirements specified.
- *
- * @param[in] size Specifies the size of the buffers that will be allocated from
- * this pool.
- * @param[in] align Specifies the byte alignment requirements of the buffers
- * allocated from this pool.  Must be a power of 2.
- * @param[in] boundary Specifies the N-byte boundary that buffers allocated from
- * this pool must not cross.
- *
- * @returns A pointer to an internal opaque structure which is not to be
- * accessed outside of these library functions.  Use this handle to specify
- * which pools to allocate/free DMA buffers from and also to destroy the pool,
- * when you are done with it.
- */
-extern dwc_pool_t *DWC_DMA_POOL_CREATE(uint32_t size, uint32_t align, uint32_t boundary);
-
-/**
- * Destroy a DMA pool.  All buffers allocated from that pool must be freed first.
- */
-extern void DWC_DMA_POOL_DESTROY(dwc_pool_t *pool);
-
-/**
- * Allocate a buffer from the specified DMA pool and zeros its contents.
- */
-extern void *DWC_DMA_POOL_ALLOC(dwc_pool_t *pool, uint64_t *dma_addr);
-
-/**
- * Free a previously allocated buffer from the DMA pool.
- */
-extern void DWC_DMA_POOL_FREE(dwc_pool_t *pool, void *vaddr, void *daddr);
-#endif
 
 /** Allocates a DMA capable buffer and zeroes its contents. */
 extern void *__DWC_DMA_ALLOC(void *dma_ctx, uint32_t size, dwc_dma_t *dma_addr);

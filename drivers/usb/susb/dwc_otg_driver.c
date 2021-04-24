@@ -56,6 +56,7 @@
 #include "dwc_otg_pcd_if.h"
 #include "dwc_otg_hcd_if.h"
 #include <linux/mm.h>
+#include <linux/pm_runtime.h>
 #define DWC_DRIVER_VERSION	"3.00a 10-AUG-2012"
 #define DWC_DRIVER_DESC		"HS OTG USB Controller driver"
 
@@ -243,6 +244,7 @@ static DRIVER_ATTR(version, S_IRUGO, version_show, NULL);
  */
 uint32_t g_dbg_lvl = 0x0;		/* OFF */
 
+#ifdef CONFIG_USB_DEBUG_NODE
 /**
  * This function shows the driver Debug Level.
  */
@@ -263,6 +265,7 @@ static ssize_t dbg_level_store(struct device_driver *drv, const char *buf,
 
 static DRIVER_ATTR(debuglevel, (S_IRUGO | S_IWUSR), dbg_level_show,
 				   dbg_level_store);
+#endif
 
 /**
  * This function is called during module intialization
@@ -844,9 +847,7 @@ static int dwc_otg_driver_probe(
 	 * perform initial actions required for Internal ADP logic.
 	 */
 	if (!dwc_otg_get_param_adp_enable(dwc_otg_device->core_if)) {
-#if 0
-		dwc_otg_enable_global_interrupts(dwc_otg_device->core_if);
-#endif
+		/* dwc_otg_enable_global_interrupts(dwc_otg_device->core_if); */
 	} else
 		dwc_otg_adp_start(dwc_otg_device->core_if,
 				  dwc_otg_is_host_mode(dwc_otg_device->core_if));
@@ -881,13 +882,43 @@ static int dwc_otg_driver_resume(struct lm_device *lm_dev)
  * unregistered with the bus driver.
  */
 #ifdef LM_INTERFACE
+#ifdef CONFIG_PM
+static int dwc_otg_driver_runtime_suspend(struct device *dev)
+{
+	usb_dbg("+\n");
+	return 0;
+}
+
+static int dwc_otg_driver_runtime_resume(struct device *dev)
+{
+	usb_dbg("+\n");
+	return 0;
+}
+
+static int dwc_otg_driver_runtime_idle(struct device *dev)
+{
+	usb_dbg("+\n");
+	return 0;
+}
+
+static const struct dev_pm_ops dwc_otg_pm_ops = {
+	SET_RUNTIME_PM_OPS(dwc_otg_driver_runtime_suspend,
+			dwc_otg_driver_runtime_resume,
+			dwc_otg_driver_runtime_idle)
+};
+#endif
+
 static struct lm_driver dwc_otg_driver = {
-	.drv = {.name = (char *)dwc_driver_name,},
+	.drv = {
+		.name = (char *)dwc_driver_name,
+#ifdef CONFIG_PM
+		.pm = &dwc_otg_pm_ops,
+#endif
+	},
 	.probe = dwc_otg_driver_probe,
 	.remove = dwc_otg_driver_remove,
 	.suspend = dwc_otg_driver_suspend,
 	.resume = dwc_otg_driver_resume,
-
 };
 #elif defined(PCI_INTERFACE)
 static const struct pci_device_id pci_ids[] = { {
@@ -946,7 +977,9 @@ static int __init dwc_otg_driver_init(void)
 		printk(KERN_ERR "%s error=%d\n", __func__, error);
 	}
 
+#ifdef CONFIG_USB_DEBUG_NODE
 	error = driver_create_file(&dwc_otg_driver.drv, &driver_attr_debuglevel);
+#endif
 #elif defined(PCI_INTERFACE)
 	error = driver_create_file(&dwc_otg_driver.driver, &driver_attr_version);
 
@@ -954,7 +987,9 @@ static int __init dwc_otg_driver_init(void)
 		printk(KERN_ERR "%s error=%d\n", __func__, error);
 	}
 
+#ifdef CONFIG_USB_DEBUG_NODE
 	error = driver_create_file(&dwc_otg_driver.driver, &driver_attr_debuglevel);
+#endif
 #endif
 	return retval;
 }
@@ -972,11 +1007,15 @@ static void __exit dwc_otg_driver_cleanup(void)
 	printk(KERN_DEBUG "dwc_otg_driver_cleanup()\n");
 
 #ifdef LM_INTERFACE
+#ifdef CONFIG_USB_DEBUG_NODE
 	driver_remove_file(&dwc_otg_driver.drv, &driver_attr_debuglevel);
+#endif
 	driver_remove_file(&dwc_otg_driver.drv, &driver_attr_version);
 	lm_driver_unregister(&dwc_otg_driver);
 #elif defined(PCI_INTERFACE)
+#ifdef CONFIG_USB_DEBUG_NODE
 	driver_remove_file(&dwc_otg_driver.driver, &driver_attr_debuglevel);
+#endif
 	driver_remove_file(&dwc_otg_driver.driver, &driver_attr_version);
 	pci_unregister_driver(&dwc_otg_driver);
 #endif
@@ -1137,8 +1176,10 @@ module_param_named(ulpi_fs_ls, dwc_otg_module_params.ulpi_fs_ls, int, 0444);
 MODULE_PARM_DESC(ulpi_fs_ls, "ULPI PHY FS/LS mode only");
 module_param_named(ts_dline, dwc_otg_module_params.ts_dline, int, 0444);
 MODULE_PARM_DESC(ts_dline, "Term select Dline pulsing for all PHYs");
+#ifdef CONFIG_USB_DEBUG_NODE
 module_param_named(debug, g_dbg_lvl, int, 0444);
 MODULE_PARM_DESC(debug, "");
+#endif
 
 module_param_named(en_multiple_tx_fifo,
 		   dwc_otg_module_params.en_multiple_tx_fifo, int, 0444);

@@ -119,21 +119,6 @@ typedef struct dwc_list_link {
 #define DWC_LIST_ENTRY(link, type, field)			\
 	(type *)((uint8_t *)(link) - (size_t)(&((type *)0)->field))
 
-#if 0
-#define DWC_LIST_INSERT_HEAD(list, link) do {			\
-	(link)->next = (list)->next;				\
-	(link)->prev = (list);					\
-	(list)->next->prev = (link);				\
-	(list)->next = (link);					\
-} while (0)
-
-#define DWC_LIST_INSERT_TAIL(list, link) do {			\
-	(link)->next = (list);					\
-	(link)->prev = (list)->prev;				\
-	(list)->prev->next = (link);				\
-	(list)->prev = (link);					\
-} while (0)
-#else
 #define DWC_LIST_INSERT_HEAD(list, link) do {			\
 	dwc_list_link_t *__next__ = (list)->next;		\
 	__next__->prev = (link);				\
@@ -149,42 +134,6 @@ typedef struct dwc_list_link {
 	(link)->prev = __prev__;				\
 	__prev__->next = (link);				\
 } while (0)
-#endif
-
-#if 0
-static inline void __list_add(struct list_head *new,
-				struct list_head *prev,
-				struct list_head *next)
-{
-	next->prev = new;
-	new->next = next;
-	new->prev = prev;
-	prev->next = new;
-}
-
-static inline void list_add(struct list_head *new, struct list_head *head)
-{
-	__list_add(new, head, head->next);
-}
-
-static inline void list_add_tail(struct list_head *new, struct list_head *head)
-{
-	__list_add(new, head->prev, head);
-}
-
-static inline void __list_del(struct list_head *prev, struct list_head *next)
-{
-	next->prev = prev;
-	prev->next = next;
-}
-
-static inline void list_del(struct list_head *entry)
-{
-	__list_del(entry->prev, entry->next);
-	entry->next = LIST_POISON1;
-	entry->prev = LIST_POISON2;
-}
-#endif
 
 #define DWC_LIST_REMOVE(link) do {				\
 	(link)->next->prev = (link)->prev;			\

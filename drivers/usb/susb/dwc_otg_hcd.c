@@ -198,7 +198,12 @@ static void kill_all_urbs(dwc_otg_hcd_t *hcd)
 	kill_urbs_in_qh_list(hcd, &hcd->periodic_sched_queued);
 }
 
-
+/**
+ * Start the connection timer.  An OTG host is required to display a
+ * message if the device does not connect within 10 seconds.  The
+ * timer is deleted if a port connect interrupt occurs before the
+ * timer expires.
+ */
 static void dwc_otg_hcd_start_connect_timer(dwc_otg_hcd_t *hcd)
 {
 	DWC_TIMER_SCHEDULE(hcd->conn_timer, 10000 /* 10 secs */);
@@ -448,12 +453,10 @@ void dwc_otg_hcd_stop(dwc_otg_hcd_t *hcd)
 }
 
 int dwc_otg_hcd_urb_enqueue(dwc_otg_hcd_t *hcd,
-			dwc_otg_hcd_urb_t *dwc_otg_urb, void **ep_handle,
-			int atomic_alloc)
+			dwc_otg_qh_t *qh,
+			dwc_otg_qtd_t *qtd, int atomic_alloc)
 {
-	dwc_irqflags_t flags;
 	int retval = 0;
-	dwc_otg_qtd_t *qtd;
 	gintmsk_data_t intr_mask = {.d32 = 0 };
 	struct lm_device *lm_dev;
 	lm_dev = hcd->otg_dev->os_dep.lmdev;
@@ -466,29 +469,14 @@ int dwc_otg_hcd_urb_enqueue(dwc_otg_hcd_t *hcd,
 		return -DWC_E_NO_DEVICE;
 	}
 
-	qtd = dwc_otg_hcd_qtd_create(dwc_otg_urb, atomic_alloc);
-	if (qtd == NULL) {
-		DWC_ERROR("DWC OTG HCD URB Enqueue failed creating QTD\n");
-		return -DWC_E_NO_MEMORY;
-	}
-
-	if (*ep_handle == NULL) {
-		*ep_handle = dwc_otg_hcd_qh_create(hcd, dwc_otg_urb, atomic_alloc);
-		if (*ep_handle == NULL) {
-			return DWC_E_NO_MEMORY;
-		}
-	}
-	DWC_SPINLOCK_IRQSAVE(hcd->lock, &flags);
 	retval =
-		dwc_otg_hcd_qtd_add(qtd, hcd, (dwc_otg_qh_t **) ep_handle, atomic_alloc);
+		dwc_otg_hcd_qtd_add(qtd, hcd, &qh, atomic_alloc);
 	if (retval < 0) {
 		DWC_ERROR("DWC OTG HCD URB Enqueue failed adding QTD. "
 				  "Error status %d\n", retval);
-		dwc_otg_hcd_qtd_free(qtd);
-		DWC_SPINUNLOCK_IRQRESTORE(hcd->lock, flags);
 		return DWC_E_UNKNOWN;
 	} else {
-		qtd->qh = *ep_handle;
+		qtd->qh = qh;
 	}
 	intr_mask.d32 = DWC_READ_REG32(&hcd->core_if->core_global_regs->gintmsk);
 	if (!intr_mask.b.sofintr && retval == 0) {
@@ -496,7 +484,6 @@ int dwc_otg_hcd_urb_enqueue(dwc_otg_hcd_t *hcd,
 		if ((qtd->qh->ep_type == UE_BULK)
 			&& !(qtd->urb->flags & URB_GIVEBACK_ASAP)) {
 			/* Do not schedule SG transactions until qtd has URB_GIVEBACK_ASAP set */
-			DWC_SPINUNLOCK_IRQRESTORE(hcd->lock, flags);
 			return 0;
 		}
 
@@ -506,7 +493,6 @@ int dwc_otg_hcd_urb_enqueue(dwc_otg_hcd_t *hcd,
 		}
 	}
 
-	DWC_SPINUNLOCK_IRQRESTORE(hcd->lock, flags);
 	return retval;
 }
 
@@ -787,11 +773,6 @@ static void dwc_otg_hcd_free(dwc_otg_hcd_t *dwc_otg_hcd)
 	} else if (dwc_otg_hcd->status_buf != NULL) {
 		DWC_FREE(dwc_otg_hcd->status_buf);
 	}
-#if 0
-	DWC_SPINLOCK_FREE(dwc_otg_hcd->lock);
-	/* Set core_if's lock pointer to NULL */
-	dwc_otg_hcd->core_if->lock = NULL;
-#endif
 	DWC_TIMER_FREE(dwc_otg_hcd->conn_timer);
 	DWC_TASK_FREE(dwc_otg_hcd->reset_tasklet);
 
@@ -811,17 +792,7 @@ int dwc_otg_hcd_init(dwc_otg_hcd_t *hcd, dwc_otg_core_if_t *core_if)
 	int i;
 	dwc_hc_t *channel;
 
-#if 0
-	hcd->lock = DWC_SPINLOCK_ALLOC();
-	if (!hcd->lock) {
-		DWC_ERROR("Could not allocate lock for pcd");
-		DWC_FREE(hcd);
-		retval = -DWC_E_NO_MEMORY;
-		goto out;
-	}
-#else
 	hcd->lock = core_if->lock;
-#endif
 	hcd->core_if = core_if;
 
 	/* Register the HCD CIL Callbacks */
@@ -962,10 +933,6 @@ static void dwc_otg_hcd_reinit(dwc_otg_hcd_t *hcd)
 
 	/* Initialize the DWC core for host mode operation. */
 	dwc_otg_core_host_init(hcd->core_if);
-#if 0
-	/* Set core_if's lock pointer to the hcd->lock */
-	hcd->core_if->lock = hcd->lock;
-#endif
 }
 
 /**
@@ -2552,34 +2519,6 @@ int dwc_otg_hcd_hub_control(dwc_otg_hcd_t *dwc_otg_hcd,
 			}
 
 			/** @todo - check how sw can wait for 1 sec to check asesvld??? */
-#if 0 /* vahrama !!!!!!!!!!!!!!!!!! */
-			if (core_if->adp_enable) {
-				gotgctl_data_t gotgctl = {.d32 = 0 };
-				gpwrdn_data_t gpwrdn;
-
-				while (gotgctl.b.asesvld == 1) {
-					gotgctl.d32 =
-						DWC_READ_REG32(&core_if->
-								core_global_regs->
-								gotgctl);
-					dwc_mdelay(100);
-				}
-
-				/* Enable Power Down Logic */
-				gpwrdn.d32 = 0;
-				gpwrdn.b.pmuactv = 1;
-				DWC_MODIFY_REG32(&core_if->core_global_regs->
-						 gpwrdn, 0, gpwrdn.d32);
-
-				/* Unmask SRP detected interrupt from Power Down Logic */
-				gpwrdn.d32 = 0;
-				gpwrdn.b.srp_det_msk = 1;
-				DWC_MODIFY_REG32(&core_if->core_global_regs->
-						 gpwrdn, 0, gpwrdn.d32);
-
-				dwc_otg_adp_probe_start(core_if);
-			}
-#endif
 			break;
 		case UHF_PORT_POWER:
 			DWC_DEBUGPL(DBG_HCD, "DWC OTG HCD HUB CONTROL - "
@@ -3102,11 +3041,6 @@ void dwc_otg_hcd_urb_set_pipeinfo(dwc_otg_hcd_urb_t *dwc_otg_urb,
 {
 	dwc_otg_hcd_fill_pipe(&dwc_otg_urb->pipe_info, dev_addr, ep_num,
 						  ep_type, ep_dir, mps);
-#if 0
-	DWC_PRINTF
-	("addr = %d, ep_num = %d, ep_dir = 0x%x, ep_type = 0x%x, mps = %d\n",
-	 dev_addr, ep_num, ep_dir, ep_type, mps);
-#endif
 }
 
 void dwc_otg_hcd_urb_set_params(dwc_otg_hcd_urb_t *dwc_otg_urb,
@@ -3368,72 +3302,6 @@ void dwc_print_setup_data(uint8_t *setup)
 
 void dwc_otg_hcd_dump_frrem(dwc_otg_hcd_t *hcd)
 {
-#if 0
-	DWC_PRINTF("Frame remaining at SOF:\n");
-	DWC_PRINTF("  samples %u, accum %llu, avg %llu\n",
-			   hcd->frrem_samples, hcd->frrem_accum,
-			   (hcd->frrem_samples > 0) ?
-			   hcd->frrem_accum / hcd->frrem_samples : 0);
-
-	DWC_PRINTF("\n");
-	DWC_PRINTF("Frame remaining at start_transfer (uframe 7):\n");
-	DWC_PRINTF("  samples %u, accum %llu, avg %llu\n",
-			   hcd->core_if->hfnum_7_samples,
-			   hcd->core_if->hfnum_7_frrem_accum,
-			   (hcd->core_if->hfnum_7_samples >
-				0) ? hcd->core_if->hfnum_7_frrem_accum /
-			   hcd->core_if->hfnum_7_samples : 0);
-	DWC_PRINTF("Frame remaining at start_transfer (uframe 0):\n");
-	DWC_PRINTF("  samples %u, accum %llu, avg %llu\n",
-			   hcd->core_if->hfnum_0_samples,
-			   hcd->core_if->hfnum_0_frrem_accum,
-			   (hcd->core_if->hfnum_0_samples >
-				0) ? hcd->core_if->hfnum_0_frrem_accum /
-			   hcd->core_if->hfnum_0_samples : 0);
-	DWC_PRINTF("Frame remaining at start_transfer (uframe 1-6):\n");
-	DWC_PRINTF("  samples %u, accum %llu, avg %llu\n",
-			   hcd->core_if->hfnum_other_samples,
-			   hcd->core_if->hfnum_other_frrem_accum,
-			   (hcd->core_if->hfnum_other_samples >
-				0) ? hcd->core_if->hfnum_other_frrem_accum /
-			   hcd->core_if->hfnum_other_samples : 0);
-
-	DWC_PRINTF("\n");
-	DWC_PRINTF("Frame remaining at sample point A (uframe 7):\n");
-	DWC_PRINTF("  samples %u, accum %llu, avg %llu\n",
-			   hcd->hfnum_7_samples_a, hcd->hfnum_7_frrem_accum_a,
-			   (hcd->hfnum_7_samples_a > 0) ?
-			   hcd->hfnum_7_frrem_accum_a / hcd->hfnum_7_samples_a : 0);
-	DWC_PRINTF("Frame remaining at sample point A (uframe 0):\n");
-	DWC_PRINTF("  samples %u, accum %llu, avg %llu\n",
-			   hcd->hfnum_0_samples_a, hcd->hfnum_0_frrem_accum_a,
-			   (hcd->hfnum_0_samples_a > 0) ?
-			   hcd->hfnum_0_frrem_accum_a / hcd->hfnum_0_samples_a : 0);
-	DWC_PRINTF("Frame remaining at sample point A (uframe 1-6):\n");
-	DWC_PRINTF("  samples %u, accum %llu, avg %llu\n",
-			   hcd->hfnum_other_samples_a, hcd->hfnum_other_frrem_accum_a,
-			   (hcd->hfnum_other_samples_a > 0) ?
-			   hcd->hfnum_other_frrem_accum_a /
-			   hcd->hfnum_other_samples_a : 0);
-
-	DWC_PRINTF("\n");
-	DWC_PRINTF("Frame remaining at sample point B (uframe 7):\n");
-	DWC_PRINTF("  samples %u, accum %llu, avg %llu\n",
-			   hcd->hfnum_7_samples_b, hcd->hfnum_7_frrem_accum_b,
-			   (hcd->hfnum_7_samples_b > 0) ?
-			   hcd->hfnum_7_frrem_accum_b / hcd->hfnum_7_samples_b : 0);
-	DWC_PRINTF("Frame remaining at sample point B (uframe 0):\n");
-	DWC_PRINTF("  samples %u, accum %llu, avg %llu\n",
-			   hcd->hfnum_0_samples_b, hcd->hfnum_0_frrem_accum_b,
-			   (hcd->hfnum_0_samples_b > 0) ?
-			   hcd->hfnum_0_frrem_accum_b / hcd->hfnum_0_samples_b : 0);
-	DWC_PRINTF("Frame remaining at sample point B (uframe 1-6):\n");
-	DWC_PRINTF("  samples %u, accum %llu, avg %llu\n",
-			   hcd->hfnum_other_samples_b, hcd->hfnum_other_frrem_accum_b,
-			   (hcd->hfnum_other_samples_b > 0) ?
-			   hcd->hfnum_other_frrem_accum_b /
-			   hcd->hfnum_other_samples_b : 0);
-#endif
 }
 
 #endif /* DWC_DEVICE_ONLY */

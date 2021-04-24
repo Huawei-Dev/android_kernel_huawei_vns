@@ -8,6 +8,7 @@
 #include "dwc_otg_hi6250.h"
 
 #include <linux/gpio.h>
+#include <huawei_platform/power/huawei_charger.h>
 
 int hi6250_enable_abb_clk(struct otg_dev *otg_device)
 {
@@ -135,11 +136,58 @@ void close_usb_otg_phy_hi6250(struct otg_dev *otg_device)
 	msleep(1);
 }
 
+static void hi6250_dplus_pulldown(struct otg_dev *otg_device)
+{
+	usb_dbg("+\n");
+
+	struct usb_ahbif_registers *ahbif = (struct usb_ahbif_registers *)otg_device->usb_ahbif_base;
+	volatile u32 reg;
+
+	/* enable BC */
+	writel(1, &ahbif->bc_ctrl3);
+
+	reg = readl(&ahbif->bc_ctrl4);
+	reg |= ((1u << 8) | (1u << 9));
+	writel(reg, &ahbif->bc_ctrl4);
+
+	usb_dbg("-\n");
+}
+
+static void hi6250_dplus_pullup(struct otg_dev *otg_device)
+{
+	usb_dbg("+\n");
+
+	struct usb_ahbif_registers *ahbif = (struct usb_ahbif_registers *)otg_device->usb_ahbif_base;
+	volatile u32 reg;
+
+	reg = readl(&ahbif->bc_ctrl4);
+	reg &= (~((1u << 8) | (1u << 9)));
+	writel(reg, &ahbif->bc_ctrl4);
+
+	/* disable BC */
+	writel(0, &ahbif->bc_ctrl3);
+	usb_dbg("-\n");
+}
+
+static void hi6250_check_voltage(struct otg_dev *otg_device)
+{
+	usb_dbg("+\n");
+
+	if (otg_device->check_voltage) {
+		/*first dplus pulldown*/
+		hi6250_dplus_pulldown(otg_device);
+		hi6250_dplus_pullup(otg_device);
+	}
+
+	usb_dbg("-\n");
+}
+
 struct usb_phy_ops hi6250_usb_phy_ops = {
 	.init = init_usb_otg_phy_hi6250,
 	.close = close_usb_otg_phy_hi6250,
 	.enable_clk = hi6250_enable_abb_clk,
-	.disable_clk = hi6250_disable_abb_clk
+	.disable_clk = hi6250_disable_abb_clk,
+	.check_voltage = hi6250_check_voltage,
 };
 
 static int dwc_otg_hi6250_probe(struct platform_device *pdev)

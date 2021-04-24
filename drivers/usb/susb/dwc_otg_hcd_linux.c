@@ -653,23 +653,14 @@ static int urb_enqueue(struct usb_hcd *hcd,
 	uint8_t ep_type = 0;
 	uint32_t flags = 0;
 	void *buf;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
+	dwc_otg_qh_t *qh;
+	bool qh_allocated = false;
+	dwc_otg_qtd_t *qtd;
 	dwc_irqflags_t irq_flags;
-#endif
 
 #ifdef DEBUG
 	if (CHK_DEBUG_LEVEL(DBG_HCDV | DBG_HCD_URB)) {
 		dump_urb_info(urb, "urb_enqueue");
-	}
-#endif
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
-	DWC_SPINLOCK_IRQSAVE(dwc_otg_hcd->lock, &irq_flags);
-	retval = usb_hcd_link_urb_to_ep(hcd, urb);
-	DWC_SPINUNLOCK_IRQRESTORE(dwc_otg_hcd->lock, irq_flags);
-	if (retval) {
-		DWC_ERROR("usb_hcd_link_urb_to_ep fail\n");
-		return retval;
 	}
 #endif
 
@@ -705,7 +696,7 @@ static int urb_enqueue(struct usb_hcd *hcd,
 	if (!dwc_otg_urb) {
 		retval = -DWC_E_NO_MEMORY;
 		DWC_ERROR("Alloc hcd urb failed\n");
-		goto err;
+		return retval;
 	}
 
 	dwc_otg_hcd_urb_set_pipeinfo(dwc_otg_urb, usb_pipedevice(urb->pipe),
@@ -745,7 +736,34 @@ static int urb_enqueue(struct usb_hcd *hcd,
 	}
 
 	urb->hcpriv = dwc_otg_urb;
-	retval = dwc_otg_hcd_urb_enqueue(dwc_otg_hcd, dwc_otg_urb, &ep->hcpriv,
+
+	qh = (dwc_otg_qh_t *)ep->hcpriv;
+	if (qh == NULL) {
+		qh = dwc_otg_hcd_qh_create(dwc_otg_hcd, dwc_otg_urb, mem_flags == GFP_ATOMIC ? 1 : 0);
+		if (qh == NULL) {
+			retval = -DWC_E_NO_MEMORY;
+			goto fail0;
+		}
+		ep->hcpriv = qh;
+		qh_allocated = true;
+	}
+
+	qtd = dwc_otg_hcd_qtd_create(dwc_otg_urb, mem_flags == GFP_ATOMIC ? 1 : 0);
+	if (qtd == NULL) {
+		DWC_ERROR("DWC OTG HCD URB Enqueue failed creating QTD\n");
+		retval = -DWC_E_NO_MEMORY;
+		goto fail1;
+	}
+
+	DWC_SPINLOCK_IRQSAVE(dwc_otg_hcd->lock, &irq_flags);
+	retval = usb_hcd_link_urb_to_ep(hcd, urb);
+
+	if (retval) {
+		DWC_ERROR("usb_hcd_link_urb_to_ep fail\n");
+		goto fail2;
+	}
+
+	retval = dwc_otg_hcd_urb_enqueue(dwc_otg_hcd, qh, qtd,
 					 mem_flags == GFP_ATOMIC ? 1 : 0);
 	if (!retval) {
 		if (alloc_bandwidth) {
@@ -757,17 +775,25 @@ static int urb_enqueue(struct usb_hcd *hcd,
 		if (retval == -DWC_E_NO_DEVICE) {
 			retval = -ENODEV;
 		}
-		goto err;
+		DWC_ERROR("DWC OTG HCD URB Enqueue failed\n");
+		goto fail3;
 	}
-
-	return 0;
-
-err:
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
-	DWC_SPINLOCK_IRQSAVE(dwc_otg_hcd->lock, &irq_flags);
-	usb_hcd_unlink_urb_from_ep(hcd, urb);
 	DWC_SPINUNLOCK_IRQRESTORE(dwc_otg_hcd->lock, irq_flags);
-#endif
+	return 0;
+fail3:
+	dwc_otg_urb->priv = NULL;
+	usb_hcd_unlink_urb_from_ep(hcd, urb);
+fail2:
+	DWC_SPINUNLOCK_IRQRESTORE(dwc_otg_hcd->lock, irq_flags);
+	urb->hcpriv = NULL;
+	dwc_otg_hcd_qtd_free(qtd);
+fail1:
+	if (qh_allocated) {
+		ep->hcpriv = NULL;
+		dwc_otg_hcd_qh_free(dwc_otg_hcd, qh);
+	}
+fail0:
+	kfree(dwc_otg_urb);
 	return retval;
 }
 

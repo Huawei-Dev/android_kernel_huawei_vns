@@ -585,18 +585,6 @@ typedef struct {
 #define USB_POWER_DOWN_TIME	200 /* ms */
 #define USB_PORT_POWER_DOWN_TIME	100 /* ms */
 
-#if 0
-/* These are the values from the spec. */
-#define USB_PORT_RESET_DELAY	10  /* ms */
-#define USB_PORT_ROOT_RESET_DELAY 50  /* ms */
-#define USB_PORT_RESET_RECOVERY	10  /* ms */
-#define USB_PORT_POWERUP_DELAY	100 /* ms */
-#define USB_SET_ADDRESS_SETTLE	2   /* ms */
-#define USB_RESUME_DELAY	(20*5)  /* ms */
-#define USB_RESUME_WAIT		10  /* ms */
-#define USB_RESUME_RECOVERY	10  /* ms */
-#define USB_EXTRA_POWER_UP_TIME	0   /* ms */
-#else
 /* Allow for marginal (i.e. non-conforming) devices. */
 #define USB_PORT_RESET_DELAY	50  /* ms */
 #define USB_PORT_ROOT_RESET_DELAY 250  /* ms */
@@ -607,7 +595,6 @@ typedef struct {
 #define USB_RESUME_WAIT		50  /* ms */
 #define USB_RESUME_RECOVERY	50  /* ms */
 #define USB_EXTRA_POWER_UP_TIME	20  /* ms */
-#endif
 
 #define USB_MIN_POWER		100 /* mA */
 #define USB_MAX_POWER		500 /* mA */

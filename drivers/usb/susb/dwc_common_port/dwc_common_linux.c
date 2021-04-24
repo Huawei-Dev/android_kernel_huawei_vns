@@ -305,36 +305,6 @@ void __DWC_DEBUG(char *format, ...)
 
 /* dwc_mem.h */
 
-#if 0
-dwc_pool_t *DWC_DMA_POOL_CREATE(uint32_t size, uint32_t align, uint32_t alloc)
-{
-	struct dma_pool *pool = dma_pool_create("Pool", NULL,
-						size, align, alloc);
-	return (dwc_pool_t *)pool;
-}
-
-void DWC_DMA_POOL_DESTROY(dwc_pool_t *pool)
-{
-	dma_pool_destroy((struct dma_pool *)pool);
-}
-
-void *DWC_DMA_POOL_ALLOC(dwc_pool_t *pool, uint64_t *dma_addr)
-{
-	return dma_pool_alloc((struct dma_pool *)pool, GFP_KERNEL, dma_addr);
-}
-
-void *DWC_DMA_POOL_ZALLOC(dwc_pool_t *pool, uint64_t *dma_addr)
-{
-	void *vaddr = DWC_DMA_POOL_ALLOC(pool, dma_addr);
-	memset(..);
-}
-
-void DWC_DMA_POOL_FREE(dwc_pool_t *pool, void *vaddr, void *daddr)
-{
-	dma_pool_free(pool, vaddr, daddr);
-}
-#endif
-
 void *__DWC_DMA_ALLOC(void *dma_ctx, uint32_t size, dwc_dma_t *dma_addr)
 {
 #ifdef xxCOSIM /* Only works for 32-bit cosim */
@@ -567,12 +537,6 @@ uint32_t DWC_READ_REG32(uint32_t volatile * reg)
 	return readl(reg);
 }
 
-#if 0
-uint64_t DWC_READ_REG64(uint64_t volatile * reg)
-{
-}
-#endif
-
 void DWC_WRITE_REG32(uint32_t volatile * reg, uint32_t value)
 {
 	if (unlikely(!dwc_otg_hicommon_is_power_on())) {
@@ -581,12 +545,6 @@ void DWC_WRITE_REG32(uint32_t volatile * reg, uint32_t value)
 	writel(value, reg);
 }
 
-#if 0
-void DWC_WRITE_REG64(uint64_t volatile * reg, uint64_t value)
-{
-}
-#endif
-
 void DWC_MODIFY_REG32(uint32_t volatile * reg, uint32_t clear_mask, uint32_t set_mask)
 {
 	if (unlikely(!dwc_otg_hicommon_is_power_on())) {
@@ -594,13 +552,6 @@ void DWC_MODIFY_REG32(uint32_t volatile * reg, uint32_t clear_mask, uint32_t set
 	}
 	writel((readl(reg) & ~clear_mask) | set_mask, reg);
 }
-
-#if 0
-void DWC_MODIFY_REG64(uint64_t volatile * reg, uint64_t clear_mask, uint64_t set_mask)
-{
-}
-#endif
-
 
 /* Locking */
 
@@ -779,7 +730,6 @@ dwc_timer_t *DWC_TIMER_ALLOC(char *name, dwc_timer_callback_t cb, void *data)
 	}
 
 	t->scheduled = 0;
-	t->t->base = &boot_tvec_bases;
 	t->t->expires = jiffies;
 	setup_timer(t->t, timer_callback, (unsigned long)t);
 
@@ -1333,12 +1283,6 @@ EXPORT_SYMBOL(DWC_BE16_TO_CPU);
 EXPORT_SYMBOL(DWC_READ_REG32);
 EXPORT_SYMBOL(DWC_WRITE_REG32);
 EXPORT_SYMBOL(DWC_MODIFY_REG32);
-
-#if 0
-EXPORT_SYMBOL(DWC_READ_REG64);
-EXPORT_SYMBOL(DWC_WRITE_REG64);
-EXPORT_SYMBOL(DWC_MODIFY_REG64);
-#endif
 
 EXPORT_SYMBOL(DWC_SPINLOCK_ALLOC);
 EXPORT_SYMBOL(DWC_SPINLOCK_FREE);

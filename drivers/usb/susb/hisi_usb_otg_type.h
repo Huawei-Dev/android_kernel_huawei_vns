@@ -5,6 +5,7 @@
 #include <linux/hisi/usb/hisi_usb.h>
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
+#include <linux/platform_device.h>
 
 /**
  * usb otg ahbif registers definations
@@ -338,6 +339,7 @@ struct usb_phy_ops {
 	void (*close)(struct otg_dev *otg_device);
 	int (*enable_clk)(struct otg_dev *otg_device);
 	void (*disable_clk)(struct otg_dev *otg_device);
+	void (*check_voltage)(struct otg_dev *otg_device);
 };
 
 struct hiusb_event_queue {
@@ -387,14 +389,20 @@ struct otg_dev {
 	struct clk *clk;
 	struct clk *hclk_usb2otg;
 
+	/* for bc again */
 	int bc_again_flag;
+	int bc_unknown_again_flag;
+	unsigned int bc_again_delay_time;
 	struct notifier_block conndone_nb;
 	struct delayed_work bc_again_work;
+
+	unsigned int vdp_src_enable;
 
 	/* event queue for handle event */
 	struct hiusb_event_queue event_queue;
 
 	unsigned int need_disable_vdp;
+	unsigned int check_voltage;
 };
 
 #ifdef CONFIG_PM
@@ -417,5 +425,14 @@ static inline struct usb_phy_ops *get_usb_phy_ops(struct otg_dev *dev_p)
 {
 	return dev_p->usb_phy_ops;
 }
+
+/*
+ * hisi usb bc
+ */
+#define BC_AGAIN_DELAY_TIME_1 200
+#define BC_AGAIN_DELAY_TIME_2 8000
+void notify_charger_type(struct otg_dev *dev_p);
+void schdule_bc_again(struct otg_dev *dev_p);
+void cancel_bc_again(struct otg_dev *dev_p, int sync);
 
 #endif /* hisi_usb_otg_type.h */

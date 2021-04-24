@@ -1072,6 +1072,7 @@ DEVICE_ATTR(hcd_frrem, S_IRUG, hcd_frrem_show, 0);
  */
 #define RW_REG_COUNT 10000000
 #define MSEC_PER_JIFFIE (1000/HZ)
+#ifdef CONFIG_USB_DEBUG_NODE
 static ssize_t rd_reg_test_show(struct device *_dev,
 				struct device_attribute *attr, char *buf)
 {
@@ -1133,6 +1134,7 @@ static ssize_t wr_reg_test_show(struct device *_dev,
 }
 
 DEVICE_ATTR(wr_reg_test, S_IRUG, wr_reg_test_show, 0);
+#endif
 
 #ifdef CONFIG_USB_DWC_OTG_LPM
 
@@ -1287,8 +1289,10 @@ void dwc_otg_attr_create(
 	error = device_create_file(&dev->dev, &dev_attr_spramdump);
 	error = device_create_file(&dev->dev, &dev_attr_hcddump);
 	error = device_create_file(&dev->dev, &dev_attr_hcd_frrem);
+#ifdef CONFIG_USB_DEBUG_NODE
 	error = device_create_file(&dev->dev, &dev_attr_rd_reg_test);
 	error = device_create_file(&dev->dev, &dev_attr_wr_reg_test);
+#endif
 #ifdef CONFIG_USB_DWC_OTG_LPM
 	error = device_create_file(&dev->dev, &dev_attr_lpm_response);
 	error = device_create_file(&dev->dev, &dev_attr_sleep_status);
@@ -1340,8 +1344,10 @@ void dwc_otg_attr_remove(
 	device_remove_file(&dev->dev, &dev_attr_spramdump);
 	device_remove_file(&dev->dev, &dev_attr_hcddump);
 	device_remove_file(&dev->dev, &dev_attr_hcd_frrem);
+#ifdef CONFIG_USB_DEBUG_NODE
 	device_remove_file(&dev->dev, &dev_attr_rd_reg_test);
 	device_remove_file(&dev->dev, &dev_attr_wr_reg_test);
+#endif
 #ifdef CONFIG_USB_DWC_OTG_LPM
 	device_remove_file(&dev->dev, &dev_attr_lpm_response);
 	device_remove_file(&dev->dev, &dev_attr_sleep_status);

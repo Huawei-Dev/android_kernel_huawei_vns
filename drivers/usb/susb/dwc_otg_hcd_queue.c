@@ -212,12 +212,6 @@ void qh_init(dwc_otg_hcd_t *hcd, dwc_otg_qh_t *qh, dwc_otg_hcd_urb_t *urb)
 						    SCHEDULE_SLOP);
 		qh->interval = urb->interval;
 
-#if 0
-		/* Increase interrupt polling rate for debugging. */
-		if (qh->ep_type == UE_INTERRUPT) {
-			qh->interval = 8;
-		}
-#endif
 		hprt.d32 = DWC_READ_REG32(hcd->core_if->host_if->hprt0);
 		if ((hprt.b.prtspd == DWC_HPRT0_PRTSPD_HIGH_SPEED) &&
 		    ((dev_speed == USB_SPEED_LOW) ||

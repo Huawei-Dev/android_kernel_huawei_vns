@@ -347,19 +347,6 @@ int32_t dwc_otg_handle_conn_id_status_change_intr(dwc_otg_core_if_t *core_if)
 			" ++Connector ID Status Change Interrupt++  (%s)\n",
 			(dwc_otg_is_host_mode(core_if) ? "Host" : "Device"));
 
-#if 0
-	DWC_SPINUNLOCK(core_if->lock);
-
-	/*
-	 * Need to schedule a work, as there are possible DELAY function calls
-	 * Release lock before scheduling workq as it holds spinlock during scheduling
-	 */
-
-	DWC_WORKQ_SCHEDULE(core_if->wq_otg, w_conn_id_status_change,
-					   core_if, "connection id status change");
-	DWC_SPINLOCK(core_if->lock);
-#endif
-
 	/* Set flag and clear interrupt */
 	gintsts.b.conidstschng = 1;
 	DWC_WRITE_REG32(&core_if->core_global_regs->gintsts, gintsts.d32);
@@ -424,13 +411,6 @@ void w_wakeup_detected(void *p)
 		return;
 	}
 
-#if 0
-	pcgcctl_data_t pcgcctl = {.d32 = 0 };
-	/* Restart the Phy Clock */
-	pcgcctl.b.stoppclk = 1;
-	DWC_MODIFY_REG32(core_if->pcgcctl, pcgcctl.d32, 0);
-	dwc_udelay(10);
-#endif /* 0 */
 	hprt0.d32 = dwc_otg_read_hprt0(core_if);
 	DWC_DEBUGPL(DBG_ANY, "Resume: HPRT0=%0x\n", hprt0.d32);
 /*      dwc_mdelay(70); */
@@ -980,14 +960,7 @@ int32_t dwc_otg_handle_disconnect_intr(dwc_otg_core_if_t *core_if)
 			/* If in device mode Disconnect and stop the HCD, then
 			 * start the PCD. */
 			/* avoid lockup */
-#if 0
-			DWC_SPINUNLOCK(core_if->lock);
 			cil_hcd_disconnect(core_if);
-			cil_pcd_start(core_if);
-			DWC_SPINLOCK(core_if->lock);
-#else
-			cil_hcd_disconnect(core_if);
-#endif
 			core_if->op_state = B_PERIPHERAL;
 		} else {
 			DWC_DEBUGPL(DBG_ANY, "!a_peripheral && !devhnpen\n");

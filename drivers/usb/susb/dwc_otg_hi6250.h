@@ -44,7 +44,6 @@
 #define REG_PMU_SSI_IRQ_MASK_0		(0x102 << 2)
 #define REG_PMU_SSI_IRQ_MASK_1		(0x103 << 2)
 
-
 /**
  * USB ahbif registers
  */

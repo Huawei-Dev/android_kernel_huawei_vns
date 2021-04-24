@@ -391,9 +391,6 @@ static void dwc_otg_enable_common_interrupts(dwc_otg_core_if_t *core_if)
 	 * Enable the interrupts in the GINTMSK.
 	 */
 	intr_mask.b.modemismatch = 1;
-#if 0
-	intr_mask.b.otgintr = 1;
-#endif
 
 	if (!core_if->dma_enable) {
 		intr_mask.b.rxstsqlvl = 1;
@@ -1629,21 +1626,6 @@ void dwc_otg_enable_device_interrupts(dwc_otg_core_if_t *core_if)
 
 	/* Enable the ignore frame number for ISOC xfers - MAS */
 	/* Disable to support high bandwith ISOC transfers - manukz */
-#if 0
-#ifdef DWC_UTE_PER_IO
-	if (core_if->dma_enable) {
-		if (core_if->dma_desc_enable) {
-			dctl_data_t dctl1 = {.d32 = 0 };
-			dctl1.b.ifrmnum = 1;
-			DWC_MODIFY_REG32(&core_if->dev_if->dev_global_regs->dctl,
-					0, dctl1.d32);
-			DWC_DEBUG("----Enabled Ignore frame number (0x%08x)",
-				DWC_READ_REG32(
-					&core_if->dev_if->dev_global_regs->dctl));
-		}
-	}
-#endif
-#endif
 #ifdef DWC_EN_ISOC
 	if (core_if->dma_enable) {
 		if (core_if->dma_desc_enable == 0) {
@@ -2080,14 +2062,6 @@ void dwc_otg_core_dev_init(dwc_otg_core_if_t *core_if)
 		dctl.b.nakonbble = 1;
 		DWC_MODIFY_REG32(&dev_if->dev_global_regs->dctl, 0, dctl.d32);
 	}
-#if 0
-	if (core_if->snpsid >= OTG_CORE_REV_2_94a) {
-		dctl_data_t dctl = {.d32 = 0 };
-		dctl.d32 = DWC_READ_REG32(&dev_if->dev_global_regs->dctl);
-		dctl.b.sftdiscon = 0;
-		DWC_WRITE_REG32(&dev_if->dev_global_regs->dctl, dctl.d32);
-	}
-#endif
 	printk(KERN_INFO "%s -\n", __func__);
 }
 

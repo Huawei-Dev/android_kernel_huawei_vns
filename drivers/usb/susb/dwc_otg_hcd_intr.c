@@ -753,7 +753,13 @@ update_isoc_urb_state(dwc_otg_hcd_t *hcd,
 	return ret_val;
 }
 
-
+/**
+ * Frees the first QTD in the QH's list if free_qtd is 1. For non-periodic
+ * QHs, removes the QH from the active non-periodic schedule. If any QTDs are
+ * still linked to the QH, the QH is added to the end of the inactive
+ * non-periodic schedule. For periodic QHs, removes the QH from the periodic
+ * schedule if no more QTDs are linked to the QH.
+ */
 static void deactivate_qh(dwc_otg_hcd_t *hcd, dwc_otg_qh_t *qh, int free_qtd)
 {
 	int continue_split = 0;
@@ -1496,15 +1502,6 @@ static int32_t handle_hc_nyet_intr(dwc_otg_hcd_t *hcd,
 				 * No longer in the same full speed frame.
 				 * Treat this as a transaction error.
 				 */
-#if 0
-				/** @todo Fix system performance so this can
-				 * be treated as an error. Right now complete
-				 * splits cannot be scheduled precisely enough
-				 * due to other system activity, so this error
-				 * occurs regularly in Slave mode.
-				 */
-				qtd->error_count++;
-#endif
 				qtd->complete_split = 0;
 				halt_channel(hcd, hc, qtd,
 					     DWC_OTG_HC_XFER_XACT_ERR);
