@@ -1558,8 +1558,6 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 	else
 		goto out_err;
 
-	walk_data.type = type;
-
 	if (type == RECLAIM_RANGE) {
 		char *token;
 		unsigned long long len, len_in, tmp;

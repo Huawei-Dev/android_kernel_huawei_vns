@@ -778,7 +778,6 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
 
 		rq = list_first_entry(&rq_list, struct request, queuelist);
 		list_del_init(&rq->queuelist);
-		req_latency_check(rq,REQ_PROC_STAGE_MQ_RUN_QUEUE_CHECK);
 
 		bd.rq = rq;
 		bd.list = dptr;
@@ -1094,7 +1093,6 @@ void blk_mq_flush_plug_list(struct blk_plug *plug, bool from_schedule)
 	while (!list_empty(&list)) {
 		rq = list_entry_rq(list.next);
 		list_del_init(&rq->queuelist);
-		req_latency_check(rq,REQ_PROC_STAGE_MQ_FLUSH_PLUGLIST_SCHEDULE);
 		BUG_ON(!rq->q);
 		if (rq->mq_ctx != this_ctx) {
 			if (this_ctx) {
@@ -1315,7 +1313,6 @@ static blk_qc_t blk_mq_make_request(struct request_queue *q, struct bio *bio)
 			}
 
 			list_add_tail(&rq->queuelist, &plug->mq_list);
-			req_latency_check(rq,REQ_PROC_STAGE_MQ_ADDTO_PLUGLIST);
 		} else /* is_sync */
 			old_rq = rq;
 		blk_mq_put_ctx(data.ctx);
