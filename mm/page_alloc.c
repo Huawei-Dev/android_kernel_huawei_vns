@@ -1900,12 +1900,6 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order,
 {
 	struct page *page;
 	
-	if (migratetype == MIGRATE_CMA) {
-		if (!in_interrupt()
-		    && current->signal->oom_score_adj > SERVICE_ADJ)
-			migratetype = MIGRATE_MOVABLE;
-	}
-
 	page = __rmqueue_smallest(zone, order, migratetype);
 	if (unlikely(!page)) {
 		page = __rmqueue_fallback(zone, order, migratetype,

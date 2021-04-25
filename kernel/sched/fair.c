@@ -4448,14 +4448,6 @@ void remove_entity_load_avg(struct sched_entity *se)
 
 	sync_entity_load_avg(se);
 	atomic_long_add(se->avg.load_avg, &cfs_rq->removed_load_avg);
-
-	if (!entity_is_task(se))
-		return;
-
-	last_update_time = cfs_rq_last_update_time(&rq_of(cfs_rq)->cfs);
-
-	__update_load_avg(last_update_time, cpu_of(rq_of(cfs_rq)), &se->avg, 0,
-			  upd_util_se(se, 0), NULL);
 	atomic_long_add(se->avg.util_avg, &rq_of(cfs_rq)->cfs.removed_util_avg);
 }
 
