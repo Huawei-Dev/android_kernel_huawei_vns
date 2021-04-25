@@ -40,7 +40,7 @@ int hisi_lowmem_tune(int *other_free, int *other_file,
 		/*lint -save -e834 */
 		zone_free = (int)zone_page_state(dma_zone, NR_FREE_PAGES)
 			- (int)zone_page_state(dma_zone, NR_FREE_CMA_PAGES)
-			- (int)dma_zone->dirty_balance_reserve;
+			- (int)dma_zone->totalreserve_pages;
 		zone_file = (int)zone_page_state(dma_zone, NR_FILE_PAGES)
 			- (int)zone_page_state(dma_zone, NR_SHMEM)
 			- (int)zone_page_state(dma_zone, NR_SWAPCACHE);
