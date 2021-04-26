@@ -7,10 +7,10 @@
 
 
 #define MAX_INPUT_STREAM_NR (2)
-#define MAX_STREAM_NR       (11)
+#define MAX_STREAM_NR       (10)
 #define NAME_LEN            (32)
 #define PARAS_LEN           (400)
-#define EVENT_PARAMS_LEN    (68)
+#define EVENT_PARAMS_LEN    (64)
 #define TIME_LEN            (32)
 
 /* based on msg len is 464 */
@@ -106,19 +106,19 @@ typedef enum
 
 typedef enum _ucfg_ext_e
 {
-    NO_USE                       = 0 << 0,
-    H_VIDEO_720P_120             = 1 << 1,
-    H_VIDEO_1080P_60             = 1 << 2,
-    MIRROR_MODE                  = 1 << 3,
-    LONG_EXPOSURE_MODE           = 1 << 4,
-    HDR_MOVIE                    = 1 << 5,
-    DARK_RAIDER_MODE             = 1 << 6,
-    H_VIDEO_720P_60              = 1 << 7,
-    H_VIDEO_VGA_120              = 1 << 8,
-    TUNING_PRE_MODE              = 1 << 9,
-    H_VIDEO_720P_240             = 1 << 10,
-    H_VIDEO_1080P_120            = 1 << 11,
-    RESERVED                     = 1 << 12,
+    NO_USE               = 0 << 0,
+    H_VIDEO_720P_120     = 1 << 1,
+    H_VIDEO_1080P_60     = 1 << 2,
+    MIRROR_MODE          = 1 << 3,
+    LONG_EXPOSURE_MODE   = 1 << 4,
+    HDR_MOVIE            = 1 << 5,
+    DARK_RAIDER_MODE     = 1 << 6,
+    H_VIDEO_720P_60      = 1 << 7,
+    H_VIDEO_VGA_120      = 1 << 8,
+    TUNING_PRE_MODE      = 1 << 9,
+    H_VIDEO_720P_240     = 1 << 10,
+    H_VIDEO_1080P_120    = 1 << 11,
+    RESERVED             = 1 << 12,
 } ucfg_ext_e;
 
 typedef enum _ucfg_scene_e
@@ -675,18 +675,6 @@ typedef enum
     SUBCMD_SET_PDAF_RESULT,
     SUBCMD_SET_SELF_LEARN_DATA,
     SUBCMD_SET_SFR_TEST_DATA,
-    SUBCMD_SET_AF_OTPSTART_MODE,
-    SUBCMD_SET_LOG_LEVEL,
-    SUBCMD_PDAF_ENABLE,
-    SUBCMD_SET_HFBC_ALIGMENT,
-    SUBCMD_SET_SOFTLIGHT_MODE = 149,
-
-    SUBCMD_SET_PDALGO_ENABLE              = 150,
-    SUBCMD_SET_PD_INFO                    = 151,
-    SUBCMD_SET_SWPD_KEY                   = 152,
-    SUBCMD_GET_SWPD_KEY                   = 153,
-    SUBCMD_GET_SENSOR_COORD               = 154,
-
 } extendset_info_e;
 
 typedef enum

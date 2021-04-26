@@ -12,7 +12,6 @@
 #include "hwsensor.h"
 #include "sensor_commom.h"
 #include "hw_csi.h"
-//lint -save -e650 -e31
 
 #define I2S(i) container_of(i, sensor_t, intf)
 
@@ -182,8 +181,6 @@ struct sensor_power_setting hw_imx214_power_down_setting[] = {
     },
 };
 
-struct mutex imx214_power_lock;
-atomic_t volatile imx214_powered = ATOMIC_INIT(0);
 static sensor_t s_imx214 =
 {
     .intf = { .vtbl = &s_imx214_vtbl, },
@@ -195,7 +192,6 @@ static sensor_t s_imx214 =
             .size = ARRAY_SIZE(hw_imx214_power_down_setting),
             .power_setting = hw_imx214_power_down_setting,
     },
-    .p_atpowercnt = &imx214_powered,
 
 };
 
@@ -416,6 +412,48 @@ matchID_exit:
     return rc;
 }
 
+#if 0
+static ssize_t imx214_powerctrl_show(struct device *dev,
+	struct device_attribute *attr,char *buf)
+{
+        cam_info("enter %s", __func__);
+        return 1;
+}
+static ssize_t imx214_powerctrl_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int state = simple_strtol(buf, NULL, 10);
+	cam_info("enter %s, state %d", __func__, state);
+
+	if (state == POWER_ON)
+		imx214_power_up(&s_imx214.intf);
+	else
+		imx214_power_down(&s_imx214.intf);
+
+	return count;
+}
+
+
+static struct device_attribute imx214_powerctrl =
+    __ATTR(power_ctrl, 0664, imx214_powerctrl_show, imx214_powerctrl_store);
+
+int imx214_register_attribute(hwsensor_intf_t* intf, struct device* dev)
+{
+	int ret = 0;
+	cam_info("enter %s", __func__);
+
+	ret = device_create_file(dev, &imx214_powerctrl);
+	if (ret < 0) {
+		cam_err("%s failed to creat power ctrl attribute.", __func__);
+		goto err_create_power_ctrl;
+	}
+	return 0;
+err_create_power_ctrl:
+	device_remove_file(dev, &imx214_powerctrl);
+	return ret;
+}
+#endif
+
 static hwsensor_vtbl_t
 s_imx214_vtbl =
 {
@@ -447,31 +485,16 @@ imx214_config(
 	cam_debug("imx214 cfgtype = %d",data->cfgtype);
 	switch(data->cfgtype){
 		case SEN_CONFIG_POWER_ON:
-			mutex_lock(&imx214_power_lock);
 			if(false == power_on_status){
-				ret = si->vtbl->power_up(si);
-				if (0 == ret)
-				{
-					power_on_status = true;
-				}
+			ret = si->vtbl->power_up(si);
+				power_on_status = true;
 			}
-			/*lint -e455 -esym(455,*)*/
-			mutex_unlock(&imx214_power_lock);
-			/*lint -e455 +esym(455,*)*/
 			break;
 		case SEN_CONFIG_POWER_OFF:
-			mutex_lock(&imx214_power_lock);
 			if(true == power_on_status){
-				ret = si->vtbl->power_down(si);
-				if (0 != ret)
-				{
-					cam_err("%s. power_down fail.", __func__);
-				}
+			ret = si->vtbl->power_down(si);
 				power_on_status = false;
 			}
-			/*lint -e455 -esym(455,*)*/
-			mutex_unlock(&imx214_power_lock);
-			/*lint -e455 +esym(455,*)*/
 			break;
 		case SEN_CONFIG_WRITE_REG:
 			break;
@@ -513,7 +536,7 @@ imx214_platform_probe(
 	}
 
     s_imx214.dev = &pdev->dev;
-	mutex_init(&imx214_power_lock);
+
 	rc = hwsensor_register(pdev, &s_imx214.intf);
 	rc = rpmsg_sensor_register(pdev, (void*)&s_imx214);
 
@@ -541,4 +564,3 @@ module_init(imx214_init_module);
 module_exit(imx214_exit_module);
 MODULE_DESCRIPTION("imx214");
 MODULE_LICENSE("GPL v2");
-//lint -restore

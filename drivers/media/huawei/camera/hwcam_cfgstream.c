@@ -14,12 +14,9 @@
 #include <media/v4l2-fh.h>
 #include <media/v4l2-ioctl.h>
 #include <media/videobuf2-core.h>
-#include <linux/version.h>
 
 #include "hwcam_intf.h"
 #include "hwcam_compat32.h"
-//lint -save -e578 -e527 -e593
-
 
 #define HWCAM_CFGSTREAM_MAX                     16      //  no more than 16 streams
 
@@ -700,15 +697,10 @@ hwcam_cfgstream_mount_graphic_buf_req_create_instance(
 {
     int rc = 0; 
     int i = 0;
-    int buf_length = 0;
-    bool is_invaild = false;
     hwcam_cfgstream_mount_graphic_buf_req_t* mbr = NULL;
     *req = NULL; 
 
-    buf_length = buf->num_ints + buf->num_fds;
-    is_invaild =  buf->num_ints < 0 ||  buf->num_fds < 0 || buf_length <= 0;
-
-     if (is_invaild || (HWCAM_GRAPHIC_BUF_INFO_LENGTH <=  buf_length)){
+    if (HWCAM_GRAPHIC_BUF_INFO_LENGTH <= buf->num_ints + buf->num_fds) {
         HWCAM_CFG_ERR("out of range! \n");
         goto exit_create_instance;
     }
@@ -728,7 +720,7 @@ hwcam_cfgstream_mount_graphic_buf_req_create_instance(
             goto fail_to_fget;
         }
     }
-    for (; i <  buf_length; i++) {
+    for (; i < buf->num_fds + buf->num_ints; i++) {
         mbr->ints[i] = buf->data[i];
     }
 
@@ -1056,13 +1048,7 @@ hwcam_cfgstream_vo_get_buf(
     }
     spin_unlock_irqrestore(&stm->lock_bufq, flags);
     if (ret) {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 0))
-        bufstatus->id = ret->buf.v4l2_buf.index;
-        bufstatus->tv.tv_sec = ret->buf.v4l2_buf.timestamp.tv_sec;
-        bufstatus->tv.tv_usec = ret->buf.v4l2_buf.timestamp.tv_usec;
-#else
         bufstatus->id = ret->buf.index;
-#endif
         return 0;
     }
     else {
@@ -1083,11 +1069,7 @@ hwcam_cfgstream_vo_put_buf(
 
     spin_lock_irqsave(&stm->lock_bufq, flags);
     list_for_each_entry_safe(entry, tmp, &stm->bufq_busy, node) {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 0))
-        if (entry->buf.v4l2_buf.index == bufstatus->id) {
-#else
         if (entry->buf.index == bufstatus->id) {
-#endif
             list_move(&entry->node, &stm->bufq_idle);
             rc = 0;
             break;
@@ -1109,11 +1091,7 @@ hwcam_cfgstream_vo_buf_done(
 
     spin_lock_irqsave(&stm->lock_bufq, flags);
     list_for_each_entry_safe(entry, tmp, &stm->bufq_busy, node) {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 0))
-        if (entry->buf.v4l2_buf.index == bufstatus->id) {
-#else
         if (entry->buf.index == bufstatus->id) {
-#endif
             list_del_init(&entry->node);
             if (bufstatus->buf_status == false) {
                 vb2_buffer_done(&entry->buf, VB2_BUF_STATE_DONE);
@@ -1673,4 +1651,4 @@ hwcam_cfgstream_get_by_fd(int fd)
     }
     return stm;
 }
-//lint -restore
+

@@ -11,8 +11,6 @@
  */
 
 #include "hw_flash.h"
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-label"
 //lint -save -e31 -e64 -e84 -e708 -e712 -e713 -e715 -e732 -e734 -e737
 //lint -save -e750 -e754 -e528 -e570 -e574 -e578 -e651 -e701
 //lint -save -e747 -e753 -e778 -e785 -e838 -e846 -e866 -e514
@@ -39,8 +37,6 @@
 #define LM3642_TORCH_DEFAULT_CUR_LEV         2    //140mA
 #define LM3642_FLASH_MAX_CUR                         1500
 #define LM3642_TORCH_MAX_CUR                         375
-#define LM3642_TORCH_MAX_RT_CUR                      190
-#define LM3642_TORCH_MAX_LEV                         7
 
 #define FLASH_LED_MAX			16
 #define TORCH_LED_MAX			8
@@ -198,9 +194,9 @@ static int hw_lm3642_find_match_torch_current(int cur_torch)
         return -1;
     }
 
-    if(cur_torch > LM3642_TORCH_MAX_CUR){
+    if(cur_torch >= LM3642_TORCH_MAX_CUR){
         cam_warn("%s current set is %d", __func__, cur_torch);
-        return LM3642_TORCH_MAX_LEV;
+        return LM3642_TORCH_DEFAULT_CUR_LEV;
     }
 
     for(i=0; i < 8; i ++){
@@ -610,7 +606,7 @@ static ssize_t hw_lm3642_lightness_store(struct device *dev,
 			return rc;
 		}
 	} else if(cdata.mode == TORCH_MODE){
-        cdata.data = LM3642_TORCH_MAX_RT_CUR;//hardware test requiring the max torch mode current
+        cdata.data = LM3642_TORCH_MAX_CUR;//hardware test requiring the max torch mode current
         cam_info("%s mode=%d, max_current=%d.", __func__, cdata.mode, cdata.data);
 
 		rc = hw_lm3642_on(&hw_lm3642_ctrl, &cdata);
@@ -722,7 +718,7 @@ err_create_lightness_file:
 	led_classdev_unregister(&flash_ctrl->cdev_torch);
 err_out:
 	return rc;
-}//lint !e563
+}
 
 static int hw_lm3642_match(struct hw_flash_ctrl_t *flash_ctrl)
 {
@@ -840,4 +836,3 @@ module_init(hw_lm3642_module_init);
 module_exit(hw_lm3642_module_exit);
 MODULE_DESCRIPTION("LM3642 FLASH");
 MODULE_LICENSE("GPL v2");
-#pragma GCC diagnostic pop

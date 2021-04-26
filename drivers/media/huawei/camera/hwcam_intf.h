@@ -334,8 +334,6 @@ hwcam_cfgdev_release_graphic_buffer(struct ion_handle* hdl);
 
 //  hwcam_cfgdev interface definition end
 
-extern int
-hw_is_binderized(void);
 
 ////////////////////////////////////////////////////////////////////////////////
 //

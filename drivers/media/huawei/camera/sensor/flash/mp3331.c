@@ -40,14 +40,12 @@
 #define I_FL                                             0x18   //flash current:760.8mA
 #define I_TX                                             0x08   // I_TX:253.6mA   
 #define I_TOR                                           0x05   // torch current:158.5mA
-#define BASE                                    10
 
 #define MP3331_FLASH_DEFAULT_CUR_LEV          24  //760mA
 #define MP3331_TORCH_DEFAULT_CUR_LEV         5    //158mA
 #define MP3331_FLASH_MAX_CUR_LEV                 47  //1490mA
 #define MP3331_TORCH_MAX_CUR_LEV                 12   //380mA
-//#define MP3331_TORCH_MAX_CUR                           380
-#define MP3331_TORCH_MAX_RT_CUR                        190
+#define MP3331_TORCH_MAX_CUR                           380
 #define MP3331_CUR_STEP_LEV                            317  //31.7mA * 10
 
 #define FLASH_CHIP_ID_MASK       0xF8
@@ -126,7 +124,7 @@ static int hw_mp3331_clear_err_and_unlock(struct hw_flash_ctrl_t *flash_ctrl)
            if(!dsm_client_ocuppy(client_flash)) {
                 dsm_client_record(client_flash, "flash OVP, VOUT or LED short! FlagReg_H[0x%x]\n", fault_h);
                 dsm_client_notify(client_flash, DSM_FLASH_OPEN_SHOTR_ERROR_NO);
-                cam_warn("[I/DSM] %s flash OVP, VOUT or LED short! FlagReg_H[0x%x]", __func__, (unsigned int)fault_h);
+                cam_warn("[I/DSM] flash OVP, VOUT or LED short! FlagReg_H[0x%x]", __func__, fault_h);
            }
 	}
 
@@ -134,7 +132,7 @@ static int hw_mp3331_clear_err_and_unlock(struct hw_flash_ctrl_t *flash_ctrl)
            if(!dsm_client_ocuppy(client_flash)) {
                 dsm_client_record(client_flash, "flash LED Open! FlagReg_L[0x%x]\n", fault_l);
                 dsm_client_notify(client_flash, DSM_FLASH_OPEN_SHOTR_ERROR_NO);
-                cam_warn("[I/DSM] %s flash LED Opent! FlagReg_L[0x%x]", __func__, (unsigned int)fault_l);
+                cam_warn("[I/DSM] flash LED Opent! FlagReg_L[0x%x]", __func__, fault_l);
            }
 	}
 
@@ -218,7 +216,7 @@ static int hw_mp3331_flash_mode(struct hw_flash_ctrl_t *flash_ctrl, int data)
 	}
 	else
 	{
-		if( data > MP3331_FLASH_MAX_CUR_LEV * MP3331_CUR_STEP_LEV / BASE){
+		if( data*10 > MP3331_FLASH_MAX_CUR_LEV * MP3331_CUR_STEP_LEV){
 		      current_level = MP3331_FLASH_DEFAULT_CUR_LEV;
 		}
 		else{
@@ -270,8 +268,8 @@ static int hw_mp3331_torch_mode(struct hw_flash_ctrl_t *flash_ctrl, int data)
 	}
 	else
 	{
-		if( data > MP3331_TORCH_MAX_CUR_LEV * MP3331_CUR_STEP_LEV / BASE){
-		      current_level = MP3331_TORCH_MAX_CUR_LEV;
+		if( data*10 > MP3331_TORCH_MAX_CUR_LEV * MP3331_CUR_STEP_LEV){
+		      current_level = MP3331_TORCH_DEFAULT_CUR_LEV;
 		}
 		else{
 		      current_level = hw_mp3331_find_match_current(data);
@@ -475,7 +473,7 @@ static ssize_t hw_mp3331_lightness_store(struct device *dev,
 			return rc;
 		}
 	} else if(cdata.mode == TORCH_MODE){
-		cdata.data = MP3331_TORCH_MAX_RT_CUR;//hardware test requiring the max torch mode current
+		cdata.data = MP3331_TORCH_MAX_CUR;//hardware test requiring the max torch mode current
 		cam_info("%s mode=%d, max_current=%d.", __func__, cdata.mode, cdata.data);
 
 		rc = hw_mp3331_on(&hw_mp3331_ctrl, &cdata);

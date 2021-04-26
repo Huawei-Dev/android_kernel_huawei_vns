@@ -53,16 +53,9 @@ typedef enum _tag_hwsensor_position_kind
     HWSENSOR_POSITION_REAR                      =    0,
     HWSENSOR_POSITION_FORE                      =    1,
     HWSENSOR_POSITION_SUBREAR                   =    2,
-    HWSENSOR_POSITION_SUBFORE                   =    3,
-    HWSENSOR_POSITION_IRIS                      =    8,
+    HWSENSOR_POSITION_IRIS                      =    3,
     HWSENSOR_POSITION_GAZE = 9,
 } hwsensor_position_kind_t;
-
-typedef enum _tag_hwsensor_flash_pos_type_kind
-{//0-alone, 1-mix
-    HWSENSOR_FLASH_POS_ALONE                    =    0,
-    HWSENSOR_FLASH_POS_MIX                      =    1,
-} hwsensor_flash_pos_type_kind_t;
 
 typedef struct _tag_hwsensor_info
 {
@@ -78,7 +71,6 @@ typedef struct _tag_hwsensor_info
     int                                         i2c_id[I2C_NUM];
     int                                         module_type;
     int                                         valid;
-    hwsensor_flash_pos_type_kind_t              flash_pos_type;
 } hwsensor_info_t;
 
 /********************* cfg data define ************************************/

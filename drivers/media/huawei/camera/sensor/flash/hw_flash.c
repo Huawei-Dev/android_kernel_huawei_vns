@@ -1,14 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 and
- * only version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- */
+
 
 #include "hw_subdev.h"
 #include "hw_flash.h"
@@ -19,7 +9,6 @@
 #include "hwcam_intf.h"
 #include "../../clt/hisi_clt_flag.h"
 
-/*lint -save -e64*/
 struct dsm_client_ops ops3={
     .poll_state = NULL,
     .dump_func = NULL,
@@ -52,20 +41,17 @@ struct hw_flash_ctrl_t * hw_get_flash_ctrl(void)
 
 unsigned int hw_flash_get_state(void)
 {
-    cam_info("%s enter flash_state(%d).\n", __func__, hw_flash_led_state);
     return (hw_flash_led_state & (FLASH_LED_THERMAL_PROTECT_ENABLE
         | FLASH_LED_LOWPOWER_PROTECT_ENABLE));
 }
 
 void hw_flash_set_state(unsigned int state)
 {
-    cam_info("%s enter flash_state(%d), state(%d).\n", __func__, hw_flash_led_state, state);
     hw_flash_led_state |= state;
 }
 
 void hw_flash_clear_state(unsigned int state)
 {
-    cam_info("%s enter flash_state(%d), state(%d).\n", __func__, hw_flash_led_state, state);
     hw_flash_led_state &= (~state);
 }
 
@@ -217,35 +203,9 @@ static int hw_flash_register_attribute(struct hw_flash_ctrl_t *flash_ctrl, struc
     return 0;
 }
 
-static int hw_flash_mix_register_attribute(struct hw_flash_ctrl_t *flash_ctrl, struct device *dev)
-{
-    int rc = 0;
-
-    if ((NULL == flash_ctrl) || (NULL == dev)) {
-        cam_err("%s flash_ctrl or dev is NULL.", __func__);
-        return -EINVAL;
-    }
-
-    rc = device_create_file(flash_ctrl->cdev_torch1.dev, &hw_flash_thermal_protect);
-    if (rc < 0) {
-        cam_err("%s failed to creat flash mix lowpower protect attribute.", __func__);
-        return rc;
-    }
-
-    /* check flash led open or short */
-    cam_notice("create node: flash led fault");
-    rc = device_create_file(flash_ctrl->cdev_torch1.dev, &hw_flash_led_fault);
-    if(rc < 0) {
-        cam_err("%s failed to create flash mix led fault attribute.", __func__);
-        return rc;
-    }
-
-    return 0;
-}
-
 int hw_flash_get_dt_data(struct hw_flash_ctrl_t *flash_ctrl)
 {
-    struct device_node *dev_node;
+    struct device_node *of_node;
     struct hw_flash_info *flash_info;
     int rc = -1;
 
@@ -256,19 +216,19 @@ int hw_flash_get_dt_data(struct hw_flash_ctrl_t *flash_ctrl)
         return rc;
     }
 
-    dev_node = flash_ctrl->dev->of_node;
+    of_node = flash_ctrl->dev->of_node;
 
     flash_info = &flash_ctrl->flash_info;
 
-    rc = of_property_read_string(dev_node, "huawei,flash-name", &flash_info->name);
+    rc = of_property_read_string(of_node, "huawei,flash-name", &flash_info->name);
     cam_info("%s huawei,flash-name %s, rc %d\n", __func__, flash_info->name, rc);
     if (rc < 0) {
         cam_err("%s failed %d\n", __func__, __LINE__);
         goto fail;
     }
 
-    rc = of_property_read_u32(dev_node, "huawei,flash-index",
-        (u32 *)&flash_info->index);
+    rc = of_property_read_u32(of_node, "huawei,flash-index",
+        &flash_info->index);
     cam_info("%s huawei,flash-index %d, rc %d\n", __func__,
         flash_info->index, rc);
     if (rc < 0) {
@@ -276,8 +236,8 @@ int hw_flash_get_dt_data(struct hw_flash_ctrl_t *flash_ctrl)
         goto fail;
     }
 
-    rc = of_property_read_u32(dev_node, "huawei,flash-type",
-        (u32 *)&flash_info->type);
+    rc = of_property_read_u32(of_node, "huawei,flash-type",
+        &flash_info->type);
     cam_info("%s huawei,flash-type %d, rc %d\n", __func__,
         flash_info->type, rc);
     if (rc < 0) {
@@ -285,7 +245,7 @@ int hw_flash_get_dt_data(struct hw_flash_ctrl_t *flash_ctrl)
         goto fail;
     }
 
-    rc = of_property_read_u32(dev_node, "huawei,slave-address",
+    rc = of_property_read_u32(of_node, "huawei,slave-address",
         &flash_info->slave_address);
     cam_info("%s slave-address %d, rc %d\n", __func__,
         flash_info->slave_address, rc);
@@ -342,15 +302,9 @@ int hw_flash_config(struct hw_flash_ctrl_t *flash_ctrl, void *arg)
         break;
     case CFG_FLASH_GET_FLASH_STATE:
         mutex_lock(flash_ctrl->hw_flash_mutex);
-        cdata->mode = (flash_mode)flash_ctrl->state.mode;
+        cdata->mode = flash_ctrl->state.mode;
         cdata->data = flash_ctrl->state.data;
         mutex_unlock(flash_ctrl->hw_flash_mutex);
-        break;
-    case CFG_FLASH_SET_POSITION:
-        mutex_lock(flash_ctrl->hw_flash_mutex);
-        flash_ctrl->mix_pos = cdata->data;
-        mutex_unlock(flash_ctrl->hw_flash_mutex);
-        cam_info("%s position =%d.", __func__, cdata->data);
         break;
     default:
         cam_err("%s cfgtype error.\n", __func__);
@@ -410,7 +364,6 @@ static struct v4l2_subdev_internal_ops hw_flash_subdev_internal_ops = {
     .close = &hw_flash_subdev_internal_close,
 };
 
-/*Add for CLT Camera, begin*/
 static int hw_simulate_init(struct hw_flash_ctrl_t *flash_ctrl)
 {
     cam_info("%s simulated function for CLT Camera\n", __func__);
@@ -467,7 +420,6 @@ static int hw_simulate_match(struct hw_flash_ctrl_t *flash_ctrl)
     return 0;
 }
 
-/*Add for CLT Camera, end*/
 
 int32_t hw_flash_platform_probe(struct platform_device *pdev,
     void *data)
@@ -598,7 +550,6 @@ int32_t hw_flash_i2c_probe(struct i2c_client *client,
         return -EFAULT;
     }
 
-    flash_ctrl->flash_type = FLASH_ALONE;//default alone
     rc = flash_ctrl->func_tbl->flash_init(flash_ctrl);
     if (rc < 0) {
         cam_err("%s flash init failed.\n", __func__);
@@ -643,16 +594,6 @@ int32_t hw_flash_i2c_probe(struct i2c_client *client,
     if (rc < 0) {
         cam_err("%s failed to register flash attribute node.", __func__);
         return rc;
-    }
-
-    /*for mix flash, mix:flash_type = 1; alone:flash_type = 0; */
-    if (FLASH_MIX == flash_ctrl->flash_type) {
-        rc = hw_flash_mix_register_attribute(flash_ctrl,
-            &flash_ctrl->hw_sd.sd.devnode->dev);
-        if (rc < 0) {
-            cam_err("%s failed to register hisi flash mix attribute node.", __func__);
-            return rc;
-        }
     }
 
     rc = hw_flash_register_attribute(flash_ctrl,
@@ -701,4 +642,3 @@ void hw_flash_led_state_write(unsigned int x)
 }
 
 #endif /* CONFIG_LLT_TEST */
-/*lint -restore*/

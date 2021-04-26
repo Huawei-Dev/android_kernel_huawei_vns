@@ -15,6 +15,7 @@
 #define _HW_CCI_H
 
 #include "../sensor/hwsensor.h"
+#include "../platform/hi3635/platform_cfg.h"
 #include "../platform/sensor_commom.h"
 
 /*I2C control register */

@@ -40,7 +40,7 @@ typedef struct _tag_hwsensor
 #define I2S(i) container_of(i, sensor_t, intf)
 
 //lint -save -e838 -e732 -e747 -e713 -e826 -e715 -e785  -e774 -esym(753,*)
-//lint -save -e578 -e438 -e30 -e142 -e64 -e429 -esym(528,*)
+//lint -save -e578 -e438 -e30 -e142 -e64 -esym(528,*)
 static int hw_sensor_subdev_internal_close(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
     hwsensor_t *s = SD2Sensor(sd);
@@ -136,7 +136,6 @@ hwsensor_subdev_get_info(
     info->mount_position = (hwsensor_position_kind_t)index;
     info->extisp_type = sensor->board_info->extisp_type;
     info->module_type = sensor->board_info->module_type;
-    info->flash_pos_type = sensor->board_info->flash_pos_type;
     for (i=0; i<CSI_NUM; i++) {
         info->csi_id[i] = sensor->board_info->csi_id[i];
         info->i2c_id[i] = sensor->board_info->i2c_id[i];
@@ -261,24 +260,8 @@ s_subdev_core_ops_hwsensor =
     .s_power = hwsensor_power,
 };
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0))
-static int
-hwsensor_v4l2_enum_fmt(
-        struct v4l2_subdev* sd,
-        unsigned int index,
-        enum v4l2_mbus_pixelcode* code)
-{
-    return 0;
-}
-#endif
-
 static struct v4l2_subdev_video_ops
-s_subdev_video_ops_hwsensor =
-{
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 1, 0))
-    .enum_mbus_fmt = hwsensor_v4l2_enum_fmt,
-#endif
-};
+s_subdev_video_ops_hwsensor = { };
 
 static struct v4l2_subdev_ops
 s_subdev_ops_hwsensor =
@@ -424,7 +407,8 @@ register_fail:
 }
 
 #define Intf2Hwsensor(si) container_of(si, hwsensor_t, intf)
-void hwsensor_unregister(hwsensor_intf_t* si)
+extern void
+hwsensor_unregister(hwsensor_intf_t* si)
 {
     struct v4l2_subdev* subdev = NULL;
     hwsensor_t* sensor = Intf2Hwsensor(si);

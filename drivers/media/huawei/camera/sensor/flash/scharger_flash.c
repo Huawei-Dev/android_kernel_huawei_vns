@@ -25,11 +25,6 @@
 #define TORCH_LED_MAX			(8)
 #define FLASH_TIMEOUT_MS        (600)
 
-#define SCHG_FLASH_MAX_CUR                    (1500)  //1500ma
-#define SCHG_TORCH_MAX_CUR                   (400)    //400ma
-#define SCHG_TORCH_DEFAULT_CUR           (150)    //150ma
-#define SCHG_MA_TO_UM                              (1000)
-
 #define SCHG_BOOST_REGULATOR      "pvdd-classd"    /*"schg_boost3"*/
 #define SCHG_FLASH_MODE_REGULATOR "flash-led" /*"schg_source1"*/
 #define SCHG_TORCH_MODE_REGULATOR "torch-led" /*"schg_source2"*/
@@ -81,7 +76,7 @@ static int hw_scharger_flash_mode(struct hw_flash_ctrl_t *flash_ctrl, int data)
     struct hw_scharger_private_data_t *pdata;
     int ret = 0;
 
-    cam_info("%s data=%d.\n", __func__, data);
+    cam_debug("%s data=%d.\n", __func__, data);
 
     if (NULL == flash_ctrl) {
         cam_err("%s flash_ctrl is NULL.", __func__);
@@ -90,14 +85,9 @@ static int hw_scharger_flash_mode(struct hw_flash_ctrl_t *flash_ctrl, int data)
 
     pdata = (struct hw_scharger_private_data_t *)flash_ctrl->pdata;
 
-    if(data <= 0) {
-        cam_err("set the flash_lum_level: %d", data);
+    if (data >= pdata->flash_led_num) {
+        cam_err("Unsupport flash_lum_level: %d", data);
         return -1;
-    }
-
-    if (data > SCHG_FLASH_MAX_CUR) {
-        cam_warn("set the max flash_lum_level: %d", data);
-        data = SCHG_FLASH_MAX_CUR;
     }
 
     if ((NULL == pdata->flash_inter_ldo) || (NULL == pdata->flash_mode_ldo)) {
@@ -112,12 +102,13 @@ static int hw_scharger_flash_mode(struct hw_flash_ctrl_t *flash_ctrl, int data)
     }
 
     if (audio_codec_mute_flag){
-        audio_codec_mute_pga(1);//lint !e64
+        audio_codec_mute_pga(1);
     }
 
     ret = scharger_flash_led_timeout_config(FLASH_TIMEOUT_MS);
     if (ret < 0) {
         cam_err("%s scharger_flash_led_timeout_config  fail ret = %d ", __func__, ret);
+        regulator_disable(pdata->flash_inter_ldo);
         goto err_out;
     }
 
@@ -139,12 +130,9 @@ static int hw_scharger_flash_mode(struct hw_flash_ctrl_t *flash_ctrl, int data)
     }
     udelay(500);
 
-    //the scharger current unit is ua
-    data = data *SCHG_MA_TO_UM;
-
-    ret = regulator_set_current_limit(pdata->flash_mode_ldo, data, data);
+    ret = regulator_set_current_limit(pdata->flash_mode_ldo, pdata->flash_led[data], pdata->flash_led[data]);
     if (ret < 0) {
-        cam_err("%s regulator_set_current_limit  fail ret = %d current is %d", __func__, ret, data);
+        cam_err("%s regulator_set_current_limit  fail ret = %d current is %d", __func__, ret, (pdata->flash_led[data]));
         regulator_disable(pdata->flash_inter_ldo);
         goto err_out;
     }
@@ -168,7 +156,7 @@ static int hw_scharger_flash_mode(struct hw_flash_ctrl_t *flash_ctrl, int data)
 err_out:
 
     if (audio_codec_mute_flag){
-        audio_codec_mute_pga(0);//lint !e64
+        audio_codec_mute_pga(0);
     }
 
     return ret;
@@ -180,7 +168,7 @@ static int hw_scharger_torch_mode(struct hw_flash_ctrl_t *flash_ctrl, int data)
     struct hw_scharger_private_data_t *pdata;
     int ret = 0;
 
-    cam_info("%s data=%d.\n", __func__, data);
+    cam_debug("%s data=%d.\n", __func__, data);
 
     if (NULL == flash_ctrl) {
         cam_err("%s flash_ctrl is NULL.", __func__);
@@ -189,14 +177,9 @@ static int hw_scharger_torch_mode(struct hw_flash_ctrl_t *flash_ctrl, int data)
 
     pdata = (struct hw_scharger_private_data_t *)flash_ctrl->pdata;
 
-    if(data <= 0) {
-        cam_err("set the torch_lum_level: %d", data);
+    if (data >= pdata->torch_led_num) {
+        cam_err("Unsupport torch_lum_level: %d", data);
         return -1;
-    }
-
-    if (data > SCHG_TORCH_MAX_CUR) {
-        cam_warn("set the max torch_lum_level: %d", data);
-        data = SCHG_TORCH_MAX_CUR;
     }
 
     if ((NULL == pdata->flash_inter_ldo) || (NULL == pdata->torch_mode_ldo)) {
@@ -224,12 +207,9 @@ static int hw_scharger_torch_mode(struct hw_flash_ctrl_t *flash_ctrl, int data)
 
     udelay(500);
 
-    //the scharger current unit is ua
-    data = data *SCHG_MA_TO_UM;
-
-    ret = regulator_set_current_limit(pdata->torch_mode_ldo, data, data);
+    ret = regulator_set_current_limit(pdata->torch_mode_ldo, pdata->torch_led[data], pdata->torch_led[data]);
     if (ret < 0) {
-        cam_err("%s regulator_set_current_limit  fail ret = %d current is %d", __func__, ret, data);
+        cam_err("%s regulator_set_current_limit  fail ret = %d current is %d", __func__, ret, (pdata->torch_led[data]));
         return ret;
     }
 
@@ -315,7 +295,7 @@ static int hw_scharger_off(struct hw_flash_ctrl_t *flash_ctrl)
     }
 
     if (audio_codec_mute_flag){
-        audio_codec_mute_pga(0);//lint !e64
+        audio_codec_mute_pga(0);
     }
 
     flash_ctrl->state.mode = STANDBY_MODE;
@@ -329,8 +309,8 @@ static int hw_scharger_off(struct hw_flash_ctrl_t *flash_ctrl)
 static int hw_scharger_get_dt_data(struct hw_flash_ctrl_t *flash_ctrl)
 {
     struct hw_scharger_private_data_t *pdata;
-    struct device_node *dev_node;
-    unsigned int i;
+    struct device_node *of_node;
+    int i;
     int rc = -1;
 
     cam_debug("%s enter.\n", __func__);
@@ -341,16 +321,16 @@ static int hw_scharger_get_dt_data(struct hw_flash_ctrl_t *flash_ctrl)
     }
 
     pdata = (struct hw_scharger_private_data_t *)flash_ctrl->pdata;
-    dev_node= flash_ctrl->dev->of_node;
+    of_node = flash_ctrl->dev->of_node;
 
-    rc = of_property_read_u32(dev_node, "huawei,flash_led_num", &pdata->flash_led_num);
+    rc = of_property_read_u32(of_node, "huawei,flash_led_num", &pdata->flash_led_num);
     cam_debug("%s hisi,flash_led_num %d, rc %d\n", __func__, pdata->flash_led_num, rc);
     if (rc < 0) {
         cam_err("%s failed %d\n", __func__, __LINE__);
         return rc;
     }
 
-    rc = of_property_read_u32(dev_node, "huawei,torch_led_num",
+    rc = of_property_read_u32(of_node, "huawei,torch_led_num",
             &pdata->torch_led_num);
     cam_debug("%s hisi,torch_led_num %d, rc %d\n", __func__,
             pdata->torch_led_num, rc);
@@ -359,7 +339,7 @@ static int hw_scharger_get_dt_data(struct hw_flash_ctrl_t *flash_ctrl)
         return rc;
     }
 
-    rc = of_property_read_u32_array(dev_node, "huawei,flash_led",
+    rc = of_property_read_u32_array(of_node, "huawei,flash_led",
             pdata->flash_led, pdata->flash_led_num);
     if (rc < 0) {
         cam_err("%s failed line %d\n", __func__, __LINE__);
@@ -371,7 +351,7 @@ static int hw_scharger_get_dt_data(struct hw_flash_ctrl_t *flash_ctrl)
         }
     }
 
-    rc = of_property_read_u32_array(dev_node, "huawei,torch_led",
+    rc = of_property_read_u32_array(of_node, "huawei,torch_led",
             pdata->torch_led, pdata->torch_led_num);
     if (rc < 0) {
         cam_err("%s failed line %d\n", __func__, __LINE__);
@@ -383,7 +363,7 @@ static int hw_scharger_get_dt_data(struct hw_flash_ctrl_t *flash_ctrl)
         }
     }
 
-    rc = of_property_read_u32(dev_node, "huawei,audio_codec_mute_flag",
+    rc = of_property_read_u32(of_node, "huawei,audio_codec_mute_flag",
             &audio_codec_mute_flag);
     cam_info("%s hisi,audio_codec_mute_flag %d, rc %d\n", __func__,
             audio_codec_mute_flag, rc);
@@ -467,7 +447,7 @@ static ssize_t hw_scharger_lightness_store(struct device *dev,
             return rc;
         }
     } else if(cdata.mode == TORCH_MODE){
-        cdata.data = SCHG_TORCH_DEFAULT_CUR;
+        cdata.data = pdata->torch_led_num-1;//hardware test requiring the max torch mode current level NO.
         cam_info("%s mode=%d, max_current=%d.", __func__, cdata.mode, cdata.data);
 
         rc = hw_scharger_on(&hw_scharger_ctrl, &cdata);
@@ -523,7 +503,7 @@ static void hw_scharger_torch_brightness_set(struct led_classdev *cdev,
         }
     } else {
         cdata.mode = TORCH_MODE;
-        cdata.data = SCHG_TORCH_DEFAULT_CUR;
+        cdata.data = brightness - 1;
         rc = hw_scharger_on(&hw_scharger_ctrl, &cdata);
         if (rc < 0) {
             cam_err("%s scharger on error.", __func__);
@@ -558,7 +538,7 @@ static int hw_scharger_register_attribute(struct hw_flash_ctrl_t *flash_ctrl,
     }
 
     flash_ctrl->cdev_torch.name = "torch";
-    flash_ctrl->cdev_torch.max_brightness = (enum led_brightness)pdata->torch_led_num;
+    flash_ctrl->cdev_torch.max_brightness = pdata->torch_led_num;
     flash_ctrl->cdev_torch.brightness_set = hw_scharger_torch_brightness_set;
     rc = led_classdev_register((struct device *)dev, &flash_ctrl->cdev_torch);
     if (rc < 0) {
@@ -688,7 +668,7 @@ static struct hw_flash_fn_t hw_scharger_func_tbl = {
     .flash_register_attribute = hw_scharger_register_attribute,
 };
 
-static struct hw_flash_ctrl_t hw_scharger_ctrl = {//lint !e31
+static struct hw_flash_ctrl_t hw_scharger_ctrl = {
     .func_tbl = &hw_scharger_func_tbl,
     .hw_flash_mutex = &flash_mut_scharger,
     .pdata = (void*)&hw_scharger_pdata,

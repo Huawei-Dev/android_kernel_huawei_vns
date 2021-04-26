@@ -26,6 +26,7 @@ config USE_CAMERA3_ARCH
     ---help---
         Hisilicon K3 camera3 driver.
 
+	
 if HUAWEI_CAMERA
 source "drivers/media/huawei/camera/Kconfig"
 endif

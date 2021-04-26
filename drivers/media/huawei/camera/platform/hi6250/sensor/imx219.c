@@ -11,7 +11,6 @@
 #include "sensor_commom.h"
 #include "hw_csi.h"
 #include <linux/pinctrl/consumer.h>
-//lint -save -e31
 
 #define I2S(i) container_of(i, sensor_t, intf)
 static char *sensor_dts_name = "IMX219_VENDOR";
@@ -108,6 +107,12 @@ struct sensor_power_setting imx219_power_down_setting[] = {
     },
     {
         .seq_type = SENSOR_MCLK,
+        .sensor_index = SENSOR_INDEX_INVALID,
+        .delay = 1,
+    },
+    {
+        .seq_type = SENSOR_MIPI_SW,
+        .config_val = SENSOR_GPIO_LOW,
         .sensor_index = SENSOR_INDEX_INVALID,
         .delay = 1,
     },
@@ -244,6 +249,12 @@ struct sensor_power_setting imx219_power_down_setting_dvdd120[] = {
         .sensor_index = SENSOR_INDEX_INVALID,
         .delay = 1,
     },
+    {
+        .seq_type = SENSOR_MIPI_SW,
+        .config_val = SENSOR_GPIO_LOW,
+        .sensor_index = SENSOR_INDEX_INVALID,
+        .delay = 1,
+    },
     //SCAM DVDD 1.2V
     {
         .seq_type = SENSOR_DVDD,
@@ -291,8 +302,6 @@ struct sensor_power_setting imx219_power_down_setting_dvdd120[] = {
     },
 };
 
-struct mutex imx219_power_lock;
-atomic_t volatile imx219_powered = ATOMIC_INIT(0);
 static sensor_t s_imx219 =
 {
     .intf = { .vtbl = &s_imx219_vtbl, },
@@ -304,8 +313,6 @@ static sensor_t s_imx219 =
             .size = ARRAY_SIZE(imx219_power_down_setting),
             .power_setting = imx219_power_down_setting,
     },
-    .p_atpowercnt = &imx219_powered,
-
 };
 
 static const struct of_device_id s_imx219_dt_match[] =
@@ -509,7 +516,7 @@ static int imx219_match_id(
 pinctrl_error:
             gpio_free(sensor->board_info->gpios[FSIN].gpio);
 matchID_exit:
-            if ((unsigned int)cdata->data != SENSOR_INDEX_INVALID) {
+            if (cdata->data != SENSOR_INDEX_INVALID) {
                 cam_info("%s, cdata->cfg.name = %s", __func__,cdata->cfg.name );
             }
 
@@ -525,6 +532,7 @@ static hwsensor_vtbl_t s_imx219_vtbl =
     .match_id = imx219_match_id,
     .csi_enable = imx219_csi_enable,
     .csi_disable = imx219_csi_disable,
+    .match_id = imx219_match_id,
 };
 
 int imx219_config(hwsensor_intf_t* si, void  *argp)
@@ -542,29 +550,16 @@ int imx219_config(hwsensor_intf_t* si, void  *argp)
     cam_debug("imx219 cfgtype = %d",data->cfgtype);
     switch(data->cfgtype){
         case SEN_CONFIG_POWER_ON:
-            mutex_lock(&imx219_power_lock);
             if(false == power_on_status){
-                ret = si->vtbl->power_up(si);
-                if (ret == 0) {
-                    power_on_status = true;
-                }
+            ret = si->vtbl->power_up(si);
+                power_on_status = true;
             }
-            /*lint -e455 -esym(455,*)*/
-            mutex_unlock(&imx219_power_lock);
-            /*lint -e455 +esym(455,*)*/
             break;
         case SEN_CONFIG_POWER_OFF:
-            mutex_lock(&imx219_power_lock);
-            if(true == power_on_status) {
-                ret = si->vtbl->power_down(si);
-                if (ret != 0) {
-                    cam_err("%s. power_down fail.", __func__);
-                 }
+            if(true == power_on_status){
+            ret = si->vtbl->power_down(si);
                 power_on_status = false;
             }
-            /*lint -e455 -esym(455,*)*/
-            mutex_unlock(&imx219_power_lock);
-            /*lint -e455 +esym(455,*)*/
             break;
         case SEN_CONFIG_WRITE_REG:
             break;
@@ -616,7 +611,6 @@ static int32_t imx219_platform_probe(struct platform_device* pdev)
         goto imx219_sensor_probe_fail;
     }
     s_imx219.dev = &pdev->dev;
-	mutex_init(&imx219_power_lock);
     rc = hwsensor_register(pdev, &s_imx219.intf);
     rc = rpmsg_sensor_register(pdev, (void*)&s_imx219);
 imx219_sensor_probe_fail:
@@ -640,5 +634,4 @@ module_init(imx219_init_module);
 module_exit(imx219_exit_module);
 MODULE_DESCRIPTION("imx219");
 MODULE_LICENSE("GPL v2");
-//lint -restore
 

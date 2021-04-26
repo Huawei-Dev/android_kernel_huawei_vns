@@ -61,13 +61,7 @@ typedef enum _tag_hwcam_buf_kind
 
 enum
 {
-    HWCAM_GRAPHIC_BUF_INFO_LENGTH                       =   100, //ints
-};
-
-enum
-{
-    HWCAM_DATA_TABLE_ENTRY_UNUSED                       =   0, //ints
-    HWCAM_DATA_TABLE_ENTRY_USED                         =   1, //ints
+    HWCAM_GRAPHIC_BUF_INFO_LENGTH                       =   64, //ints
 };
 
 typedef struct _tag_hwcam_buf_info
@@ -123,7 +117,6 @@ typedef struct _tag_hwcam_data_entry
     uint32_t const                                      size;
     uint32_t const                                      dim;
     uint32_t const                                      offset;
-    uint32_t                                            used;
 } hwcam_data_entry_t;
 
 /**
@@ -261,32 +254,16 @@ hwcam_data_table_get_entry_by_index(hwcam_data_table_t* tbl,
 }
 
 static inline void
-hwcam_data_table_reset_used_list_status(hwcam_data_table_t* tbl,
-                                        hwcam_data_entry_t* fu,
-                                        hwcam_data_entry_t* lu)
-{
-    hwcam_data_entry_t* cur = fu;
-    while (cur != lu && cur) {
-        cur->used = HWCAM_DATA_TABLE_ENTRY_UNUSED;
-        cur = hwcam_data_table_get_next_entry(tbl, cur);
-    }
-    if (cur) {
-        cur->used = HWCAM_DATA_TABLE_ENTRY_UNUSED;
-    }
-}
-
-static inline void
 hwcam_data_table_reset(hwcam_data_table_t* tbl)
 {
     hwcam_data_entry_t* fu =
         (hwcam_data_entry_t*)((uint8_t*)tbl + tbl->used_list.next);
     hwcam_data_entry_t* lu =
         (hwcam_data_entry_t*)((uint8_t*)tbl + tbl->used_list.prev);
-    hwcam_data_entry_t* ln = NULL;
 
     if (fu != &tbl->used_list && lu != &tbl->used_list) {
-        hwcam_data_table_reset_used_list_status(tbl, fu, lu);
-        ln = (hwcam_data_entry_t*)((uint8_t*)tbl + tbl->unused_list.prev);
+        hwcam_data_entry_t* ln =
+            (hwcam_data_entry_t*)((uint8_t*)tbl + tbl->unused_list.prev);
 
         fu->prev = tbl->unused_list.prev;
         lu->next = ln->next;
@@ -324,7 +301,6 @@ hwcam_data_table_set_entry_data(hwcam_data_table_t* tbl,
         tgt->prev = tbl->used_list.prev;
         tgt->next = lu->next;
         lu->next = tbl->used_list.prev = (uint8_t*)tgt - (uint8_t*)tbl;
-        tgt->used = HWCAM_DATA_TABLE_ENTRY_USED;
 
         memcpy(data, buf, dim * size);
         if (1 < tgt->dim) {
@@ -398,7 +374,6 @@ hwcam_data_table_set_entry_as_used(hwcam_data_table_t* tbl,
             tgt->prev = tbl->used_list.prev;
             tgt->next = lu->next;
             lu->next = tbl->used_list.prev = (uint8_t*)tgt - (uint8_t*)tbl;
-            tgt->used = HWCAM_DATA_TABLE_ENTRY_USED;
         }
         else {
             hwcam_data_entry_t* ln =
@@ -407,7 +382,6 @@ hwcam_data_table_set_entry_as_used(hwcam_data_table_t* tbl,
             tgt->prev = tbl->unused_list.prev;
             tgt->next = ln->next;
             ln->next = tbl->unused_list.prev = (uint8_t*)tgt - (uint8_t*)tbl;
-            tgt->used = HWCAM_DATA_TABLE_ENTRY_UNUSED;
         }
         return 0;
     }

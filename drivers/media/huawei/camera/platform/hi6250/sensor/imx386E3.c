@@ -184,7 +184,6 @@ struct sensor_power_setting hw_imx386E3_power_down_setting[] = {
 };
 
 atomic_t volatile imx386E3_powered = ATOMIC_INIT(0);
-struct mutex imx386E3_power_lock;
 static sensor_t s_imx386E3 =
 {
     .intf = { .vtbl = &s_imx386E3_vtbl, },
@@ -277,7 +276,6 @@ int imx386E3_power_down(hwsensor_intf_t* si)
     {
         cam_err("%s. power down sensor fail.", __func__);
     }
-
     hw_sensor_power_down_config(sensor->board_info);
     return ret;
 }
@@ -331,7 +329,7 @@ static int imx386E3_match_id(hwsensor_intf_t* si, void * data)
 		    strncpy(cdata->cfg.name, sensor_name[1], strlen(sensor_name[1])+1);
 		    cdata->data = sensor->board_info->sensor_index;
 		}else{
-            cam_err("%s module =%d unknown", __func__,module_id);
+            cam_err("%s module unknown", __func__,module_id);
 		}
 	} else {
 	    strncpy(cdata->cfg.name, sensor->board_info->name, strlen(sensor->board_info->name)+1);
@@ -344,6 +342,50 @@ static int imx386E3_match_id(hwsensor_intf_t* si, void * data)
 
     return rc;
 }
+
+#if 0
+static ssize_t imx386E3_powerctrl_show(struct device *dev,
+	struct device_attribute *attr,char *buf)
+{
+        int rc=0;
+        cam_info("enter %s", __func__);
+
+        return rc;
+}
+static ssize_t imx386E3_powerctrl_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int state = simple_strtol(buf, NULL, 10);
+	cam_info("enter %s, state %d", __func__, state);
+
+	if (state == POWER_ON)
+		imx386E3_power_up(&s_imx386E3.intf);
+	else
+		imx386E3_power_down(&s_imx386E3.intf);
+
+	return count;
+}
+
+
+static struct device_attribute imx386E3_powerctrl =
+    __ATTR(power_ctrl, 0664, imx386E3_powerctrl_show, imx386E3_powerctrl_store);
+
+int imx386E3_register_attribute(hwsensor_intf_t* intf, struct device* dev)
+{
+	int ret = 0;
+	cam_info("enter %s", __func__);
+
+	ret = device_create_file(dev, &imx386E3_powerctrl);
+	if (ret < 0) {
+		cam_err("%s failed to creat power ctrl attribute.", __func__);
+		goto err_create_power_ctrl;
+	}
+	return 0;
+err_create_power_ctrl:
+	device_remove_file(dev, &imx386E3_powerctrl);
+	return ret;
+}
+#endif
 
 static hwsensor_vtbl_t
 s_imx386E3_vtbl =
@@ -375,30 +417,17 @@ imx386E3_config(
 	data = (struct sensor_cfg_data *)argp;
 	cam_debug("imx386E3 cfgtype = %d",data->cfgtype);
 	switch(data->cfgtype){
-        case SEN_CONFIG_POWER_ON:
-            mutex_lock(&imx386E3_power_lock);
-            if(false == power_on_status){
-                ret = si->vtbl->power_up(si);
-                if(0 == ret){
-                    power_on_status = true;
-                }
-            }
-            /*lint -e455 -esym(455,*)*/
-            mutex_unlock(&imx386E3_power_lock);
-            /*lint -e455 +esym(455,*)*/
-            break;
-        case SEN_CONFIG_POWER_OFF:
-            mutex_lock(&imx386E3_power_lock);
-            if(true == power_on_status){
-                ret = si->vtbl->power_down(si);
-                if(0 != ret){
-                    cam_err("%s. power_down fail.", __func__);
-                }
-                power_on_status = false;
-            }
-            /*lint -e455 -esym(455,*)*/
-            mutex_unlock(&imx386E3_power_lock);
-            /*lint -e455 +esym(455,*)*/
+		case SEN_CONFIG_POWER_ON:
+			if(false == power_on_status){
+			ret = si->vtbl->power_up(si);
+				power_on_status = true;
+			}
+			break;
+		case SEN_CONFIG_POWER_OFF:
+			if(true == power_on_status){
+			ret = si->vtbl->power_down(si);
+				power_on_status = false;
+			}
 			break;
 		case SEN_CONFIG_WRITE_REG:
 			break;
@@ -441,7 +470,6 @@ imx386E3_platform_probe(
 
     s_imx386E3.dev = &pdev->dev;
 
-    mutex_init(&imx386E3_power_lock);
 	rc = hwsensor_register(pdev, &s_imx386E3.intf);
 	rc = rpmsg_sensor_register(pdev, (void*)&s_imx386E3);
 

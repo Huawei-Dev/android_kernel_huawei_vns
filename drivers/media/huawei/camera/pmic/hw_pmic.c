@@ -44,7 +44,7 @@ struct hisi_pmic_ctrl_t * hisi_get_pmic_ctrl(void)
 
 int hisi_pmic_get_dt_data(struct hisi_pmic_ctrl_t *pmic_ctrl)
 {
-	struct device_node *dev_node;
+	struct device_node *of_node;
 	struct hisi_pmic_info *pmic_info;
 	int rc = -1;
 
@@ -55,19 +55,19 @@ int hisi_pmic_get_dt_data(struct hisi_pmic_ctrl_t *pmic_ctrl)
 		return rc;
 	}
 
-	dev_node = pmic_ctrl->dev->of_node;
+	of_node = pmic_ctrl->dev->of_node;
 
 	pmic_info = &pmic_ctrl->pmic_info;
 
-	rc = of_property_read_string(dev_node, "hisi,pmic_name", &pmic_info->name);
+	rc = of_property_read_string(of_node, "hisi,pmic_name", &pmic_info->name);
 	cam_info("%s hisi,pmic_name %s, rc %d\n", __func__, pmic_info->name, rc);
 	if (rc < 0) {
 		cam_err("%s failed %d\n", __func__, __LINE__);
 		goto fail;
 	}
 
-	rc = of_property_read_u32(dev_node, "hisi,pmic_index",
-		(u32 *)&pmic_info->index);
+	rc = of_property_read_u32(of_node, "hisi,pmic_index",
+		&pmic_info->index);
 	cam_info("%s hisi,pmic_index %d, rc %d\n", __func__,
 		pmic_info->index, rc);
 	if (rc < 0) {
@@ -75,20 +75,13 @@ int hisi_pmic_get_dt_data(struct hisi_pmic_ctrl_t *pmic_ctrl)
 		goto fail;
 	}
 
-	rc = of_property_read_u32(dev_node, "hisi,slave_address",
+	rc = of_property_read_u32(of_node, "hisi,slave_address",
 		&pmic_info->slave_address);
 	cam_info("%s slave_address %d, rc %d\n", __func__,
 		pmic_info->slave_address, rc);
 	if (rc < 0) {
 		cam_err("%s failed %d\n", __func__, __LINE__);
 		goto fail;
-	}
-
-	if(of_property_read_u32(dev_node, "hisi,pmic_mutex_flag",(u32 *)&pmic_info->mutex_flag)){
-		cam_err("%s read pmic_mutex_flag failed %d\n", __func__, __LINE__);
-	}else{
-		cam_info("%s hisi,pmic_mutex_flag %d\n", __func__,
-		pmic_info->mutex_flag);
 	}
 fail:
 	return rc;

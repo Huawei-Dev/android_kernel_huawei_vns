@@ -4,21 +4,15 @@
 #if !defined(__TRACE_HISP_H__) || defined(TRACE_HEADER_MULTI_READ)
 #define __TRACE_HISP_H__
 
-#if defined( HISP150_CAMERA  )
+#if defined( CHICAGO_CAMERA  ) || defined( BOSTON_CAMERA  )
 #include <media/huawei/hisp150_cfg.h>
-#elif defined( HISP160_CAMERA  )
-#include <media/huawei/hisp160_cfg.h>
-#elif defined( HISP120_CAMERA  )
-#include <media/huawei/hisp120_cfg.h>
-#elif defined( HISP200_CAMERA  )
-#include <media/huawei/hisp200_cfg.h>
 #else
 #include <media/huawei/hisp_cfg.h>
 #endif
 
 #include <linux/tracepoint.h>
 #include <media/huawei/camera.h>
-#include "hisp_intf.h"
+#include "hisp_intf.h" 
 
 DECLARE_EVENT_CLASS(hisp_rpmsg_internel,/* [false alarm]:will not cause error */
 

@@ -103,6 +103,12 @@ struct sensor_power_setting ov8856_power_down_setting[] = {
         .sensor_index = SENSOR_INDEX_INVALID,
         .delay = 1,
     },
+    {
+        .seq_type = SENSOR_MIPI_SW,
+        .config_val = SENSOR_GPIO_LOW,
+        .sensor_index = SENSOR_INDEX_INVALID,
+        .delay = 1,
+    },
     //SCAM DVDD 1.2V
     {
         .seq_type = SENSOR_DVDD,
@@ -233,6 +239,12 @@ struct sensor_power_setting ov8856_power_down_setting_dvdd120[] = {
         .sensor_index = SENSOR_INDEX_INVALID,
         .delay = 1,
     },
+    {
+        .seq_type = SENSOR_MIPI_SW,
+        .config_val = SENSOR_GPIO_LOW,
+        .sensor_index = SENSOR_INDEX_INVALID,
+        .delay = 1,
+    },
     //SCAM DVDD 1.2V
     {
         .seq_type = SENSOR_DVDD,
@@ -285,8 +297,6 @@ struct sensor_power_setting ov8856_power_down_setting_dvdd120[] = {
     },
 };
 
-struct mutex ov8856_power_lock;
-atomic_t volatile ov8856_powered = ATOMIC_INIT(0);
 static sensor_t s_ov8856 =
 {
     .intf = { .vtbl = &s_ov8856_vtbl, },
@@ -298,7 +308,6 @@ static sensor_t s_ov8856 =
             .size = ARRAY_SIZE(ov8856_power_down_setting),
             .power_setting = ov8856_power_down_setting,
     },
-    .p_atpowercnt = &ov8856_powered,
 
 };
 
@@ -435,32 +444,17 @@ int ov8856_config(hwsensor_intf_t* si, void  *argp)
     cam_debug("ov8856 cfgtype = %d",data->cfgtype);
     switch(data->cfgtype){
         case SEN_CONFIG_POWER_ON:
-			mutex_lock(&ov8856_power_lock);
-			if(false == power_on_status){
-				ret = si->vtbl->power_up(si);
-				if (0 == ret)
-				{
-					power_on_status = true;
-				}
-			}
-			/*lint -e455 -esym(455,*)*/
-			mutex_unlock(&ov8856_power_lock);
-			/*lint -e455 +esym(455,*)*/
-			break;
+            if(false == power_on_status){
+            ret = si->vtbl->power_up(si);
+                power_on_status = true;
+            }
+            break;
         case SEN_CONFIG_POWER_OFF:
-			mutex_lock(&ov8856_power_lock);
-			if(true == power_on_status){
-				ret = si->vtbl->power_down(si);
-				if (0 != ret)
-				{
-					cam_err("%s. power_down fail.", __func__);
-				}
-				power_on_status = false;
-			}
-			/*lint -e455 -esym(455,*)*/
-			mutex_unlock(&ov8856_power_lock);
-			/*lint -e455 +esym(455,*)*/
-			break;
+            if(true == power_on_status){
+            ret = si->vtbl->power_down(si);
+                power_on_status = false;
+            }
+            break;
         case SEN_CONFIG_WRITE_REG:
             break;
         case SEN_CONFIG_READ_REG:
@@ -511,7 +505,6 @@ static int32_t ov8856_platform_probe(struct platform_device* pdev)
         goto ov8856_sensor_probe_fail;
     }
     s_ov8856.dev = &pdev->dev;
-    mutex_init(&ov8856_power_lock);
     rc = hwsensor_register(pdev, &s_ov8856.intf);
     rc = rpmsg_sensor_register(pdev, (void*)&s_ov8856);
 ov8856_sensor_probe_fail:

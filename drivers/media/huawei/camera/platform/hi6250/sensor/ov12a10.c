@@ -206,7 +206,6 @@ struct sensor_power_setting hw_ov12a10_power_down_setting[] = {
 };
 
 atomic_t volatile ov12a10_powered = ATOMIC_INIT(0);
-struct mutex ov12a10_power_lock;
 static sensor_t s_ov12a10 =
 {
     .intf = { .vtbl = &s_ov12a10_vtbl, },
@@ -473,34 +472,19 @@ int ov12a10_config(hwsensor_intf_t* si,void  *argp)
     cam_debug("ov12a10 cfgtype = %d",data->cfgtype);
     switch(data->cfgtype){
         case SEN_CONFIG_POWER_ON:
-			mutex_lock(&ov12a10_power_lock);
-			if (!s_ov12a10_power_on)
-			{
-				ret = si->vtbl->power_up(si);
-				if (0 == ret)
-				{
-					s_ov12a10_power_on = true;
-				}
-			}
-			/*lint -e455 -esym(455,*)*/
-			mutex_unlock(&ov12a10_power_lock);
-			/*lint -e455 +esym(455,*)*/
-			break;
+            if (!s_ov12a10_power_on)
+            {
+                ret = si->vtbl->power_up(si);
+                s_ov12a10_power_on = true;
+            }
+            break;
         case SEN_CONFIG_POWER_OFF:
-			mutex_lock(&ov12a10_power_lock);
-			if (s_ov12a10_power_on)
-			{
-				ret = si->vtbl->power_down(si);
-				if (0 != ret)
-				{
-					cam_err("%s. power_down fail.", __func__);
-				}
-				s_ov12a10_power_on = false;
-			}
-			/*lint -e455 -esym(455,*)*/
-			mutex_unlock(&ov12a10_power_lock);
-			/*lint -e455 +esym(455,*)*/
-			break;
+            if (s_ov12a10_power_on)
+            {
+                ret = si->vtbl->power_down(si);
+                s_ov12a10_power_on = false;
+            }
+            break;
         case SEN_CONFIG_WRITE_REG:
             break;
         case SEN_CONFIG_READ_REG:
@@ -539,7 +523,7 @@ static int32_t ov12a10_platform_probe(struct platform_device* pdev)
     }
 
     s_ov12a10.dev = &pdev->dev;
-    mutex_init(&ov12a10_power_lock);
+
     rc = hwsensor_register(pdev, &s_ov12a10.intf);
     rc = rpmsg_sensor_register(pdev, (void*)&s_ov12a10);
 

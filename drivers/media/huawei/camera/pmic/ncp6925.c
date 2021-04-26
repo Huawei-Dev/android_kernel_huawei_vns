@@ -17,8 +17,6 @@
 #include <huawei_platform/devdetect/hw_dev_dec.h>
 #endif
 
-//lint -save -e31
-
 /* NCP6925 Registers define */
 #define CHIP_REV        0x00
 #define EXTID           0x01
@@ -127,7 +125,7 @@ int hw_extern_pmic_config(int index, int voltage, int enable)
     struct hisi_pmic_ctrl_t *pmic_ctrl = NULL;
     pmic_ctrl = hisi_get_pmic_ctrl();
     if(pmic_ctrl != NULL) {
-        cam_debug("pmic power on!");
+        cam_info("pmic power on!");
         pmic_ctrl->func_tbl->pmic_on(pmic_ctrl, 0);
     } else {
         cam_err("pmic_ctrl is NULL,just return");
@@ -160,7 +158,7 @@ int hw_extern_pmic_query_state(int index, int *state)
         return -1;
     }
     *state = chx_enable & chx_enable_tmp;
-     cam_debug("hw_extern_pmic_query_state chx_enable:%d,chx_enable_tmp:%d,state:%d",
+     cam_info("hw_extern_pmic_query_state chx_enable:%d,chx_enable_tmp:%d,state:%d",
          chx_enable,chx_enable_tmp,*state);
 
     return 0;
@@ -168,7 +166,7 @@ int hw_extern_pmic_query_state(int index, int *state)
 
 static int ncp6925_remove(struct i2c_client *client)
 {
-    cam_debug("%s enter.", __func__);
+    cam_info("%s enter.", __func__);
 
     client->adapter = NULL;
     return 0;
@@ -183,7 +181,7 @@ static int ncp6925_init(struct hisi_pmic_ctrl_t *pmic_ctrl)
     u8 external_id = 0;
     int ret = 0;
 
-    cam_debug("%s enter.", __func__);
+    cam_info("%s enter.", __func__);
 
     if (NULL == pmic_ctrl) {
         cam_err("%s pmic_ctrl is NULL.", __func__);
@@ -200,7 +198,7 @@ static int ncp6925_init(struct hisi_pmic_ctrl_t *pmic_ctrl)
 
     pdata = (struct ncp6925_private_data_t *)pmic_ctrl->pdata;
 
-    cam_debug("%s PMIC_POWER_CTRL = %d", __func__,
+    cam_info("%s PMIC_POWER_CTRL = %d", __func__,
             pdata->pin[PMIC_POWER_CTRL]);
 
     ret = gpio_request(pdata->pin[PMIC_POWER_CTRL], "pmic-power-ctrl");
@@ -241,7 +239,7 @@ static int ncp6925_init(struct hisi_pmic_ctrl_t *pmic_ctrl)
         cam_err("%s: read CHIP_REV failed, ret = %d ", __func__, ret);
         return ret;
     }
-    cam_debug("%s device id=%d", __func__,
+    cam_info("%s device id=%d", __func__,
             device_id);
 
     ret = i2c_func->i2c_read(i2c_client, EXTID, &external_id);
@@ -249,7 +247,7 @@ static int ncp6925_init(struct hisi_pmic_ctrl_t *pmic_ctrl)
         cam_err("%s: read EXTID failed, ret = %d ", __func__, ret);
         return ret;
     }
-    cam_debug("%s external id=%d", __func__,
+    cam_info("%s external id=%d", __func__,
             external_id);
 
     ret = i2c_func->i2c_read(i2c_client, REARM_ID, &pdata->rearm_id);
@@ -257,7 +255,7 @@ static int ncp6925_init(struct hisi_pmic_ctrl_t *pmic_ctrl)
         cam_err("%s: read EXTID failed, ret = %d ", __func__, ret);
         return ret;
     }
-    cam_debug("%s rearm id=%d", __func__, pdata->rearm_id);
+    cam_info("%s rearm id=%d", __func__, pdata->rearm_id);
 
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
     if(device_id == 0 && external_id == 0xff) {
@@ -271,8 +269,8 @@ static int ncp6925_init(struct hisi_pmic_ctrl_t *pmic_ctrl)
     ****************************/
     if (pmic_enable_sensor_3v3_flag) {
         ncp6925_on(&ncp6925_ctrl, pdata);
-        ncp6925_seq_config(&ncp6925_ctrl, (pmic_seq_index_t)PMIC_LDO3_INDEX, PMIC_3P3V, 1);
-        cam_debug("%s set LDO3=3V3", __func__);
+        ncp6925_seq_config(&ncp6925_ctrl, PMIC_LDO3_INDEX, PMIC_3P3V, 1);
+        cam_info("%s set LDO3=3V3", __func__);
     }
     /***************************
     *ldo2 1.8v
@@ -280,8 +278,8 @@ static int ncp6925_init(struct hisi_pmic_ctrl_t *pmic_ctrl)
     ****************************/
     if(pmic_enable_sensor_1v8_flag == 1){
         ncp6925_on(&ncp6925_ctrl, pdata);
-        ncp6925_seq_config(&ncp6925_ctrl, (pmic_seq_index_t)PMIC_LDO2_INDEX, PMIC_1P8V, 1);
-        cam_debug("%s set LDO2=1V8", __func__);
+        ncp6925_seq_config(&ncp6925_ctrl, PMIC_LDO2_INDEX, PMIC_1P8V, 1);
+        cam_info("%s set LDO2=1V8", __func__);
     }
 
     return ret;
@@ -296,7 +294,7 @@ static int ncp6925_exit(struct hisi_pmic_ctrl_t *pmic_ctrl)
 {
     struct ncp6925_private_data_t *pdata;
 
-    cam_debug("%s enter.", __func__);
+    cam_info("%s enter.", __func__);
 
     if (NULL == pmic_ctrl) {
         cam_err("%s pmic_ctrl is NULL.", __func__);
@@ -317,7 +315,7 @@ static int ncp6925_on(struct hisi_pmic_ctrl_t *pmic_ctrl, void *data)
     struct ncp6925_private_data_t *pdata;
     int gpio_value = 0;
 
-    cam_debug("%s enter.", __func__);
+    cam_info("%s enter.", __func__);
 
     if (NULL == pmic_ctrl) {
         cam_err("%s pmic_ctrl is NULL.", __func__);
@@ -331,7 +329,7 @@ static int ncp6925_on(struct hisi_pmic_ctrl_t *pmic_ctrl, void *data)
     i2c_func = pmic_ctrl->pmic_i2c_client->i2c_func_tbl;
 
     gpio_value = gpio_get_value_cansleep(pdata->pin[PMIC_POWER_CTRL]);
-    cam_debug("%s: pmic enable gpio value = %d.", __func__, gpio_value);
+    cam_info("%s: pmic enable gpio value = %d.", __func__, gpio_value);
     if(0 == gpio_value) {
         if(!dsm_client_ocuppy(client_pmic)) {
             dsm_client_record(client_pmic, "pmic enable failed! gpio value = %d\n", gpio_value);
@@ -348,7 +346,7 @@ static int ncp6925_on(struct hisi_pmic_ctrl_t *pmic_ctrl, void *data)
 static int ncp6925_off(struct hisi_pmic_ctrl_t *pmic_ctrl)
 {
     struct ncp6925_private_data_t *pdata;
-    cam_debug("%s enter.", __func__);
+    cam_info("%s enter.", __func__);
 
     if (NULL == pmic_ctrl) {
         cam_err("%s pmic_ctrl is NULL.", __func__);
@@ -381,7 +379,7 @@ static int ncp6925_check_state_exception(struct hisi_pmic_ctrl_t *pmic_ctrl)
 
     // TSD warning: INT_ACK3:00000100
     i2c_func->i2c_read(i2c_client, INT_ACK3, &reg_value);
-    cam_debug("%s: pmic INT_ACK3 = %d.", __func__, reg_value);
+    cam_info("%s: pmic INT_ACK3 = %d.", __func__, reg_value);
     if ((reg_value & 0x04) == 0x04) {
         if (!dsm_client_ocuppy(client_pmic)) {
             dsm_client_record(client_pmic, "NCP6925: thermal shutdown error.\n");
@@ -393,7 +391,7 @@ static int ncp6925_check_state_exception(struct hisi_pmic_ctrl_t *pmic_ctrl)
     // under voltage lock
     reg_value = 0;
     i2c_func->i2c_read(i2c_client, INT_ACK1, &reg_value);
-    cam_debug("%s: pmic INT_ACK1 = %d.", __func__, reg_value);
+    cam_info("%s: pmic INT_ACK1 = %d.", __func__, reg_value);
     if (reg_value != 0) {
         if (!dsm_client_ocuppy(client_pmic)) {
             dsm_client_record(client_pmic, "NCP6925: under voltage threshold error.\n");
@@ -405,7 +403,7 @@ static int ncp6925_check_state_exception(struct hisi_pmic_ctrl_t *pmic_ctrl)
     // over current
     reg_value = 0;
     i2c_func->i2c_read(i2c_client, INT_ACK2, &reg_value);
-    cam_debug("%s: pmic INT_ACK2 = %d.", __func__, reg_value);
+    cam_info("%s: pmic INT_ACK2 = %d.", __func__, reg_value);
     if (reg_value != 0) {
         if (!dsm_client_ocuppy(client_pmic)) {
             dsm_client_record(client_pmic, "NCP6925: over current error.\n");
@@ -432,7 +430,7 @@ static int twl80125_check_state_exception(struct hisi_pmic_ctrl_t *pmic_ctrl)
     i2c_func = pmic_ctrl->pmic_i2c_client->i2c_func_tbl;
 
     i2c_func->i2c_read(i2c_client, CHX_ERR, &reg_value);
-    cam_debug("%s: pmic CHX_ERR = %d.", __func__, reg_value);
+    cam_info("%s: pmic CHX_ERR = %d.", __func__, reg_value);
     if ((reg_value & 0x0E) == 0x0E) {
         if(dsm_client_ocuppy(client_pmic)) {
             dsm_client_record(client_pmic, "TWL80125: thermal shutdown error.\n");
@@ -459,10 +457,10 @@ static int pmic_check_state_exception(struct hisi_pmic_ctrl_t *pmic_ctrl)
     }
 
     if (pdata->rearm_id == ON_REARM) {
-        cam_debug("%s: pmic rearm_id(ON_REARM): %u", __func__, pdata->rearm_id);
+        cam_info("%s: pmic rearm_id(ON_REARM): %u", __func__, pdata->rearm_id);
         ncp6925_check_state_exception(pmic_ctrl);
     } else if (pdata->rearm_id == TI_REARM) {
-        cam_debug("%s: pmic rearm_id(TI_REARM): %u", __func__, pdata->rearm_id);
+        cam_info("%s: pmic rearm_id(TI_REARM): %u", __func__, pdata->rearm_id);
         twl80125_check_state_exception(pmic_ctrl);
     } else {
         cam_err("InvalidArgument chipid %u", pdata->rearm_id);
@@ -473,14 +471,14 @@ static int pmic_check_state_exception(struct hisi_pmic_ctrl_t *pmic_ctrl)
 
 static int ncp6925_match(struct hisi_pmic_ctrl_t *pmic_ctrl)
 {
-    cam_debug("%s enter.", __func__);
+    cam_info("%s enter.", __func__);
     return 0;
 }
 
 static int ncp6925_get_dt_data(struct hisi_pmic_ctrl_t *pmic_ctrl)
 {
     struct ncp6925_private_data_t *pdata;
-    struct device_node *dev_node;
+    struct device_node *of_node;
     int i;
     int rc = -1;
     int pmic_sensor_1v8 = 0;
@@ -494,44 +492,44 @@ static int ncp6925_get_dt_data(struct hisi_pmic_ctrl_t *pmic_ctrl)
     }
 
     pdata = (struct ncp6925_private_data_t *)pmic_ctrl->pdata;
-    dev_node = pmic_ctrl->dev->of_node;
+    of_node = pmic_ctrl->dev->of_node;
 
-    rc = of_property_read_u32_array(dev_node, "hisi,pmic-pin",
+    rc = of_property_read_u32_array(of_node, "hisi,pmic-pin",
             pdata->pin, MAX_PIN);
     if (rc < 0) {
         cam_err("%s failed line %d\n", __func__, __LINE__);
         return rc;
     } else {
         for (i=0; i<MAX_PIN; i++) {
-            cam_debug("%s pin[%d]=%d.\n", __func__, i,
+            cam_info("%s pin[%d]=%d.\n", __func__, i,
                     pdata->pin[i]);
         }
     }
 
-    rc = of_property_read_u32_array(dev_node, "hisi,pmic-voltage",
+    rc = of_property_read_u32_array(of_node, "hisi,pmic-voltage",
             pdata->voltage, VOUT_MAX);
     if (rc < 0) {
         cam_err("%s failed line %d\n", __func__, __LINE__);
         return rc;
     } else {
         for (i=0; i<VOUT_MAX; i++) {
-            cam_debug("%s voltage[%d]=%d.\n", __func__, i,
+            cam_info("%s voltage[%d]=%d.\n", __func__, i,
                     pdata->voltage[i]);
         }
     }
 
-    rc = of_property_read_u32(dev_node, "hisi,pmic_sensor_1v8",
-        (u32 *)&pmic_sensor_1v8);
+    rc = of_property_read_u32(of_node, "hisi,pmic_sensor_1v8",
+        &pmic_sensor_1v8);
     if (rc < 0)
-        cam_debug("%s not read pmic_sensor_1v8\n", __func__);
+        cam_info("%s not read pmic_sensor_1v8\n", __func__);
     else
-        cam_debug("%s pmic_sensor_1v8:%d\n", __func__,pmic_sensor_1v8);
+        cam_info("%s pmic_sensor_1v8:%d\n", __func__,pmic_sensor_1v8);
 
-    rc = of_property_read_u32(dev_node, "hisi,pmic_sensor_3v3", (u32 *)&pmic_sensor_3v3);
+    rc = of_property_read_u32(of_node, "hisi,pmic_sensor_3v3", &pmic_sensor_3v3);
     if (rc < 0)
-        cam_debug("%s not read pmic_sensor_3v3\n", __func__);
+        cam_info("%s not read pmic_sensor_3v3\n", __func__);
     else
-        cam_debug("%s pmic_sensor_3v3:%d\n", __func__,pmic_sensor_3v3);
+        cam_info("%s pmic_sensor_3v3:%d\n", __func__,pmic_sensor_3v3);
 
     if(pmic_sensor_1v8 == 1)
         pmic_enable_sensor_1v8_flag = 1;
@@ -565,7 +563,7 @@ static int calc_buck_vlotage_ext(struct hisi_pmic_ctrl_t *pmic_ctrl,
 {
     struct ncp6925_private_data_t *pdata = NULL;
     int ret = -1;
-    cam_debug("%s enter.", __func__);
+    cam_info("%s enter.", __func__);
     if (pmic_ctrl == NULL || out == NULL)
     {
         cam_err("invalid arguments");
@@ -592,7 +590,7 @@ static int calc_buck_vlotage_ext(struct hisi_pmic_ctrl_t *pmic_ctrl,
 static int calc_ldo_vlotage(u32 in, u8 *out)
 {
     int ret = -1;
-    cam_debug("%s enter, ldo in %d", __func__, in);
+    cam_info("%s enter, ldo in %d", __func__, in);
     if (in <= LDO_MIN || in >= LDO_MAX) {
         cam_err("do not support the ldo voltage");
         return ret;
@@ -613,24 +611,15 @@ static int ncp6925_seq_config(struct hisi_pmic_ctrl_t *pmic_ctrl, pmic_seq_index
     struct hisi_pmic_i2c_fn_t *i2c_func;
     int ret = 0;
 
-    cam_debug("%s enter.", __func__);
+    cam_info("%s enter.", __func__);
 
     if (NULL == pmic_ctrl) {
         cam_err("%s pmic_ctrl is NULL.", __func__);
         return -1;
     }
 
-    if(0 > seq_index || VOUT_MAX <= seq_index)
-    {
-        cam_err("%s seq_index out of range.", __func__);
-        return -1;
-    }
-
     i2c_client = pmic_ctrl->pmic_i2c_client;
     i2c_func = pmic_ctrl->pmic_i2c_client->i2c_func_tbl;
-    if(pmic_ctrl->pmic_info.mutex_flag == 1){
-        mutex_lock(pmic_ctrl->hisi_pmic_mutex);
-    }
 
     chx_enable = voltage_map[seq_index].chx_enable;
     voltage_reg = voltage_map[seq_index].vout_reg;
@@ -643,7 +632,7 @@ static int ncp6925_seq_config(struct hisi_pmic_ctrl_t *pmic_ctrl, pmic_seq_index
             buck12_prog = (voltage_val & 0x80)>>7;
             buck12_prog = (seq_index == VOUT_BUCK_1 ? buck12_prog : buck12_prog << 1);
             voltage_val &= 0x7F;
-            cam_debug("%s, buck[6:0] voltage 0x%x", __func__, voltage_val);
+            cam_info("%s, buck[6:0] voltage 0x%x", __func__, voltage_val);
         } else {
             calc_ldo_vlotage(voltage, &voltage_val);
         }
@@ -658,11 +647,11 @@ static int ncp6925_seq_config(struct hisi_pmic_ctrl_t *pmic_ctrl, pmic_seq_index
             i2c_func->i2c_read(i2c_client, BUCK_VSEL, &buck12_prog_old);
             buck12_prog |= buck12_prog_old;
             i2c_func->i2c_write(i2c_client, BUCK_VSEL, buck12_prog);
-            cam_debug("%s buck_vsel 0x%x", __func__, buck12_prog);
+            cam_info("%s buck_vsel 0x%x", __func__, buck12_prog);
         }
         mdelay(1);
         i2c_func->i2c_write(i2c_client, CHX_EN, chx_enable_tmp | chx_enable);
-        cam_debug("%s chx_enable 0x%x, voltage_reg 0x%x, voltage_val 0x%x", __func__, chx_enable, voltage_reg, voltage_val);
+        cam_info("%s chx_enable 0x%x, voltage_reg 0x%x, voltage_val 0x%x", __func__, chx_enable, voltage_reg, voltage_val);
     } else {
         i2c_func->i2c_write(i2c_client, CHX_EN, chx_enable_tmp & (~chx_enable));
         //i2c_func->i2c_write(i2c_client, voltage_reg, state);
@@ -672,9 +661,6 @@ static int ncp6925_seq_config(struct hisi_pmic_ctrl_t *pmic_ctrl, pmic_seq_index
     }
 
     i2c_func->i2c_read(i2c_client, CHX_ERR, &chx_enable_tmp);
-    if(pmic_ctrl->pmic_info.mutex_flag == 1){
-        mutex_unlock(pmic_ctrl->hisi_pmic_mutex);
-    }
 
     return ret;
 }
@@ -892,4 +878,3 @@ module_exit(ncp6925_module_exit);
 MODULE_DESCRIPTION("NCP6925 PMIC");
 MODULE_LICENSE("GPL v2");
 
-//lint -restore

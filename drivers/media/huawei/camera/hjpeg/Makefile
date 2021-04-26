@@ -1,5 +1,4 @@
 ccflags-y += -Idrivers/media/huawei/camera
-ccflags-y += -Idrivers/media/huawei/jpeg
 
 obj-y = hjpgenc.o 
 
@@ -7,10 +6,9 @@ obj-y = hjpgenc.o
 
 ifeq ($(CONFIG_HISI_CAMERA_HISTAR_ISPV150), y)
 obj-y += hjpeg150/
-else ifeq ($(CONFIG_HISI_CAMERA_HISTAR_ISPV160), y)
-obj-y += hjpegenc/
-else ifeq ($(CONFIG_HISI_CAMERA_HISTAR_ISPV120), y)
-obj-y += hjpegenc/
-else ifeq ($(CONFIG_HISI_CAMERA_HISTAR_ISPV200), y)
-obj-y += hjpegenc/
 endif
+
+ifeq ($(CONFIG_HISI_CAMERA_HISTAR_ISPV160), y)
+obj-y += hjpeg160/
+endif
+

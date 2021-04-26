@@ -4,9 +4,6 @@ comment "Huawei Camera"
 source "drivers/media/huawei/camera/hisp/Kconfig"
 source "drivers/media/huawei/camera/sensor/Kconfig"
 source "drivers/media/huawei/camera/laser/Kconfig"
-source "drivers/media/huawei/camera/fd/Kconfig"
-
-
 
 if HISI_CAMERA_HISTAR_ISPV160
 source "drivers/media/huawei/camera/platform/kirin970/Kconfig"
@@ -14,6 +11,14 @@ endif
 
 if HISI_CAMERA_HISTAR_ISPV150
 source "drivers/media/huawei/camera/platform/hi3660/Kconfig"
+endif
+
+if HISI_CAMERA_HISTAR_ISPV100
+source "drivers/media/huawei/camera/platform/hi3650/Kconfig"
+endif
+
+if HISI_CAMERA_OVISP23
+source "drivers/media/huawei/camera/platform/hi3635/Kconfig"
 endif
 
 if HISI_CAMERA_HISTAR_ISPV110
@@ -31,6 +36,20 @@ menuconfig HISI_CAMERA_FLASH
     default n
     help
         Say Y here to enable Flash for Huawei camera
+
+menuconfig HUAWEI_CAMERA_USE_EXTISP
+    bool "Huawei external ISP support"
+    default n
+    select SPI
+    help
+        Say Y here to enable external ISP for Huawei camera
+
+config HISI_CAMERA_HISTAR_ISPV100
+    tristate "Support histar ispv100 driver"
+    depends on HUAWEI_CAMERA
+    default n
+    ---help---
+        Hisilicon histar ispv100 driver.
 
 config HISI_CAMERA_HISTAR_ISPV110
     tristate "Support histar ispv110 driver"
@@ -53,23 +72,14 @@ config HISI_CAMERA_HISTAR_ISPV160
     ---help---
         Hisilicon histar ispv160 driver.
 
-config HISI_CAMERA_HISTAR_ISPV120
-    tristate "Support histar ispv120 driver"
+config HISI_CAMERA_OVISP23
+    tristate "Support ovisp23 driver"
     depends on HUAWEI_CAMERA
     default n
     ---help---
-        Hisilicon histar ispv120 driver.
+        Hisilicon ovisp23 driver.
 
-config HISI_CAMERA_HISTAR_ISPV200
-    tristate "Support histar ispv200 driver"
-    depends on HUAWEI_CAMERA
-    default n
-    ---help---
-        Hisilicon histar ispv200 driver.
+if HUAWEI_CAMERA_USE_EXTISP
+source "drivers/media/huawei/camera/extisp/Kconfig"
+endif
 
-config HISI_CAMERA_ISP_SECURE
-    tristate "Support histar isp secure"
-    depends on HUAWEI_CAMERA
-    default n
-    ---help---
-        Hisilicon histar isp secure.

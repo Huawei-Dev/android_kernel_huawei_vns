@@ -3,7 +3,6 @@
 #include "hwcam_compat32.h"
 #include "cam_log.h"
 #include "hwcam_intf.h"
-//lint -save -e578
 
 long compat_get_v4l2_event_data(struct v4l2_event __user *pdata, struct v4l2_event32 __user *pdata32)
 {
@@ -230,5 +229,5 @@ long compat_put_hwcam_buf_status_data(hwcam_buf_status_t __user *pdata, hwcam_bu
 
 	return ret;
 }
-//lint -restore
+
 

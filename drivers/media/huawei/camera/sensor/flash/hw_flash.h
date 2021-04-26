@@ -43,8 +43,7 @@
 
 #define LOW                             0
 #define HIGH                            1
-#define FLASH_ALONE                     0
-#define FLASH_MIX                       1
+
 
 #define FLASH_LED_THERMAL_PROTECT_ENABLE		(1<<0)
 #define FLASH_LED_LOWPOWER_PROTECT_ENABLE		(1<<1)
@@ -150,9 +149,6 @@ struct hw_flash_ctrl_t {
 	bool flash_mask_enable;
 	struct led_classdev cdev_flash;
 	struct led_classdev cdev_torch;
-	int flash_type;//add for mix flash:0-alone;1:mix
-	struct led_classdev cdev_torch1;//add for mix flash
-	flash_position_t mix_pos; //add for mix flash
 	void *pdata;
 };
 

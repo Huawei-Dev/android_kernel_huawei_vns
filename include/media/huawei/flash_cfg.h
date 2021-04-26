@@ -14,7 +14,6 @@
 #define CFG_FLASH_TURN_OFF		1
 #define CFG_FLASH_GET_FLASH_NAME	2
 #define CFG_FLASH_GET_FLASH_STATE	3
-#define CFG_FLASH_SET_POSITION		4 //use for mix flash
 
 typedef enum {
 	STANDBY_MODE=0,
@@ -35,11 +34,6 @@ struct flash_i2c_reg {
 	unsigned int address;
 	unsigned int value;
 };
-
-typedef enum {
-	HWFLASH_POSITION_REAR = 0,
-	HWFLASH_POSITION_FORE = 1,
-} flash_position_t;
 
 struct hw_flash_cfg_data {
 	int cfgtype;
