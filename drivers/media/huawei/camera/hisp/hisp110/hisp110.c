@@ -276,7 +276,7 @@ static void hisp110_save_rpmsg_data(void *data, int len)
 {
 	struct rpmsg_hisp110_service *hisi_serv = rpmsg_local.hisi_isp_serv;
 	struct sk_buff *skb = NULL;
-	char *skbdata = NULL;
+	unsigned char *skbdata = NULL;
 
 	cam_debug("Enter %s\n", __func__);
 	if (NULL == hisi_serv){
@@ -1056,6 +1056,8 @@ static const struct of_device_id s_hisp110_dt_match[] = {
 MODULE_DEVICE_TABLE(of, s_hisp110_dt_match);
 
 static struct rpmsg_driver rpmsg_hisp110_driver = {
+	.drv.name   = KBUILD_MODNAME,
+	.drv.owner  = THIS_MODULE,
 	.id_table = rpmsg_hisp110_id_table,
 	.probe = hisp110_rpmsg_probe,
 	.callback = hisp110_rpmsg_driver_cb,
