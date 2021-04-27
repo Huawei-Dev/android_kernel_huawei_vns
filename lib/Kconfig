@@ -528,10 +528,6 @@ config ARCH_HAS_SG_CHAIN
 config ARCH_HAS_PMEM_API
 	bool
 
-config QUASI
-    bool "quasi io"
-    default n
-
 config STACKDEPOT
 	bool
 	select STACKTRACE
