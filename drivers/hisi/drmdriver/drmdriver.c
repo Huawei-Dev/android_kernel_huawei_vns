@@ -1,6 +1,3 @@
-
-/*lint -e715 -esym(715,*) */
-/*lint -e818 -esym(818,*) */
 #include <asm/compiler.h>
 #include <linux/dma-mapping.h>
 #include <linux/kernel.h>
@@ -42,7 +39,7 @@ noinline int atfd_hisi_service_access_register_smc(u64 main_fun_id, u64 buff_add
 static ATFD_DATA g_atfd_config;
 void configure_master_security(unsigned int is_security, int master_id)
 {
-	if (master_id >= MASTER_ID_MAX || master_id == MASTER_DSS_ID) {
+	if (master_id >= MASTER_ID_MAX || master_id == MASTER_DSS_ID || master_id < 0) {
 		printk(KERN_ERR "%s %d, invalid master_id=%d.\n", __func__, __LINE__, (int)master_id);
 		return;
 	}
@@ -51,7 +48,9 @@ void configure_master_security(unsigned int is_security, int master_id)
 		return;
 	}
 	is_security |= 0xabcde0;
-	(void)atfd_hisi_service_access_register_smc(ACCESS_REGISTER_FN_MAIN_ID, (u64)is_security, (u64)master_id, ACCESS_REGISTER_FN_SUB_ID_MASTER_SECURITY_CONFIG);
+	(void)atfd_hisi_service_access_register_smc(ACCESS_REGISTER_FN_MAIN_ID,
+			(u64)is_security, (u64)master_id,/*lint !e571*/
+			(u64)ACCESS_REGISTER_FN_SUB_ID_MASTER_SECURITY_CONFIG);
 	return;
 }
 EXPORT_SYMBOL_GPL(configure_master_security);
@@ -138,6 +137,3 @@ arch_initcall(hisi_drm_driver_init);
 MODULE_DESCRIPTION("Hisilicon drm driver module");
 MODULE_AUTHOR("lvtaolong@huawei.com.sh");
 MODULE_LICENSE("GPL");
-
-/*lint +e715 +esym(715,*) */
-/*lint +e818 +esym(818,*) */
