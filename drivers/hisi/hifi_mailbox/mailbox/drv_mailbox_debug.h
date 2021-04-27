@@ -310,6 +310,9 @@ MAILBOX_EXTERN void mailbox_record_sche_send(void *priv);
 
 MAILBOX_EXTERN void mailbox_record_sche_recv(void *priv);
 
+MAILBOX_EXTERN void mailbox_usb_suspend(bool is_suspend);
+
+
 #ifdef __cplusplus
 #if __cplusplus
 }

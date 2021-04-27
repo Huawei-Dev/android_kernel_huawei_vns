@@ -30,7 +30,7 @@
 #include <linux/slab.h>
 #include <linux/hisi/hilog.h>
 #include <linux/pm_runtime.h>
-#include <dsm/dsm_pub.h>
+#include <dsm_audio/dsm_audio.h>
 
 #include "hi3630_asp_common.h"
 
@@ -41,9 +41,8 @@
 #include "slimbus_6403.h"
 
 
-extern struct dsm_client *dsm_audio_client;
 
-/*lint -e838 -e730 -e747 -e774 -e826 -e529 -e438 -e485 -e785*/
+/*lint -e838 -e730 -e747 -e774 -e826 -e529 -e438 -e485 -e785 -e651 -e64 -e527 -e570*/
 
 slimbus_channel_property_t audio_playback[SLIMBUS_AUDIO_PLAYBACK_CHANNELS] = {{0,{0,},{{0,},},},};
 slimbus_channel_property_t audio_capture[SLIMBUS_AUDIO_CAPTURE_MULTI_MIC_CHANNELS] = {{0,{0,},{{0,},},},};
@@ -104,6 +103,8 @@ uint32_t slimbus_rdwrerr_times	= 0;
 slimbus_device_info_t *slimbus_dev = NULL;
 
 bool track_state[SLIMBUS_TRACK_MAX];
+
+bool hi6402_soundtrigger_if1_used = false;
 
 slimbus_track_config_t track_config_table[SLIMBUS_TRACK_MAX] = {
 	/* play back */
@@ -260,17 +261,16 @@ int slimbus_element_read(
 	mutex_unlock(&dev->rw_mutex);
 
 	if (ret) {
-		SLIMBUS_LIMIT_ERR("read error! slice_size=%d, addr=0x%x!\n", slice_size, byte_address);
+		SLIMBUS_LIMIT_ERR("read error! slice_size=%d, addr=0x%pK!\n", slice_size, (void *)(long)byte_address);
 		if (1 == slimbus_dmd_flag) {
-			if (!dsm_client_ocuppy(dsm_audio_client)) {
-				dsm_client_record(dsm_audio_client, "slice_size=%d, addr=0x%x\n",slice_size, byte_address);
-				dsm_client_notify(dsm_audio_client, DSM_HI6402_SLIMBUS_READ_ERR);
+			if (audio_dsm_report_info(AUDIO_CODEC, DSM_HI6402_SLIMBUS_READ_ERR,
+				"slice_size=%d, addr=0x%pK\n",slice_size, (void *)(long)byte_address) >= 0) {
 				slimbus_dmd_flag = 0;
 			}
 		}
 		return -EFAULT;
 	}
-	SLIMBUS_RECOVER_INFO("read recover, slice_size=%d, addr=%x!\n", slice_size, byte_address);
+	SLIMBUS_RECOVER_INFO("read recover, slice_size=%d, addr=%pK!\n", slice_size, (void *)(long)byte_address);
 
 	return 0;
 }
@@ -299,10 +299,10 @@ int slimbus_element_write(
 	mutex_unlock(&dev->rw_mutex);
 
 	if (ret) {
-		SLIMBUS_LIMIT_ERR("write error! slice_size=%d, addr=0x%x!\n", slice_size, byte_address);
+		SLIMBUS_LIMIT_ERR("write error! slice_size=%d, addr=0x%pK!\n", slice_size, (void *)(long)byte_address);
 		return -EFAULT;
 	}
-	SLIMBUS_RECOVER_INFO("write recover, slice_size=%d, addr=%x!\n", slice_size, byte_address);
+	SLIMBUS_RECOVER_INFO("write recover, slice_size=%d, addr=%pK!\n", slice_size, (void *)(long)byte_address);
 
 	return 0;
 }
@@ -326,7 +326,7 @@ unsigned int slimbus_read_1byte(unsigned int reg)
 		slimbus_element_read(slimbus_dev, reg, SLIMBUS_SS_1_BYTE, &value);
 
 		if (value == 0x5A) {
-			SLIMBUS_LIMIT_INFO("SLIMbus read1byte retry: reg:%#x, val:%#x !\n", reg, value);
+			SLIMBUS_LIMIT_INFO("SLIMbus read1byte retry: reg:0x%pK, val:%#x !\n", (void *)(unsigned long)reg, value);
 			retry_count++;
 			mdelay(1);
 		}
@@ -367,7 +367,7 @@ unsigned int slimbus_read_4byte(unsigned int reg)
 		slimbus_element_read(slimbus_dev, 0x20007023, SLIMBUS_SS_4_BYTES, &value);
 
 		if (value == 0x6A6A6A6A) {
-			SLIMBUS_LIMIT_INFO("SLIMbus read4byte retry: reg:%#x, val:%#x !\n", reg, value);
+			SLIMBUS_LIMIT_INFO("SLIMbus read4byte retry: reg:0x%pK, val:%#x !\n", (void *)(unsigned long)reg, value);
 			retry_count++;
 			mdelay(1);
 		}
@@ -419,8 +419,8 @@ void slimbus_read_pageaddr(void)
 	slimbus_drv_element_read(slimbus_dev->generic_la, HI6402_PAGE_SELECT_REG_2, SLIMBUS_SS_1_BYTE, (uint8_t *)&page2);
 	mutex_unlock(&slimbus_dev->rw_mutex);
 
-	pr_info("[%s:%d] cdc page addr:%#x, page0:%#x, page1:%#x, page2:%#x !\n",
-		__FUNCTION__, __LINE__, slimbus_dev->page_sel_addr, page0, page1, page2);
+	pr_info("[%s:%d] cdc page addr:0x%pK, page0:%#x, page1:%#x, page2:%#x !\n",
+		__FUNCTION__, __LINE__, (void *)(unsigned long)(slimbus_dev->page_sel_addr), page0, page1, page2);
 }
 EXPORT_SYMBOL(slimbus_read_pageaddr);
 
@@ -467,6 +467,24 @@ static bool is_call_only_scene(uint32_t active_tracks)
 	case SLIMBUS_TRACK_VOICE_UP_ON:
 	case SLIMBUS_TRACK_VOICE_DOWN_ON:
 	case SLIMBUS_TRACK_VOICE_UP_ON | SLIMBUS_TRACK_VOICE_DOWN_ON:
+		return true;
+	default:
+		break;
+	}
+
+	return false;
+}
+
+static bool is_call_12288_scene(uint32_t active_tracks)
+{
+	switch (active_tracks) {
+	case SLIMBUS_TRACK_VOICE_UP_ON | SLIMBUS_TRACK_PLAY_ON:
+	case SLIMBUS_TRACK_VOICE_DOWN_ON | SLIMBUS_TRACK_PLAY_ON:
+	case SLIMBUS_TRACK_VOICE_UP_ON | SLIMBUS_TRACK_VOICE_DOWN_ON | SLIMBUS_TRACK_PLAY_ON:
+	case SLIMBUS_TRACK_VOICE_UP_ON | SLIMBUS_TRACK_VOICE_DOWN_ON | SLIMBUS_TRACK_EC_ON:
+	case SLIMBUS_TRACK_VOICE_DOWN_ON | SLIMBUS_TRACK_PLAY_ON | SLIMBUS_TRACK_EC_ON:
+	case SLIMBUS_TRACK_VOICE_UP_ON | SLIMBUS_TRACK_PLAY_ON | SLIMBUS_TRACK_EC_ON:
+	case SLIMBUS_TRACK_VOICE_UP_ON | SLIMBUS_TRACK_VOICE_DOWN_ON | SLIMBUS_TRACK_PLAY_ON | SLIMBUS_TRACK_EC_ON:
 		return true;
 	default:
 		break;
@@ -816,6 +834,10 @@ static int slimbus_select_scenes(
 		scene_config_type = SLIMBUS_SCENE_CONFIG_CALL;
 		cg = SLIMBUS_CG_8;
 		sm = SLIMBUS_SM_6_CSW_24_SL;
+	} else if (is_call_12288_scene(active_tracks)) {
+		scene_config_type = SLIMBUS_SCENE_CONFIG_CALL_12288;
+		cg = SLIMBUS_CG_9;
+		sm = SLIMBUS_SM_8_CSW_32_SL;
 	} else if (is_anc_call_scene(active_tracks)) {
 		scene_config_type = SLIMBUS_SCENE_CONFIG_ANC_CALL;
 		cg = SLIMBUS_CG_10;
@@ -933,8 +955,10 @@ int slimbus_track_activate(
 	int ret = 0;
 	struct slimbus_device_info *dev = NULL;
 
-	BUG_ON(dev_type >= SLIMBUS_DEVICE_NUM);
-	BUG_ON(track >= SLIMBUS_TRACK_MAX);
+	if (track >= SLIMBUS_TRACK_MAX) {
+		pr_err("params error, dev_type %d, track %d\n", dev_type, track);
+		return -1;
+	}
 
 	if (NULL == slimbus_devices[dev_type]) {
 		pr_err("slimbus havn't been init\n");
@@ -1023,8 +1047,10 @@ int slimbus_track_deactivate(
 	int ret = 0;
 	struct slimbus_device_info *dev = NULL;
 
-	BUG_ON(dev_type >= SLIMBUS_DEVICE_NUM);
-	BUG_ON(track >= SLIMBUS_TRACK_MAX);
+	if ((dev_type >= SLIMBUS_DEVICE_NUM) || (track >= SLIMBUS_TRACK_MAX)) {
+		pr_err("params error, dev_type %d, track %d\n", dev_type, track);
+		return -1;
+	}
 
 	if (NULL == slimbus_devices[dev_type]) {
 		pr_err("slimbus havn't been init\n");
@@ -1274,13 +1300,13 @@ static int slimbus_init_platform_params(const char *platformtype, slimbus_device
 		bus_config[SLIMBUS_BUS_CONFIG_SWITCH_FRAMER].cg = SLIMBUS_CG_10;
 		slimbus_devices[device_type]->scene_config_type = SLIMBUS_SCENE_CONFIG_NORMAL;
 	} else {
-		if (!strcmp(platformtype, "ASIC")) {
+		if (!strncmp(platformtype, "ASIC", 4)) {
 			slimbus_devices[device_type]->rf = SLIMBUS_RF_24576;
 			bus_config[SLIMBUS_BUS_CONFIG_NORMAL].sm = SLIMBUS_SM_8_CSW_32_SL;
 			bus_config[SLIMBUS_BUS_CONFIG_SWITCH_FRAMER].sm = SLIMBUS_SM_8_CSW_32_SL;
 			bus_config[SLIMBUS_BUS_CONFIG_SWITCH_FRAMER].cg = SLIMBUS_CG_10;
 			slimbus_devices[device_type]->scene_config_type = SLIMBUS_SCENE_CONFIG_NORMAL;
-		} else if (!strcmp(platformtype, "UDP")) {
+		} else if (!strncmp(platformtype, "UDP", 3)) {
 			slimbus_devices[device_type]->rf = SLIMBUS_RF_24576;
 			slimbus_devices[device_type]->slimbusclk_drv = 0xC0;
 			slimbus_devices[device_type]->slimbusdata_drv = 0xC3;
@@ -1289,7 +1315,7 @@ static int slimbus_init_platform_params(const char *platformtype, slimbus_device
 			bus_config[SLIMBUS_BUS_CONFIG_SWITCH_FRAMER].cg = SLIMBUS_CG_10;
 			slimbus_devices[device_type]->scene_config_type = SLIMBUS_SCENE_CONFIG_NORMAL;
 			*platform_type = PLATFORM_UDP;
-		} else if (!strcmp(platformtype, "FPGA")) {
+		} else if (!strncmp(platformtype, "FPGA", 4)) {
 			slimbus_devices[device_type]->rf = SLIMBUS_RF_6144;
 			bus_config[SLIMBUS_BUS_CONFIG_NORMAL].sm = SLIMBUS_SM_4_CSW_32_SL;
 			bus_config[SLIMBUS_BUS_CONFIG_SWITCH_FRAMER].sm = SLIMBUS_SM_4_CSW_32_SL;
@@ -1533,12 +1559,12 @@ static int slimbus_pinctrl_init(struct platform_device *pdev, struct slimbus_pri
 
 	pd->device_type = SLIMBUS_DEVICE_HI6402;
 	ret = of_property_read_string(pdev->dev.of_node, "codec-type", &codectype);
-	if (ret == 0 && !strcmp(codectype, "slimbus-6403es")) {
+	if (ret == 0 && !strncmp(codectype, "slimbus-6403es", 14)) {
 		pd->device_type = SLIMBUS_DEVICE_HI6403;
 		slimbus_hi6403_register(dev_ops);
 
 		ret = dev_ops->create_slimbus_device(&slimbus_devices[SLIMBUS_DEVICE_HI6403], CODEC_HI6403ES);
-	} else if (ret == 0 && !strcmp(codectype, "slimbus-6403cs")) {
+	} else if (ret == 0 && !strncmp(codectype, "slimbus-6403cs", 14)) {
 		pd->device_type = SLIMBUS_DEVICE_HI6403;
 		slimbus_hi6403_register(dev_ops);
 
@@ -1621,7 +1647,7 @@ static int slimbus_probe(struct platform_device *pdev)
 
 	pd->slimbus_dynamic_freq_enable = false;
 	ret = of_property_read_string(pdev->dev.of_node, "slimbus_dynamic_freq", &property_value);
-	if (!ret && (!strcmp(property_value, "true"))) {
+	if (!ret && (!strncmp(property_value, "true", 4))) {
 		pd->slimbus_dynamic_freq_enable = true;
 	}
 
@@ -1633,6 +1659,9 @@ static int slimbus_probe(struct platform_device *pdev)
 
 	if (of_property_read_bool(dev->of_node, "switch_framer_disable"))
 		pd->switch_framer_disable = true;
+
+	if (of_property_read_bool(dev->of_node, "hi6402-soundtrigger-if1-used"))
+		hi6402_soundtrigger_if1_used = true;
 
 	pr_info("[%s:%d] platform type:%s device_type: %d, dynamic freq %d switch_framer_disable:%d!\n",
 		__FUNCTION__, __LINE__, platformtype, pd->device_type, pd->slimbus_dynamic_freq_enable, pd->switch_framer_disable);

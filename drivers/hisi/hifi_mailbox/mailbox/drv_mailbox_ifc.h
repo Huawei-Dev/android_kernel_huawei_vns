@@ -267,6 +267,7 @@ struct ifc_mb {
 #define _IFC_CHKPARAM6(ph, d6, t6, a6, s6, d5, t5, a5, s5,...) _ifc_chk_arg(ph, d6, s6); _IFC_CHKPARAM5(ph, d5, t5, a5, s5, __VA_ARGS__)
 
 /*调用核:生成远程函数调用者的宏*/
+// cppcheck-suppress *
 #define _IFC_GEN_CALLx(x, id, name,  ...)																							\
 int name(_IFC_DECL##x(__VA_ARGS__) unsigned int timeout ) 																		\
 {																																	\
@@ -293,6 +294,7 @@ int name(_IFC_DECL##x(__VA_ARGS__) unsigned int timeout ) 																		\
 #define IFC_GEN_EXEC_NAME(name) ife_##name
 
 /*执行核:生成远程调用执行函数体*/
+// cppcheck-suppress *
 #define __IFC_GEN_EXECx(x, name, ...)																								 \
 int IFC_GEN_EXEC_NAME(name)(struct ifc_head * ifc_h)																				 \
 {																																	 \

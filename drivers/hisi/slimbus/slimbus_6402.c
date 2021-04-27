@@ -29,12 +29,13 @@
 #include <linux/hisi/hilog.h>
 #include <dsm/dsm_pub.h>
 
-/*lint -e750 -e715 -e785*/
+/*lint -e750 -e715 -e785 -e574*/
 #define LOG_TAG "Slimbus_6402"
 
 extern slimbus_channel_property_t voice_down[SLIMBUS_VOICE_DOWN_CHANNELS];
 extern slimbus_channel_property_t voice_up[SLIMBUS_VOICE_UP_CHANNELS];
 extern slimbus_channel_property_t sound_trigger[SLIMBUS_SOUND_TRIGGER_CHANNELS];
+extern bool hi6402_soundtrigger_if1_used;
 
 #define UNUSED_PARAMETER(x) (void)(x)
 
@@ -204,6 +205,17 @@ void slimbus_hi6402_param_init(slimbus_device_info_t *dev)
 	uint8_t sink_la		= HI64XX_LA_GENERIC_DEVICE;
 	uint32_t ch		= 0;
 	int 	i		= 0;
+
+	if (hi6402_soundtrigger_if1_used) {
+		pr_info("%s: cust soundtrigger slimbus if for 4smartpa\n", __func__);
+		cn_table[SLIMBUS_TRACK_SOUND_TRIGGER][0] = VOICE_UP_CHANNEL_MIC1;
+		cn_table[SLIMBUS_TRACK_SOUND_TRIGGER][1] = VOICE_UP_CHANNEL_MIC2;
+		source_pn_table[SLIMBUS_TRACK_SOUND_TRIGGER][0] = VOICE_UP_6402_MIC1_PORT;
+		source_pn_table[SLIMBUS_TRACK_SOUND_TRIGGER][1] = VOICE_UP_6402_MIC2_PORT;
+		sink_pn_table[SLIMBUS_TRACK_SOUND_TRIGGER][0] = VOICE_UP_SOC_MIC1_PORT;
+		sink_pn_table[SLIMBUS_TRACK_SOUND_TRIGGER][1] = VOICE_UP_SOC_MIC2_PORT;
+		sd_soundtrigger_48k[0] = 0xC88;
+	}
 
 	for (track_type = 0; track_type < SLIMBUS_TRACK_MAX; track_type++) {
 		source_la = SOC_LA_GENERIC_DEVICE;
@@ -383,9 +395,15 @@ EXPORT_SYMBOL(release_hi6402_slimbus_device);
 void slimbus_hi6402_get_st_params(slimbus_sound_trigger_params_t *params)
 {
 	if (params != NULL) {
-		params->sample_rate = SLIMBUS_SAMPLE_RATE_16K;
-		params->channels = 2;
-		params->track_type = SLIMBUS_TRACK_VOICE_UP;
+		if (hi6402_soundtrigger_if1_used) {
+			params->sample_rate = SLIMBUS_SAMPLE_RATE_48K;
+			params->channels = 2;
+			params->track_type = SLIMBUS_TRACK_AUDIO_CAPTURE;
+		} else {
+			params->sample_rate = SLIMBUS_SAMPLE_RATE_16K;
+			params->channels = 2;
+			params->track_type = SLIMBUS_TRACK_VOICE_UP;
+		}
 	}
 
 	return;

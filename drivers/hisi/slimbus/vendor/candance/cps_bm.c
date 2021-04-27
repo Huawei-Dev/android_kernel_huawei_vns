@@ -11,7 +11,7 @@
 #include <linux/string.h>
 #include <linux/io.h>
 #include "cps.h"
-
+/*lint -e578 -e144*/
 
 /* see cps.h */
 uint8_t CPS_UncachedRead8(volatile uint8_t* address) {

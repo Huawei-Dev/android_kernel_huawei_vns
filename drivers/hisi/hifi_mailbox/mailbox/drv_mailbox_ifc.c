@@ -468,7 +468,7 @@ void __ifc_copy_arg(unsigned long *in, unsigned long *out, unsigned int db,
     }
 
     if (IFC_BI & db){
-        mailbox_memcpy((void*)(*out), (const void*)(*in), (unsigned int)cpsize);
+        mailbox_memcpy((void*)(*out), (const void*)(*in), (unsigned int)cpsize);/*lint !e613*/
         *ao = (unsigned int)mailbox_virt_to_phy(*out); /*在调用核mailbox_ifc_waiter()中被拷贝*/
         *out += cpsize;
         *in  += cpsize;

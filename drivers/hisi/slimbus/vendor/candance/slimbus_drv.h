@@ -46,7 +46,6 @@
 #define SLIMBUS_FRAMER_SOC_ID						0
 #define SLIMBUS_FRAMER_HI6402_ID					1
 #define SLIMBUS_LOSTMS_COUNT						5
-extern struct dsm_client *dsm_audio_client;
 
 extern int slimbus_dev_init(platform_type_t plattype);
 

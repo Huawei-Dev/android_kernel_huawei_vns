@@ -408,12 +408,12 @@ MAILBOX_LOCAL int mailbox_request_channel(
 			if (MAILBOX_OK != mailbox_mutex_lock(&mbuff->mutex)) {
 				/*非中断发送，需要资源保护，获取当前通道资源。*/
 				ret_val = mailbox_logerro_p1(MAILBOX_CRIT_GUT_MUTEX_LOCK_FAILED, mailcode);
-				goto request_erro;
+				goto request_erro;/*lint !e456*/
 			}
 		}
 	}
 
-	mbuff->mailcode = mailcode;
+	mbuff->mailcode = mailcode;/*lint !e456*/
 
     /*共享内存队列，需要依据邮箱头信息对队列操作符进行填充*/
     queue = &mbuff->mail_queue;
@@ -422,11 +422,11 @@ MAILBOX_LOCAL int mailbox_request_channel(
 
 	mbuff->mb = mb;
 	*mb_buf = mbuff;
-	return MAILBOX_OK;
+	return MAILBOX_OK;/*lint !e454*/
 request_erro:
 	mailbox_out(("###mailbox_request_channel ERR! \n"));
 	mailbox_dpm_device_put();
-	return ret_val;
+	return ret_val;/*lint !e454*/
 }
 
 /*****************************************************************************
@@ -457,7 +457,7 @@ MAILBOX_LOCAL int mailbox_release_channel(struct mb *mb,
 			/*TODO:接下来的开发(IFC for 低功耗)可能需要支持在中断中发送邮件，
 			这里就需要解锁中断。*/
 		} else {
-			mailbox_mutex_unlock(&mbuff->mutex);
+			mailbox_mutex_unlock(&mbuff->mutex);/*lint !e455*/
 		}
 	}
 
@@ -1021,7 +1021,7 @@ void *mem_remap_type(unsigned long phys_addr, size_t size, pgprot_t pgprot)
     }
     pages[0] = phys_to_page(phys_addr);
     for (i = 0; i < npages - 1 ; i++) {
-        pages[i + 1] = pages[i] + 1;
+        pages[i + 1] = pages[i] + 1;/*lint !e679*/
     }
     vaddr = (u8*)vmap(pages, npages, VM_MAP, pgprot);
     if(vaddr == 0)
@@ -1033,7 +1033,7 @@ void *mem_remap_type(unsigned long phys_addr, size_t size, pgprot_t pgprot)
         vaddr += offset;
     }
     vfree(pages);
-    printk(KERN_DEBUG "%s: phys_addr:0x%08lx size:0x%08lx npages:%d vaddr:%pK offset:0x%08lx\n", __FUNCTION__, phys_addr, (unsigned long)size, npages, vaddr, offset);
+    printk(KERN_DEBUG "%s: phys_addr:0x%pK size:0x%08lx npages:%d vaddr:%pK offset:0x%08lx\n", __FUNCTION__, (void *)phys_addr, (unsigned long)size, npages, vaddr, offset);
     return (void *)vaddr;
 }
 
@@ -1067,7 +1067,7 @@ MAILBOX_GLOBAL int mailbox_init(void)
 		return mailbox_logerro_p1(MAILBOX_ERR_GUT_ALREADY_INIT, g_mailbox_handle.init_flag);
 	}
 
-	printk("func = %s, line = %d baseaddr = 0x%x\n", __func__, __LINE__, (unsigned int)MAILBOX_MEM_BASEADDR);
+	printk("func = %s, line = %d baseaddr = 0x%pK\n", __func__, __LINE__, (void *)(unsigned int)MAILBOX_MEM_BASEADDR);
 
 	g_shareMemBase = mem_remap_nocache(MAILBOX_MEM_BASEADDR, MAILBOX_MEM_LENGTH);
 	/*初始化邮箱中的数据*/
@@ -1083,8 +1083,8 @@ MAILBOX_GLOBAL int mailbox_init(void)
 		g_mailbox_global_cfg_tbl[i].head_addr = g_mailbox_global_cfg_tbl[i].head_addr + offset;
 		g_mailbox_global_cfg_tbl[i].data_addr = g_mailbox_global_cfg_tbl[i].data_addr + offset;
 
-		printk("i = %d, head_addr = 0x%lx, data_addr = 0x%lx\n", i,
-			   g_mailbox_global_cfg_tbl[i].head_addr, g_mailbox_global_cfg_tbl[i].data_addr);
+		printk("i = %d, head_addr = 0x%pK, data_addr = 0x%pK\n", i,
+			   (void *)(g_mailbox_global_cfg_tbl[i].head_addr), (void *)(g_mailbox_global_cfg_tbl[i].data_addr));
 
 		/*初始化邮箱头*/
 		head = (struct mb_head *)g_mailbox_global_cfg_tbl[i].head_addr;
@@ -1097,13 +1097,13 @@ MAILBOX_GLOBAL int mailbox_init(void)
 	/*TODO:进行单核下电重启特性开发时，这行需要删除*/
 	mailbox_memset(&g_mailbox_handle, 0x00, sizeof(struct mb));
 
-    if ((MAILBOX_HEAD_BOTTOM_ADDR > (MAILBOX_MEM_BASEADDR + MAILBOX_MEM_HEAD_LEN)) ||
+    if ((MAILBOX_HEAD_BOTTOM_ADDR > (MAILBOX_MEM_BASEADDR + MAILBOX_MEM_HEAD_LEN)) ||/*lint !e574*/
        (MAILBOX_MEMORY_BOTTOM_ADDR > (MAILBOX_MEM_BASEADDR + MAILBOX_MEM_LENGTH)))
     {
-        mailbox_out(("mailbox address overflow: headbuttom valid(0x%lx), config(0x%x)!\n\
-          \r                          databuttom valid(0x%x), config(0x%x)!"RT,
-        (MAILBOX_MEM_BASEADDR + MAILBOX_MEM_HEAD_LEN), (unsigned int)MAILBOX_HEAD_BOTTOM_ADDR,
-        (unsigned int)(MAILBOX_MEM_BASEADDR + MAILBOX_MEM_LENGTH), (unsigned int)MAILBOX_MEMORY_BOTTOM_ADDR));
+        mailbox_out(("mailbox address overflow: headbuttom valid(0x%pK), config(0x%pK)!\n\
+          \r                          databuttom valid(0x%pK), config(0x%pK)!"RT,
+        (void *)(unsigned long)(MAILBOX_MEM_BASEADDR + MAILBOX_MEM_HEAD_LEN), (void *)(unsigned long)MAILBOX_HEAD_BOTTOM_ADDR,
+        (void *)(unsigned long)(MAILBOX_MEM_BASEADDR + MAILBOX_MEM_LENGTH), (void *)(unsigned long)MAILBOX_MEMORY_BOTTOM_ADDR));
         return mailbox_logerro_p0(MAILBOX_CRIT_GUT_MEMORY_CONFIG);
     }
 

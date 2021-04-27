@@ -285,7 +285,8 @@ typedef enum {
 	SLIMBUS_SCENE_CONFIG_FAST_PLAY          = 7,
 	SLIMBUS_SCENE_CONFIG_FAST_PLAY_AND_REC  = 8,
 	SLIMBUS_SCENE_CONFIG_FAST_PLAY_AND_ST   = 9,
-	SLIMBUS_SCENE_CONFIG_MAX                = 10,
+	SLIMBUS_SCENE_CONFIG_CALL_12288         = 10,
+	SLIMBUS_SCENE_CONFIG_MAX                = 11,
 
 } slimbus_scene_config_type_t;
 

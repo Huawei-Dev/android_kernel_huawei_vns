@@ -83,6 +83,7 @@ extern void __iomem *ipc_base;
 #define INTSRC_NUM                  32
 
 #define INT_VEC_IPC_CPU             IVEC_TO_INUM(INT_LEV_IPC_CPU)
+// cppcheck-suppress *
 #define IPC_CHECK_PARA(ulLvl) \
     do{\
         if(ulLvl >= INTSRC_NUM)\

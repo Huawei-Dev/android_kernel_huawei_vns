@@ -28,14 +28,14 @@
 #include <linux/completion.h>
 #include <linux/workqueue.h>
 #include <linux/wakelock.h>
+#include <linux/version.h>
 
 #include "slimbus_drv.h"
 #include <linux/hisi/hilog.h>
 #include "slimbus.h"
+#include <dsm_audio/dsm_audio.h>
 
-#include <dsm/dsm_pub.h>
-
-/*lint -e715 -e838 -e730*/
+/*lint -e715 -e838 -e730 -e578 -e64 -e647 -e514 -e611*/
 
 #define RFC_MAX_DEVICES 						 32
 #define SOC_DEVICE_NUM							 3
@@ -274,10 +274,7 @@ static void RFC_PrintIeStatus(CSMI_InformationElements *ie, uint8_t sourceLa)
 	if (ie->interfaceLostFs || ie->interfaceLostSfs || ie->interfaceLostMs) {
 		if (dsm_notify_limit == SLIMBUS_LOSTMS_COUNT) {
 			slimbus_dump_state(SLIMBUS_DUMP_LOSTMS);
-			if (!dsm_client_ocuppy(dsm_audio_client)) {
-				dsm_client_record(dsm_audio_client, "DSM_HI6402_SLIMBUS_LOST_MS\n");
-				dsm_client_notify(dsm_audio_client, DSM_HI6402_SLIMBUS_LOST_MS);
-			}
+			audio_dsm_report_info(AUDIO_CODEC, DSM_HI6402_SLIMBUS_LOST_MS, "DSM_HI6402_SLIMBUS_LOST_MS\n");
 		}
 		dsm_notify_limit++;
 	}

@@ -2,6 +2,7 @@
 #define __HISI_SYSCOUNTER_H__
 
 #include <soc_syscounter_interface.h>
+#include <soc_acpu_baseaddr_interface.h>
 
 union syscnt_val {
 	u64 val;
@@ -31,6 +32,7 @@ struct syscnt_device {
 
 #define SYSCOUNTER_L32 SOC_SYSCOUNTER_CNTCV_L32_NS_ADDR(0)
 #define SYSCOUNTER_H32 SOC_SYSCOUNTER_CNTCV_H32_NS_ADDR(0)
+#define IOMCU_TIMER_BASEADDR  (u64)(SOC_ACPU_IOMCU_TIMER_BASE_ADDR)
 
 extern int syscounter_to_timespec64(u64 syscnt, struct timespec64 *ts);
 extern u64 hisi_get_syscount(void);

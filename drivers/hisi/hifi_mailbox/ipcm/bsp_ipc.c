@@ -149,7 +149,8 @@ struct notifier_block rx_nb;
 
 static int hisi_hifi_mbox_init(void)
 {
-	int ret = 0, rproc_id = 0;
+	int ret = 0;
+	rproc_id_t rproc_id;
 
 	rx_nb.next = NULL;
 	rx_nb.notifier_call = DRV_k3IpcIntHandler_ipc;
@@ -200,6 +201,17 @@ static irqreturn_t DRV_k3IpcIntHandler_ack(int irq, void *dev_id)
 
 #endif
 
+static void drv_ipc_int_deinit(void)
+{
+	int i = 0;
+
+	for (i = 0; i < K3_IPC_CORE_IS_UNKNOEN; i++) {
+		if (k3IpcConfig[i].ipcBase) {
+			iounmap(k3IpcConfig[i].ipcBase);
+			k3IpcConfig[i].ipcBase = NULL;
+		}
+	}
+}
 
 /*****************************************************************************
 * º¯ Êý Ãû  : DRV_IPCIntInit
@@ -262,19 +274,19 @@ BSP_S32 DRV_IPCIntInit(void)
 		k3IpcConfig[myRole].ipcBase = ioremap(K3_SYS_IPC_BASE_ADDR_NS, K3_SYS_IPC_REG_SIZE);
 		if (!k3IpcConfig[myRole].ipcBase) {
 			printk(KERN_ERR "line %d :k3 unsec sys ipc ioremap error.\n", __LINE__);
-			return -1;
+			goto err1;
 		}
 	} else if(K3_SEC_SYS_IPC == k3IpcConfig[myRole].ipcMode) {
 		k3IpcConfig[myRole].ipcBase = ioremap(K3_SYS_IPC_BASE_ADDR_S, K3_SYS_IPC_REG_SIZE);
 		if (!k3IpcConfig[myRole].ipcBase) {
 			printk(KERN_ERR "line %d :k3 sec sys ipc ioremap error.\n", __LINE__);
-			return -1;
+			goto err1;
 		}
 	} else {
 		k3IpcConfig[myRole].ipcBase = ioremap(K3_HIFI_IPC_BASE_ADDR, K3_HIFI_IPC_REG_SIZE);
 		if (!k3IpcConfig[myRole].ipcBase) {
 			printk(KERN_ERR "line %d :k3 hifi ipc ioremap error.\n", __LINE__);
-			return -1;
+			goto err1;
 		}
 	}
 	/*¼Ä´æÆ÷½âËø*/
@@ -285,9 +297,9 @@ BSP_S32 DRV_IPCIntInit(void)
 #else
 	ret = request_irq(k3IpcConfig[K3_IPC_CORE_IS_SEND].intNum,
 	                  DRV_k3IpcIntHandler_ack, 0, "k3IpcIntHandler_ack", NULL);
-	if (ret ) {
+	if (ret) {
 		printk(KERN_ERR "BSP_DRV_IPCIntInit: Unable to register ipc irq ret=%d.\n", ret);
-		return BSP_ERROR;
+		goto err2;
 	}
 	printk(KERN_ERR "BSP_DRV_IPCIntInit line = %d\n", __LINE__);
 #endif
@@ -297,8 +309,16 @@ BSP_S32 DRV_IPCIntInit(void)
 
 	printk(KERN_ERR "BSP_DRV_IPCIntInit end.\n");
 
-
 	return BSP_OK;
+
+#ifndef USE_HISI_MAILBOX
+err2:
+#endif
+
+err1:
+	drv_ipc_int_deinit();
+
+	return BSP_ERROR;
 }
 
 /*****************************************************************************
@@ -457,7 +477,8 @@ BSP_S32 IPC_IntSend(IPC_INT_CORE_E enDstCore, IPC_INT_LEV_E ulLvl)
 
 #ifdef USE_HISI_MAILBOX
 	BSP_U32 ipcMsg[2];
-    int ret = 0, rproc_id = 0;
+	int ret = 0;
+	rproc_id_t rproc_id;
 #else
 	BSP_U32 mailBoxNum = k3IpcConfig[myRole].mailBoxNum;
 	BSP_U32 dest = k3IpcConfig[myRole].destCore;

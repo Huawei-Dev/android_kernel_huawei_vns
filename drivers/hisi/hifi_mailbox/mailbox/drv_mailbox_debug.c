@@ -67,7 +67,7 @@ MAILBOX_EXTERN int mailbox_log_erro(
 {
 	struct mb *mb	   = &g_mailbox_handle;
 	struct mb_log  *record = &mb->log_array[0];
-    unsigned int log_out = MAILBOX_FALSE; 
+    unsigned int log_out = MAILBOX_FALSE;
 	char * erro_str = MAILBOX_NULL;
 
 	/*1.记录最近错误轨迹*/
@@ -133,7 +133,7 @@ unsigned int g_mb_sche_limit = MAILBOX_MAIL_SCHE_TIME_LIMIT;
 /*对总时间和最大单次时间进行统计*/
 void mailbox_statistic_slice(
 	struct mb_slice* slice,
-                unsigned int mailcode, 
+                unsigned int mailcode,
                 unsigned int threslhold,
                 unsigned int erro_code
 )
@@ -171,7 +171,7 @@ void mailbox_statistic_slice(
 void mailbox_record_sche_send(void *priv)
 {
 	struct mb_buff *mbuf = (struct mb_buff *)priv;
-    mbuf->mntn.sche.start = (unsigned long)mailbox_get_timestamp();
+    mbuf->mntn.sche.start = (unsigned int)mailbox_get_timestamp();
 }
 
 /*记录中断响应后，调度处理的时间点，并进行统计*/
@@ -187,7 +187,7 @@ void mailbox_record_sche_recv(void *priv)
 /*可维可测: 记录剩余空间最小值*/
 void mailbox_record_send(
 	struct mb_mntn* mntn,
-                unsigned int mailcode, 
+                unsigned int mailcode,
                 unsigned int time_stamp,
 	unsigned long mail_addr)
 {
@@ -209,7 +209,7 @@ void mailbox_record_send(
 /*记录发送核IPC中断触发到接受核中断响应之间的时间*/
 void mailbox_record_transport(
 	struct mb_mntn* mntn,
-                unsigned int mailcode, 
+                unsigned int mailcode,
                 unsigned int write_slice,
                 unsigned int read_slice,
 	unsigned long mail_addr)
@@ -245,7 +245,7 @@ void mailbox_record_transport(
 /*记录响应核邮箱用户回调函数执行时间*/
 void mailbox_record_receive(
 	struct mb_mntn* mntn,
-                unsigned int mailcode, 
+                unsigned int mailcode,
                 unsigned int slice_start)
 {
 	mntn->deal.start = slice_start;
@@ -290,16 +290,16 @@ MAILBOX_LOCAL void mailbox_show_general(struct mb_cfg *cfg)
 
 	/*总体信息*/
     mailbox_out(("Max Id,      HeadAddr,    DataAddr,     DataSize,   IntSrcId"RT));
-    mailbox_out(("0x%08x,  0x%08x,  0x%08x,   0x%08x, %04d"RT,(unsigned int)cfg->butt_id,
-				 (unsigned int)cfg->head_addr, (unsigned int)cfg->data_addr,
+    mailbox_out(("0x%08x,  0x%pK,  0x%pK,   0x%08x, %04d"RT,(unsigned int)cfg->butt_id,
+				 (void *)cfg->head_addr, (void *)cfg->data_addr,
 				 (unsigned int)cfg->data_size, (unsigned int)cfg->int_src));
 	mailbox_out(("Head information:"RT));
 
 	/*打印此邮箱的邮箱头内容。*/
-	mailbox_out(("Head Front: 0x%x (0x%08x)"RT,  (unsigned int)pBoxHead->ulFront,
-				 (unsigned int)(cfg->data_addr + (pBoxHead->ulFront * sizeof(unsigned long)))));
-	mailbox_out(("Head Rear: 0x%x (0x%08x)"RT, (unsigned int)pBoxHead->ulRear,
-				 (unsigned int)(cfg->data_addr + (pBoxHead->ulRear * sizeof(unsigned long)))));
+	mailbox_out(("Head Front: 0x%x (0x%pK)"RT,  (unsigned int)pBoxHead->ulFront,
+				 (void *)(cfg->data_addr + (pBoxHead->ulFront * sizeof(unsigned long)))));
+	mailbox_out(("Head Rear: 0x%x (0x%pK)"RT, (unsigned int)pBoxHead->ulRear,
+				 (void *)(cfg->data_addr + (pBoxHead->ulRear * sizeof(unsigned long)))));
 	mailbox_out(("Head Frontslice: 0x%x"RT, (unsigned int)pBoxHead->ulFrontslice));
 	mailbox_out(("Head Rearslice: 0x%x"RT,	(unsigned int)pBoxHead->ulRearslice));
 	mailbox_out((":-------------------------------------------------------------:"RT));

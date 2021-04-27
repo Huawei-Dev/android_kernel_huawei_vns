@@ -13,6 +13,7 @@
 #include <linux/hisi/hisi_syscounter.h>
 #include <linux/syscore_ops.h>
 #include <linux/workqueue.h>
+#include <libhwsecurec/securec.h>
 
 #define RECORD_NEED_SYNC_PERIOD  0
 
@@ -26,6 +27,8 @@ int syscounter_to_timespec64(u64 syscnt, struct timespec64 *ts)
 	long nsec_delta, r_tv_nsec;
 	u64 cnt_delta, r_syscnt;
 
+	if (!ts)
+		return -EINVAL;
 	if (!dev) return -ENXIO;
 
 	spin_lock_irqsave(&dev->sync_lock, flags);
@@ -81,22 +84,6 @@ u64 hisi_get_syscount(void)
 }
 EXPORT_SYMBOL(hisi_get_syscount);
 
-int hisi_get_timecounter(unsigned long *lastcycle, struct timespec *ts)
-{
-	struct syscnt_device *dev = syscnt_dev;
-	unsigned long flags;
-
-	if (!dev) return -ENXIO;
-
-	spin_lock_irqsave(&dev->sync_lock, flags);
-	*lastcycle = dev->record.syscnt;
-	ts->tv_sec = dev->record.utc.tv_sec;
-	ts->tv_nsec = dev->record.utc.tv_nsec;
-	spin_unlock_irqrestore(&dev->sync_lock, flags);
-
-	return 0;
-}
-EXPORT_SYMBOL(hisi_get_timecounter);
 
 
 #if RECORD_NEED_SYNC_PERIOD
@@ -244,10 +231,11 @@ err_probe:
 
 static int hisi_syscounter_remove(struct platform_device *pdev)
 {
+	struct syscnt_device *d = syscnt_dev;
 	unregister_syscore_ops(&hisi_syscounter_syscore_ops);
-	if (syscnt_dev) {
-		iounmap(syscnt_dev->base);
-		kfree(syscnt_dev);
+	if (d) {
+		iounmap(d->base);
+		kfree(d);
 		syscnt_dev = NULL;
 	}
 	return 0;
@@ -263,14 +251,14 @@ static struct platform_driver hisi_syscounter_driver = {
 	.remove = hisi_syscounter_remove,
 	.driver	= {
 		.name =	"hisi-syscounter",
-		.owner = THIS_MODULE,
+		.owner = THIS_MODULE,/*lint -e64*/
 		.of_match_table = of_match_ptr(hisi_syscounter_of_match),
 	},
 };
 
 static int __init hisi_syscounter_init(void)
 {
-	return platform_driver_register(&hisi_syscounter_driver);
+	return platform_driver_register(&hisi_syscounter_driver);/*lint -e64*/
 }
 
 static void __exit hisi_syscounter_exit(void)

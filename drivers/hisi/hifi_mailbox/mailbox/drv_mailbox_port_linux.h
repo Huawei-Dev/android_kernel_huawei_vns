@@ -32,23 +32,6 @@ extern "C" {
 #endif
 #endif
 
-/*虚实地址转换接口定义*/
-#if 0
-#ifndef _DRV_LLT_
-#include <mach/hardware.h>
-
-/*ACPU实地址向虚拟地址映射的转换接口*/
-#define MEM_CORE_SHARE_PHY2VIRT(phy)		 (((unsigned int)phy) - IPC_SHARE_MEM_ADDR + IPC_SHARE_MEM_VIRT_ADDR)
-#define MEM_CORE_SHARE_VIRT2PHY(virt)		 (((unsigned int)virt) - IPC_SHARE_MEM_VIRT_ADDR + IPC_SHARE_MEM_ADDR)
-
-#else
-
-/*ACPU实地址向虚拟地址映射的转换接口*/
-#define MEM_CORE_SHARE_PHY2VIRT(phy)		 (phy)
-#define MEM_CORE_SHARE_VIRT2PHY(virt)		 (virt)
-#endif
-#endif
-
 /*目前k3还未做预留虚拟地址空间的预映射，在init函数中再做映射*/
 #define MEM_CORE_SHARE_PHY2VIRT(phy)		 (phy)
 #define MEM_CORE_SHARE_VIRT2PHY(virt)		 (virt)

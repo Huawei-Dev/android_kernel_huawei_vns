@@ -21,7 +21,7 @@
 #include "slimbus_debug.h"
 #include "slimbus_drv.h"
 
-/*lint -e750 -e578 -e866 -e774 -e730*/
+/*lint -e750 -e578 -e866 -e774 -e730 -e514 -e64 -e527 -e613*/
 /* SLIMbus Message Fields */
 #define CSMI_MESSAGE_ARBITRATION_TYPE_MASK					   0x0F
 #define CSMI_MESSAGE_ARBITRATION_TYPE_SHIFT 				   4
