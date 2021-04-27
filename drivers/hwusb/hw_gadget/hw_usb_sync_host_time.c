@@ -32,7 +32,6 @@
 
 #ifdef HW_USB_TIME_SYNC_PC
     #define AFTER_BOOT_TO_1970YEAR ((1971-1970)*365*24*60*60)
-    #define BEIJING_TIME_ZONE 8
 struct _time {
     int            time_bias;
     unsigned short year;
@@ -119,14 +118,14 @@ void hw_usb_handle_host_time(struct usb_ep *ep, struct usb_request *req)
     flush_pc_data.tv.tv_sec = (unsigned long) mktime (host_time->year,
                     host_time->month,
                     host_time->day,
-                    (host_time->hour+BEIJING_TIME_ZONE),
+                    host_time->hour,
                     host_time->minute,
                     host_time->second);
     schedule_delayed_work(&(flush_pc_data.pc_data_work), 0);
 
     return;
 }
-/*lint -save -e* */
+/*lint -save -e19 */
 EXPORT_SYMBOL(hw_usb_handle_host_time);
 /*lint -restore*/
 
@@ -146,7 +145,7 @@ void hw_usb_sync_host_time_init(void)
     memset(&flush_pc_data, 0, sizeof(struct hw_flush_pc_time) );
     INIT_DELAYED_WORK(&(flush_pc_data.pc_data_work), hw_usb_flush_pc_time_work);
 }
-/*lint -save -e* */
+/*lint -save -e19 */
 EXPORT_SYMBOL(hw_usb_sync_host_time_init);
 /*lint -restore*/
 #endif
