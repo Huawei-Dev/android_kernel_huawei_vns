@@ -2343,50 +2343,6 @@ CONFIG_MEDIA_SUBDRV_AUTOSELECT=y
 CONFIG_VIDEO_IR_I2C=y
 
 #
-# Audio decoders, processors and mixers
-#
-
-#
-# RDS decoders
-#
-
-#
-# Video decoders
-#
-
-#
-# Video and audio decoders
-#
-
-#
-# Video encoders
-#
-
-#
-# Camera sensor devices
-#
-
-#
-# Flash devices
-#
-
-#
-# Video improvement chips
-#
-
-#
-# Audio/Video compression chips
-#
-
-#
-# Miscellaneous helper chips
-#
-
-#
-# Sensors used on soc_camera driver
-#
-
-#
 # Tools to develop new frontends
 #
 # CONFIG_DVB_DUMMY_FE is not set
@@ -2403,10 +2359,6 @@ CONFIG_IMAGINATION_D5500_VCODEC=y
 # CONFIG_IMG_VIDEO is not set
 # CONFIG_IMG_DEC is not set
 # CONFIG_IMG_ENC is not set
-
-#
-# Graphics support
-#
 
 #
 # Direct Rendering Manager
@@ -2509,10 +2461,6 @@ CONFIG_SND_USB=y
 CONFIG_SND_SOC=y
 # CONFIG_SND_ATMEL_SOC is not set
 # CONFIG_SND_DESIGNWARE_I2S is not set
-
-#
-# SoC Audio for Freescale CPUs
-#
 
 #
 # Common SoC Audio options for Freescale CPUs:
@@ -2762,10 +2710,6 @@ CONFIG_USB_DEFAULT_PERSIST=y
 # CONFIG_USB_PRINTER is not set
 CONFIG_USB_WDM=y
 # CONFIG_USB_TMC is not set
-
-#
-# NOTE: USB_STORAGE depends on SCSI but BLK_DEV_SD may
-#
 
 #
 # also be needed; see USB_STORAGE Help for more info
