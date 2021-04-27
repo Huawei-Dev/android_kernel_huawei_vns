@@ -891,26 +891,6 @@ ENDPROC(cpu_switch_to)
  * and this includes saving x0 back into the kernel stack.
  */
 ret_fast_syscall:
-#ifdef CONFIG_HISI_BB
-#ifdef CONFIG_HISI_BB_SYSCALL
-/*
-*This is the syscall debug patch. The default is off.
-*/
-#syscall_hook start
-	push	x6, x7
-	push	x4, x5
-	push	x2, x3
-	push	x0, x1
-	mov x0, scno
-	mov x1, #1
-	bl syscall_hook
-	pop	x0, x1
-	pop	x2, x3
-	pop	x4, x5
-	pop	x6, x7
-#syscall_hook end
-#endif
-#endif
 	disable_irq				// disable interrupts
 	str	x0, [sp, #S_X0]			// returned x0
 #ifdef CONFIG_THREAD_INFO_IN_TASK
@@ -984,27 +964,6 @@ el0_svc_naked:					// compat entry point
 	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
 	enable_dbg_and_irq
 	ct_user_exit 1
-
-#ifdef CONFIG_HISI_BB
-#ifdef CONFIG_HISI_BB_SYSCALL
-/*
-*This is the syscall debug patch. The default is off.
-*/
-#syscall_hook start
-	push	x6, x7
-	push	x4, x5
-	push	x2, x3
-	push	x0, x1
-	mov x0, scno
-	mov x1, #0
-	bl syscall_hook
-	pop	x0, x1
-	pop	x2, x3
-	pop	x4, x5
-	pop	x6, x7
-#syscall_hook end
-#endif
-#endif
 
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 	ldr	x16, [tsk, #TSK_TI_FLAGS]	// check for syscall hooks

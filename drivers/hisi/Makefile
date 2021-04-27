@@ -1,5 +1,4 @@
 obj-$(CONFIG_HISI_HKADC) += adc/
-obj-$(CONFIG_HISI_CCI_EXTRA)		+= cci_extra/
 obj-$(CONFIG_HISI_CMDLINE_PARSE)	+= cmdline/
 obj-$(CONFIG_HISILICON_PLATFORM_MAILBOX)	+= mailbox/
 obj-$(CONFIG_HI6402_CODEC)			+= hi64xx/
@@ -16,7 +15,6 @@ obj-$(CONFIG_HISILICON_PLATFORM_SLIMBUS)+= slimbus/
 
 
 obj-$(CONFIG_HI6402_HIFI_MISC) += hi64xx_dsp/
-obj-$(CONFIG_HISI_HISEE) += hisee/
 ifneq ($(strip $(CFG_HISI_OPENSOURCE)), true)
 endif
 obj-$(CONFIG_HISI_FLP)   += flp/
@@ -36,5 +34,4 @@ obj-$(CONFIG_HISI_HMPTH_SET) += hmpthresholds/
 obj-$(CONFIG_HISI_PERFHUB) += perfhub/
 obj-$(CONFIG_HISI_HILOG) += hilog/
 obj-$(CONFIG_HISI_TIMEKEEPER) += timekeeper/
-obj-$(CONFIG_HISI_ARMV8_DEPRECATED) += armv8_deprecated/
 obj-y += hisi_lmk/

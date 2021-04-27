@@ -878,13 +878,6 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		irq_exit();
 		break;
 #endif
-#ifdef CONFIG_HISI_HISEE
-	case IPI_HISEE_INFORM:
-		irq_enter();
-		hisi_hisee_active();
-		irq_exit();
-		break;
-#endif
 
 #ifdef CONFIG_HISI_MMC_SECURE_RPMB
 	case IPI_SECURE_RPMB:

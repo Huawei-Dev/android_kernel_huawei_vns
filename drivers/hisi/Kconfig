@@ -9,7 +9,6 @@ menuconfig HISILICON_PLATFORM
 if HISILICON_PLATFORM
 
 source "drivers/hisi/adc/Kconfig"
-source "drivers/hisi/cci_extra/Kconfig"
 source "drivers/hisi/cmdline/Kconfig"
 source "drivers/hisi/mailbox/Kconfig"
 source "drivers/hisi/mntn/Kconfig"
@@ -28,7 +27,6 @@ source "drivers/hisi/hifi_mailbox/Kconfig"
 source "drivers/hisi/ddrc/Kconfig"
 source "drivers/hisi/tzdriver/Kconfig"
 source "drivers/hisi/flp/Kconfig"
-source "drivers/hisi/hisee/Kconfig"
 source "drivers/hisi/load_image/Kconfig"
 source "drivers/hisi/perfhub/Kconfig"
 source "drivers/hisi/pm/Kconfig"

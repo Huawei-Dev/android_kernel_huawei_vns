@@ -4,29 +4,13 @@ config HISILICON_PLATFORM_MAINTAIN
 	help
 	  Say yes here to support the hisilicon platform maintain module
 
-config HISILICON_PLATFORM_HISI_EASYSHELL
-	bool "Support HiSilicon Hi6XXX Easy Shell"
-	default n
-	help
-	  This driver supports HiSilicon HiXXX SOC,
-	  including easy shell, etc.
 source "drivers/hisi/mntn/blackbox/Kconfig"
-source "drivers/hisi/mntn/code_protect/Kconfig"
-source "drivers/hisi/mntn/hisee/Kconfig"
-source "drivers/hisi/mntn/bl31/Kconfig"
-
 
 config HISI_BOOT_TIME
 	bool "support print all boot slice"
 	default n
 	help
 	  Say 'Y' here if you want to print all boot slice.
-
-config HISI_BB_SYSCALL
-	bool "support print system call trace "
-	default n
-	help
-	  Say 'Y' here if you want to print system call trace.
 
 config HISI_POWER_OFF
 	bool "Hisilicon platform power off and reset driver"

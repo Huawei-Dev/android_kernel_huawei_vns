@@ -4,8 +4,3 @@ config HISI_HKADC
 	default n
 	help
 	  Say yes here to support the HISI ADC device
-
-config HISI_HKADC_DEBUG
-	tristate "HISI ADC DEBUG"
-	help
-	  Say yes here to support this lock
