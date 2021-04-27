@@ -18,7 +18,6 @@ obj-$(CONFIG_HI6402_HIFI_MISC) += hi64xx_dsp/
 ifneq ($(strip $(CFG_HISI_OPENSOURCE)), true)
 endif
 obj-$(CONFIG_HISI_FLP)   += flp/
-obj-$(CONFIG_HISI_IVP) += ivp/
 obj-$(CONFIG_HISI_HISTAR_ISP) += isp/
 obj-$(CONFIG_DRMDRIVER)                         += drmdriver/
 obj-$(CONFIG_HI3XXX_EFUSE)                      += efuse/

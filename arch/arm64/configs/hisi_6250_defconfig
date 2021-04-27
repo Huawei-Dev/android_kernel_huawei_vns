@@ -3572,12 +3572,6 @@ CONFIG_BBP_ACORE=y
 CONFIG_HISI_AXI=y
 
 #
-# Hisilicon IVP
-#
-# CONFIG_HISI_IVP is not set
-# CONFIG_IVP_SMMU is not set
-
-#
 # Hisi lpm3_debug options
 #
 # CONFIG_HISI_LPM3_DEBUG is not set
