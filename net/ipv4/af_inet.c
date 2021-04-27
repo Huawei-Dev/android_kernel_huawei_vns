@@ -125,10 +125,6 @@
 #ifdef CONFIG_ANDROID_PARANOID_NETWORK
 #include <linux/android_aid.h>
 
-#ifdef CONFIG_HW_COMMSTAT
-#include <huawei_platform/net/commstat/commstat.h>
-#endif
-
 static inline int current_has_network(void)
 {
 	return in_egroup_p(AID_INET) || capable(CAP_NET_RAW);
@@ -767,11 +763,6 @@ int inet_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 
 	err = sk->sk_prot->sendmsg(sk, msg, size);
 
-#ifdef CONFIG_HW_COMMSTAT
-	if (err > 0)
-		inet_save_comm_stat(sock, 1, err);
-#endif
-
 	return err;
 }
 EXPORT_SYMBOL(inet_sendmsg);
@@ -812,11 +803,6 @@ int inet_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 
 	if (err >= 0)
 		msg->msg_namelen = addr_len;
-
-#ifdef CONFIG_HW_COMMSTAT
-	if (err > 0)
-		inet_save_comm_stat(sock, 0, err);
-#endif
 
 	return err;
 }
@@ -1878,10 +1864,6 @@ static int __init inet_init(void)
 		pr_crit("%s: Cannot init ipv4 mibs\n", __func__);
 
 	ipv4_proc_init();
-
-#ifdef CONFIG_HW_COMMSTAT
-	comm_stat_init();
-#endif
 
 	ipfrag_init();
 

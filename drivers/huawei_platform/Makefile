@@ -28,7 +28,4 @@ obj-$(CONFIG_ANTENNA_BOARDID_GPIO_DETECT) += antenna_board_gpio_match/
 obj-$(CONFIG_HUAWEI_VIBRATOR) += vibrator/
 obj-$(CONFIG_HUAWEI_OCP) += ocp/
 obj-$(CONFIG_MADAPT) += madapt/
-obj-$(CONFIG_DOME_KEY) += dome_key/
-obj-$(CONFIG_HW_HANDPRESS_SWITCH) += handpress_switch/
-obj-$(CONFIG_HW_LED_ALWAYSON) += led_alwayson/
 obj-$(CONFIG_LCD_ON_OFF_CHECK) += lcd_on_off_check/

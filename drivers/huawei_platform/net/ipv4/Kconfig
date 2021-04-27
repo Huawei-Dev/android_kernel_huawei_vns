@@ -10,7 +10,3 @@ config HW_WIFIPRO_PROC
 config HW_WIFI
 	bool "Huawei wifi tcp monitor support"
 	default n
-
-config HUAWEI_MSS_AUTO_CHANGE
-        bool "Huawei MSS auto change function support"
-        default n

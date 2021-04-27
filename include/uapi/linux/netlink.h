@@ -42,11 +42,6 @@
 
 #define NETLINK_INET_DIAG	NETLINK_SOCK_DIAG
 
-/*netd communicate with hwfilter */
-#ifdef CONFIG_HW_NETFILTER_MODULE
-#define NETLINK_HW_NF   32
-#endif
-
 #define MAX_LINKS 33
 
 struct sockaddr_nl {

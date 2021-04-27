@@ -32,9 +32,6 @@ source "drivers/huawei_platform/antenna_board_gpio_match/Kconfig"
 source "drivers/huawei_platform/vibrator/Kconfig"
 source "drivers/huawei_platform/ocp/Kconfig"
 source "drivers/huawei_platform/madapt/Kconfig"
-source "drivers/huawei_platform/dome_key/Kconfig"
-source "drivers/huawei_platform/handpress_switch/Kconfig"
-source "drivers/huawei_platform/led_alwayson/Kconfig"
 source "drivers/huawei_platform/lcd_on_off_check/Kconfig"
 endif #HUAWEI_PLATFORM
 
