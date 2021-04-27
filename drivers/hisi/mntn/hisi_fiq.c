@@ -12,17 +12,12 @@
 
 #include <linux/hisi/hisi_ddr.h>
 #include <linux/hisi/mntn_record_sp.h>
-#include "bl31/hisi_bl31_exception.h"
 
 static u32 fiq_dump_flag;
 
 void hisi_mntn_inform(void)
 {
-	if (get_bl31_exception_flag() == BL31_PANIC_MAGIC)
-		bl31_panic_ipi_handle();
-	else {
-		dmss_ipi_handler();
-	}
+	dmss_ipi_handler();
 }
 
 asmlinkage void fiq_dump(struct pt_regs *regs, unsigned int esr)
