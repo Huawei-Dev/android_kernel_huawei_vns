@@ -357,7 +357,7 @@ static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
 		return;
 	}
 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
-			     early_pgtable_alloc);
+			     NULL);
 }
 
 void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
