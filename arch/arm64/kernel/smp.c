@@ -746,34 +746,31 @@ DEFINE_PER_CPU(struct pt_regs, regs_before_stop);
 unsigned int g_cpu_in_ipi_stop;
 #endif
 
-static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
+static void ipi_cpu_stop(unsigned int cpu)
 {
 #ifdef CONFIG_HISI_BB
+	struct pt_regs regs;
 	unsigned int mask;
 #endif
 
 	if (system_state == SYSTEM_BOOTING ||
 	    system_state == SYSTEM_RUNNING) {
-		per_cpu(regs_before_stop, cpu) = *regs;
 		raw_spin_lock(&stop_lock);
 		pr_crit("CPU%u: stopping\n", cpu);
 #ifdef CONFIG_HISI_BB
 		mask = 0x1 << get_cpu();
 		g_cpu_in_ipi_stop |= mask;
-		memset(regs, 0x0, sizeof(regs));
-		get_pt_regs(regs);
-		show_regs(regs);
+		memset(&regs, 0x0, sizeof(regs));
+		get_pt_regs(&regs);
+		show_regs(&regs);
 		put_cpu();
 #endif
-		show_regs(regs);
 		dump_stack();
-		arm64_check_cache_ecc(NULL);
 		raw_spin_unlock(&stop_lock);
 	}
 
-	set_cpu_active(cpu, false);
+	set_cpu_online(cpu, false);
 
-	flush_cache_all();
 	local_irq_disable();
 
 	while (1)
@@ -859,7 +856,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 
 	case IPI_CPU_STOP:
 		irq_enter();
-		ipi_cpu_stop(cpu, regs);
+		ipi_cpu_stop(cpu);
 		irq_exit();
 		break;
 
