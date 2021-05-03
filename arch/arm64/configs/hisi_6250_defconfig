@@ -2823,7 +2823,7 @@ CONFIG_USB_EHSET_TEST_FIXTURE=y
 # USB Physical Layer drivers
 #
 # CONFIG_USB_PHY is not set
-# CONFIG_USB_OTG_WAKELOCK is not set
+CONFIG_USB_OTG_WAKELOCK=y
 # CONFIG_NOP_USB_XCEIV is not set
 # CONFIG_USB_GPIO_VBUS is not set
 # CONFIG_USB_ISP1301 is not set
